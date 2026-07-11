@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABRI — Design System Foundations & Verification Badge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- Ink & surface ---- */
+    --ink:#141413;          /* near-black, primary text & 'Trusted' base */
+    --ink-pure:#000000;
+    --white:#ffffff;
+    --surface:#f8f7f4;      /* warm off-white page */
+    --surface-2:#f1f0ec;    /* subtle raised / muted fill */
+
+    /* ---- Warm neutral grey (paired warm to suit the gold) ---- */
+    --grey-100:#eceae5;
+    --grey-200:#e2dfd9;     /* hairline borders */
+    --grey-300:#d2cfc8;
+    --grey-400:#b1ada4;     /* disabled */
+    --grey-500:#8b877e;     /* muted text */
+    --grey-600:#6c685f;     /* secondary text */
+    --grey-700:#4b4842;
+
+    /* ---- Trust yellow: reserved for primary action / verified / success / highlight ---- */
+    --yellow:#f4b400;       /* the trust mark */
+    --yellow-hi:#ffc21f;    /* hover */
+    --yellow-soft:#fdf3d4;  /* tint background */
+    --yellow-ink:#3a2c00;   /* text on yellow (passes contrast) */
+
+    /* ---- Semantic (kept muted; yellow carries 'success') ---- */
+    --danger:#b42318;       /* report / reject only */
+    --danger-soft:#fdecea;
+
+    /* ---- Type ---- */
+    --font-ui:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    --font-data:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+
+    /* ---- Radius (minimal) ---- */
+    --r-sm:6px; --r-md:10px; --r-lg:14px; --r-pill:999px;
+
+    /* ---- Elevation (used sparingly) ---- */
+    --shadow-sm:0 1px 2px rgba(20,20,19,.05);
+    --shadow-md:0 6px 24px -8px rgba(20,20,19,.16);
+
+    /* ---- Spacing base 4 ---- */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px; --s9:96px;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{
+    margin:0;background:var(--surface);color:var(--ink);
+    font-family:var(--font-ui);font-size:15px;line-height:1.6;font-weight:400;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:var(--s7) var(--s5) var(--s9)}
+
+  /* ---------- Type scale ---------- */
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--grey-500)}
+  .display{font-size:clamp(34px,6vw,52px);line-height:1.04;font-weight:800;letter-spacing:-.025em;margin:0}
+  .h1{font-size:28px;line-height:1.2;font-weight:800;letter-spacing:-.02em;margin:0}
+  .h2{font-size:21px;line-height:1.3;font-weight:700;letter-spacing:-.015em;margin:0}
+  .h3{font-size:17px;line-height:1.4;font-weight:600;margin:0}
+  .lead{font-size:18px;line-height:1.6;color:var(--grey-600);font-weight:400;max-width:62ch}
+  .body{font-size:15px;color:var(--ink)}
+  .muted{color:var(--grey-600)}
+  .cap{font-size:13px;line-height:1.5;color:var(--grey-500);font-weight:500}
+  .data{font-family:var(--font-data);font-feature-settings:"tnum";letter-spacing:-.01em}
+
+  /* ---------- Page header ---------- */
+  .masthead{border-bottom:1px solid var(--grey-200);padding-bottom:var(--s6);margin-bottom:var(--s7)}
+  .brand{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s5)}
+  .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--ink);display:grid;place-items:center}
+  .brand-mark span{color:var(--yellow);font-weight:800;font-size:18px;letter-spacing:-.04em}
+  .brand-name{font-weight:800;letter-spacing:-.02em;font-size:18px}
+  .brand-name em{font-style:normal;color:var(--grey-500);font-weight:600}
+
+  /* ---------- Section scaffold ---------- */
+  .section{margin-top:var(--s9);scroll-margin-top:24px}
+  .section-head{display:flex;align-items:baseline;gap:var(--s3);margin-bottom:var(--s6);
+    border-bottom:1px solid var(--grey-200);padding-bottom:var(--s3)}
+  .section-no{font-family:var(--font-data);font-size:13px;color:var(--yellow-ink);background:var(--yellow);
+    padding:2px 8px;border-radius:var(--r-pill);font-weight:600}
+  .grid{display:grid;gap:var(--s4)}
+
+  /* ---------- Swatches ---------- */
+  .swatches{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .swatch{border:1px solid var(--grey-200);border-radius:var(--r-md);overflow:hidden;background:var(--white)}
+  .swatch .chip{height:72px}
+  .swatch .meta{padding:var(--s3)}
+  .swatch .name{font-weight:600;font-size:13px}
+  .swatch .hex{font-family:var(--font-data);font-size:12px;color:var(--grey-500);margin-top:2px}
+  .swatch .use{font-size:11px;color:var(--grey-500);margin-top:6px;line-height:1.4}
+
+  /* ---------- Type specimen ---------- */
+  .specimen{border:1px solid var(--grey-200);border-radius:var(--r-lg);background:var(--white);overflow:hidden}
+  .specimen .row{display:grid;grid-template-columns:120px 1fr;gap:var(--s4);align-items:baseline;
+    padding:var(--s4) var(--s5);border-bottom:1px solid var(--grey-100)}
+  .specimen .row:last-child{border-bottom:0}
+  .specimen .tok{font-family:var(--font-data);font-size:12px;color:var(--grey-500);padding-top:6px}
+
+  /* ---------- Scale strip (spacing) ---------- */
+  .scale{display:flex;align-items:flex-end;gap:var(--s4);flex-wrap:wrap}
+  .scale .unit{text-align:center}
+  .scale .bar{background:var(--yellow);border-radius:3px;width:28px}
+  .scale .lbl{font-family:var(--font-data);font-size:11px;color:var(--grey-500);margin-top:6px}
+
+  /* ---------- Component panel ---------- */
+  .panel{border:1px solid var(--grey-200);border-radius:var(--r-lg);background:var(--white);padding:var(--s6)}
+  .panel + .panel{margin-top:var(--s4)}
+  .panel-title{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grey-500);margin-bottom:var(--s5)}
+  .demo-row{display:flex;flex-wrap:wrap;gap:var(--s3);align-items:center}
+  .demo-row + .demo-row{margin-top:var(--s4)}
+
+  /* ---------- Buttons ---------- */
+  .btn{font-family:inherit;font-size:14px;font-weight:600;border-radius:var(--r-sm);
+    padding:10px 18px;border:1px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+    transition:background .15s ease,border-color .15s ease,transform .05s ease;line-height:1}
+  .btn:active{transform:translateY(1px)}
+  .btn svg{width:16px;height:16px}
+  .btn-primary{background:var(--yellow);color:var(--yellow-ink)}
+  .btn-primary:hover{background:var(--yellow-hi)}
+  .btn-secondary{background:var(--ink);color:var(--white)}
+  .btn-secondary:hover{background:#000}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--grey-300)}
+  .btn-ghost:hover{background:var(--surface-2)}
+  .btn-danger{background:transparent;color:var(--danger);border-color:var(--grey-300)}
+  .btn-danger:hover{background:var(--danger-soft);border-color:var(--danger)}
+  .btn-sm{padding:7px 13px;font-size:13px}
+  .btn-lg{padding:13px 22px;font-size:15px}
+  .btn:disabled{background:var(--grey-100);color:var(--grey-400);border-color:transparent;cursor:not-allowed}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  /* ---------- Inputs ---------- */
+  .field{max-width:360px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .input{width:100%;font-family:inherit;font-size:15px;padding:11px 13px;border:1px solid var(--grey-300);
+    border-radius:var(--r-sm);background:var(--white);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .input::placeholder{color:var(--grey-400)}
+  .input:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(244,180,0,.25)}
+  .input.is-error{border-color:var(--danger)}
+  .input.is-error:focus{box-shadow:0 0 0 3px rgba(180,35,24,.15)}
+  .hint{font-size:12px;color:var(--grey-500);margin-top:6px}
+  .hint.err{color:var(--danger)}
+  .input.data{letter-spacing:.06em}
+
+  /* ---------- Status badges (process states) ---------- */
+  .status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:var(--r-pill);line-height:1}
+  .status .dot{width:6px;height:6px;border-radius:50%}
+  .status.pending{background:var(--surface-2);color:var(--grey-600)} .status.pending .dot{background:var(--grey-400)}
+  .status.approved{background:var(--yellow-soft);color:var(--yellow-ink)} .status.approved .dot{background:var(--yellow)}
+  .status.rejected{background:var(--danger-soft);color:var(--danger)} .status.rejected .dot{background:var(--danger)}
+  .status.review{background:#eef1f4;color:#3f5366} .status.review .dot{background:#7d93a6}
+
+  /* ================= VERIFICATION BADGE (the signature) ================= */
+  /* Tier tokens */
+  .vbadge{--mark-bg:var(--surface-2);--mark-fg:var(--grey-600);--ring:var(--grey-300)}
+  .vbadge.registered{--mark-bg:var(--surface-2);--mark-fg:var(--grey-600);--ring:var(--grey-300)}
+  .vbadge.verified{--mark-bg:var(--yellow);--mark-fg:var(--yellow-ink);--ring:var(--yellow)}
+  .vbadge.trusted{--mark-bg:var(--ink);--mark-fg:var(--yellow);--ring:var(--ink)}
+
+  /* mark (the seal) */
+  .mark{border-radius:50%;background:var(--mark-bg);display:grid;place-items:center;flex:none;
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ring) 60%,transparent)}
+  .mark svg{width:60%;height:60%;color:var(--mark-fg)}
+
+  /* inline lockup (lists, next to a name) */
+  .vb-inline{display:inline-flex;align-items:center;gap:7px;vertical-align:middle}
+  .vb-inline .mark{width:18px;height:18px}
+  .vb-inline .vb-label{font-size:12px;font-weight:700;letter-spacing:.01em}
+  .vb-inline.registered .vb-label{color:var(--grey-600)}
+  .vb-inline.verified .vb-label{color:var(--ink)}
+  .vb-inline.trusted .vb-label{color:var(--ink)}
+
+  /* profile lockup (medium, explains what it proves) */
+  .vb-profile{display:inline-flex;align-items:center;gap:var(--s3);border:1px solid var(--grey-200);
+    background:var(--white);border-radius:var(--r-md);padding:10px var(--s4);max-width:340px}
+  .vb-profile .mark{width:38px;height:38px}
+  .vb-profile .vb-title{font-size:14px;font-weight:700;line-height:1.2}
+  .vb-profile .vb-sub{font-size:12px;color:var(--grey-500);margin-top:2px}
+  .vb-profile.trusted{border-color:var(--ink)}
+  .vb-profile.verified{background:var(--yellow-soft);border-color:#f1dda0}
+
+  /* NFC hero lockup (dominant trust signal on tap landing) */
+  .vb-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--s3)}
+  .vb-hero .mark{width:84px;height:84px}
+  .vb-hero .vb-title{font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .vb-hero .vb-sub{font-size:13px;color:var(--grey-600);max-width:34ch}
+
+  /* official-record card (trust indicator built from SSM data) */
+  .record{border:1px solid var(--grey-200);border-radius:var(--r-md);background:var(--white);
+    max-width:380px;overflow:hidden}
+  .record .rhead{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);
+    padding:var(--s3) var(--s4);background:var(--surface);border-bottom:1px solid var(--grey-200)}
+  .record .rhead .src{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grey-500)}
+  .record .rbody{padding:var(--s4);display:grid;gap:10px}
+  .record .line{display:grid;grid-template-columns:96px 1fr;gap:var(--s3);align-items:baseline}
+  .record .k{font-size:12px;color:var(--grey-500)}
+  .record .v{font-size:13px;font-weight:500}
+  .record .v.data{font-size:13px;letter-spacing:.04em}
+
+  /* tier comparison table */
+  .tiers{border:1px solid var(--grey-200);border-radius:var(--r-lg);overflow:hidden;background:var(--white)}
+  .tiers .trow{display:grid;grid-template-columns:170px 1fr 130px;gap:var(--s4);align-items:center;
+    padding:var(--s4) var(--s5);border-bottom:1px solid var(--grey-100)}
+  .tiers .trow:last-child{border-bottom:0}
+  .tiers .trow.head{background:var(--surface);font-size:11px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--grey-500)}
+  .tiers .proves{font-size:13px;color:var(--grey-600)}
+  .tiers .how{font-size:12px;color:var(--grey-500)}
+
+  /* sample profile card showing badge in context */
+  .pcard{border:1px solid var(--grey-200);border-radius:var(--r-lg);background:var(--white);
+    max-width:380px;overflow:hidden;box-shadow:var(--shadow-sm)}
+  .pcard .pc-top{padding:var(--s5);display:flex;gap:var(--s4);align-items:flex-start}
+  .pcard .avatar{width:52px;height:52px;border-radius:12px;background:var(--ink);color:var(--yellow);
+    display:grid;place-items:center;font-weight:800;font-size:18px;flex:none}
+  .pcard .pc-name{font-weight:800;font-size:16px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .pcard .pc-role{font-size:13px;color:var(--grey-600);margin-top:2px}
+  .pcard .pc-foot{display:flex;gap:var(--s2);padding:var(--s4) var(--s5);border-top:1px solid var(--grey-100)}
+
+  /* anatomy callout */
+  .anatomy{display:grid;grid-template-columns:auto 1fr;gap:var(--s5);align-items:center;
+    border:1px dashed var(--grey-300);border-radius:var(--r-lg);padding:var(--s6);background:var(--white)}
+  .anatomy ul{margin:0;padding-left:0;list-style:none;display:grid;gap:10px}
+  .anatomy li{display:grid;grid-template-columns:18px 1fr;gap:var(--s3);font-size:13px;color:var(--grey-600)}
+  .anatomy li b{color:var(--ink);font-weight:600}
+  .anatomy .pin{font-family:var(--font-data);font-size:11px;color:var(--yellow-ink);background:var(--yellow);
+    width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-weight:600}
+
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+  @media(max-width:680px){.twocol{grid-template-columns:1fr}.specimen .row{grid-template-columns:1fr}.tiers .trow{grid-template-columns:1fr}}
+
+  .note{background:var(--surface-2);border-radius:var(--r-md);padding:var(--s4) var(--s5);font-size:13px;color:var(--grey-600);border-left:3px solid var(--yellow)}
+  .footer{margin-top:var(--s9);padding-top:var(--s6);border-top:1px solid var(--grey-200);font-size:13px;color:var(--grey-500)}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="brand">
+      <div class="brand-mark"><span>A</span></div>
+      <div class="brand-name">ABRI <em>· Design System</em></div>
+    </div>
+    <p class="eyebrow">Deliverable 2 · Foundations &amp; the verification badge</p>
+    <h1 class="display" style="margin-top:12px">Trust, made visible.</h1>
+    <p class="lead" style="margin-top:16px">The reusable foundation every ABRI screen is built from — tokens, core components, and the verification badge that is the product's single most important, most-reused element. Minimal enterprise language: black, white, a disciplined trust-yellow, and warm neutral grey.</p>
+  </header>
+
+  <!-- 01 COLOR -->
+  <section class="section" id="color">
+    <div class="section-head"><span class="section-no">01</span><h2 class="h2">Color tokens</h2></div>
+    <p class="cap" style="margin-bottom:24px;max-width:60ch">Yellow is rationed. It appears <b>only</b> on primary actions, verified status, success, and highlights — never as body text (it fails contrast on white, and scarcity is what makes it read as "trust"). Greys are warm-neutral to sit comfortably beside the gold and feel human rather than clinical.</p>
+    <div class="grid swatches">
+      <div class="swatch"><div class="chip" style="background:#141413"></div><div class="meta"><div class="name">Ink</div><div class="hex">#141413</div><div class="use">Primary text · Trusted mark base</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#ffffff;box-shadow:inset 0 0 0 1px var(--grey-200)"></div><div class="meta"><div class="name">White</div><div class="hex">#FFFFFF</div><div class="use">Cards · inputs</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#f8f7f4"></div><div class="meta"><div class="name">Surface</div><div class="hex">#F8F7F4</div><div class="use">Page background</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#f4b400"></div><div class="meta"><div class="name">Yellow</div><div class="hex">#F4B400</div><div class="use">Primary · Verified · success</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#fdf3d4"></div><div class="meta"><div class="name">Yellow soft</div><div class="hex">#FDF3D4</div><div class="use">Highlight tint</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#e2dfd9"></div><div class="meta"><div class="name">Grey 200</div><div class="hex">#E2DFD9</div><div class="use">Hairline borders</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#6c685f"></div><div class="meta"><div class="name">Grey 600</div><div class="hex">#6C685F</div><div class="use">Secondary text</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#b42318"></div><div class="meta"><div class="name">Danger</div><div class="hex">#B42318</div><div class="use">Report · reject only</div></div></div>
+    </div>
+  </section>
+
+  <!-- 02 TYPE -->
+  <section class="section" id="type">
+    <div class="section-head"><span class="section-no">02</span><h2 class="h2">Typography</h2></div>
+    <p class="cap" style="margin-bottom:24px;max-width:64ch"><b>Manrope</b> — a modern geometric sans — carries the whole UI with strong hierarchy and generous spacing. <b>IBM Plex Mono</b> is reserved for registry data (SSM numbers, dates, IDs) so verified facts read like an official record, not marketing copy.</p>
+    <div class="specimen">
+      <div class="row"><div class="tok">display / 800</div><div class="display" style="font-size:40px">Trust from day one</div></div>
+      <div class="row"><div class="tok">h1 / 800</div><div class="h1">Verify your business</div></div>
+      <div class="row"><div class="tok">h2 / 700</div><div class="h2">Companies you can trust</div></div>
+      <div class="row"><div class="tok">h3 / 600</div><div class="h3">Registered with SSM</div></div>
+      <div class="row"><div class="tok">lead / 400</div><div class="lead" style="font-size:17px">A verified profile, shareable by tap, discoverable by the businesses that matter.</div></div>
+      <div class="row"><div class="tok">body / 400</div><div class="body">The default reading size for descriptions, services and content across the app.</div></div>
+      <div class="row"><div class="tok">caption / 500</div><div class="cap">Helper text, metadata and supporting labels.</div></div>
+      <div class="row"><div class="tok">eyebrow / 700</div><div class="eyebrow">Trust &amp; verification</div></div>
+      <div class="row"><div class="tok">data / mono</div><div class="data" style="font-size:15px">SSM&nbsp;201901023456&nbsp;·&nbsp;Active</div></div>
+    </div>
+  </section>
+
+  <!-- 03 SPACING & RADIUS -->
+  <section class="section" id="space">
+    <div class="section-head"><span class="section-no">03</span><h2 class="h2">Spacing &amp; shape</h2></div>
+    <div class="twocol">
+      <div class="panel">
+        <div class="panel-title">Spacing scale · base 4</div>
+        <div class="scale">
+          <div class="unit"><div class="bar" style="height:4px"></div><div class="lbl">4</div></div>
+          <div class="unit"><div class="bar" style="height:8px"></div><div class="lbl">8</div></div>
+          <div class="unit"><div class="bar" style="height:12px"></div><div class="lbl">12</div></div>
+          <div class="unit"><div class="bar" style="height:16px"></div><div class="lbl">16</div></div>
+          <div class="unit"><div class="bar" style="height:24px"></div><div class="lbl">24</div></div>
+          <div class="unit"><div class="bar" style="height:32px"></div><div class="lbl">32</div></div>
+          <div class="unit"><div class="bar" style="height:48px"></div><div class="lbl">48</div></div>
+          <div class="unit"><div class="bar" style="height:64px"></div><div class="lbl">64</div></div>
+        </div>
+        <p class="cap" style="margin-top:20px">12-column grid · 1080px max content · 24px gutters · generous whitespace over dividers.</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Radius · borders · elevation</div>
+        <div class="demo-row">
+          <div style="width:64px;height:48px;border-radius:6px;background:var(--surface-2);border:1px solid var(--grey-200);display:grid;place-items:center;font-size:11px" class="data">6</div>
+          <div style="width:64px;height:48px;border-radius:10px;background:var(--surface-2);border:1px solid var(--grey-200);display:grid;place-items:center;font-size:11px" class="data">10</div>
+          <div style="width:64px;height:48px;border-radius:14px;background:var(--surface-2);border:1px solid var(--grey-200);display:grid;place-items:center;font-size:11px" class="data">14</div>
+          <div style="width:64px;height:48px;border-radius:999px;background:var(--surface-2);border:1px solid var(--grey-200);display:grid;place-items:center;font-size:11px" class="data">pill</div>
+        </div>
+        <p class="cap" style="margin-top:20px">Borders are 1px hairlines (Grey&nbsp;200). Shadows appear only on raised surfaces — modals, the NFC card, key CTAs — never as decoration.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 BUTTONS -->
+  <section class="section" id="buttons">
+    <div class="section-head"><span class="section-no">04</span><h2 class="h2">Buttons</h2></div>
+    <div class="panel">
+      <div class="panel-title">Hierarchy &amp; states</div>
+      <div class="demo-row">
+        <button class="btn btn-primary">Verify business</button>
+        <button class="btn btn-secondary">Save contact</button>
+        <button class="btn btn-ghost">Connect</button>
+        <button class="btn btn-danger">Report</button>
+        <button class="btn btn-primary" disabled>Verifying…</button>
+      </div>
+      <div class="demo-row" style="margin-top:24px">
+        <button class="btn btn-primary btn-sm">Small</button>
+        <button class="btn btn-primary">Default</button>
+        <button class="btn btn-primary btn-lg">Large</button>
+      </div>
+      <p class="cap" style="margin-top:20px">One primary (yellow) action per view — it's the eye's anchor and must stay scarce. "Save contact" is ink, not yellow, because on the NFC landing it's the everyday action, while the rare, valuable act (verify / join) earns the yellow.</p>
+    </div>
+  </section>
+
+  <!-- 05 INPUTS -->
+  <section class="section" id="inputs">
+    <div class="section-head"><span class="section-no">05</span><h2 class="h2">Inputs</h2></div>
+    <div class="twocol">
+      <div class="panel">
+        <div class="panel-title">Default &amp; focus</div>
+        <div class="field" style="margin-bottom:20px">
+          <label for="i1">Work email</label>
+          <input id="i1" class="input" type="email" placeholder="you@company.com.my">
+        </div>
+        <div class="field">
+          <label for="i2">SSM registration number</label>
+          <input id="i2" class="input data" type="text" value="201901023456" inputmode="numeric">
+          <div class="hint">12 digits · we'll match this against the SSM registry instantly.</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Error &amp; states</div>
+        <div class="field" style="margin-bottom:20px">
+          <label for="i3">SSM registration number</label>
+          <input id="i3" class="input data is-error" type="text" value="20199">
+          <div class="hint err">That doesn't match a registered entity. Check the 12-digit number on your SSM certificate.</div>
+        </div>
+        <div class="demo-row" style="gap:10px">
+          <span class="status pending"><span class="dot"></span>Pending review</span>
+          <span class="status review"><span class="dot"></span>In verification</span>
+          <span class="status approved"><span class="dot"></span>Approved</span>
+          <span class="status rejected"><span class="dot"></span>Rejected</span>
+        </div>
+        <p class="cap" style="margin-top:18px">Errors name what's wrong and how to fix it, in the product's voice — never a vague "invalid input".</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 THE VERIFICATION BADGE -->
+  <section class="section" id="badge">
+    <div class="section-head"><span class="section-no">06</span><h2 class="h2">The verification badge — the signature element</h2></div>
+    <p class="lead" style="margin-bottom:32px">Three tiers, one system. The badge is the most-reused component in ABRI and the visual embodiment of "trust is the product." Each tier means something specific and is earned a specific way — so the mark is never decorative.</p>
+
+    <!-- tier comparison -->
+    <div class="tiers" style="margin-bottom:40px">
+      <div class="trow head"><div>Tier</div><div>What it proves</div><div>How it's earned</div></div>
+      <div class="trow">
+        <div><span class="vbadge vb-inline registered"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M9 11h6M9 15h4"/></svg></span><span class="vb-label">SSM Registered</span></span></div>
+        <div class="proves">The entity legally exists in Malaysia's official registry.</div>
+        <div class="how">SSM number matched — instant.</div>
+      </div>
+      <div class="trow">
+        <div><span class="vbadge vb-inline verified"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span><span class="vb-label">Verified</span></span></div>
+        <div class="proves">This member genuinely controls the business.</div>
+        <div class="how">Director match / ownership proof.</div>
+      </div>
+      <div class="trow">
+        <div><span class="vbadge vb-inline trusted"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.9 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/></svg></span><span class="vb-label">Trusted</span></span></div>
+        <div class="proves">Good standing over time — the highest signal.</div>
+        <div class="how">Tenure + connections, zero upheld reports.</div>
+      </div>
+    </div>
+
+    <!-- sizes -->
+    <div class="panel">
+      <div class="panel-title">Size 1 · Inline — for lists &amp; next to a name</div>
+      <div class="demo-row" style="gap:24px">
+        <span class="vbadge vb-inline registered"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5z"/><path d="M9 11h6M9 15h4"/></svg></span><span class="vb-label">SSM Registered</span></span>
+        <span class="vbadge vb-inline verified"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span><span class="vb-label">Verified</span></span>
+        <span class="vbadge vb-inline trusted"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.9 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/></svg></span><span class="vb-label">Trusted</span></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Size 2 · Profile — explains what it proves</div>
+      <div class="demo-row" style="gap:16px;align-items:stretch">
+        <span class="vbadge vb-profile verified">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span>
+          <span><span class="vb-title">Verified business</span><span class="vb-sub data">Ownership confirmed · 24 Jun 2026</span></span>
+        </span>
+        <span class="vbadge vb-profile trusted">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.9 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/></svg></span>
+          <span><span class="vb-title">Trusted member</span><span class="vb-sub">2 years · 140 connections</span></span>
+        </span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Size 3 · Hero — dominant signal on the NFC tap landing</div>
+      <div style="display:grid;place-items:center;padding:24px 0">
+        <span class="vbadge vb-hero verified">
+          <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span>
+          <span class="vb-title">Verified by ABRI</span>
+          <span class="vb-sub">This business is registered with SSM and its owner is confirmed.</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- anatomy -->
+    <div style="margin-top:32px">
+      <div class="anatomy">
+        <span class="vbadge verified"><span class="mark" style="width:96px;height:96px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span></span>
+        <ul>
+          <li><span class="pin">1</span><span><b>Circular seal</b> — evokes an official certification stamp; flat, no gloss. Tier sets the fill.</span></li>
+          <li><span class="pin">2</span><span><b>Inset ring</b> — 1px inner stroke at 60% tier colour, the only "border" the mark carries.</span></li>
+          <li><span class="pin">3</span><span><b>Glyph</b> — outline, consistent stroke (registry doc → check → star), sized to 60% of the mark.</span></li>
+          <li><span class="pin">4</span><span><b>Mark sizes</b> — <span class="data">18 / 38 / 84px</span> for inline / profile / hero. Stroke scales with size.</span></li>
+          <li><span class="pin">5</span><span><b>Colour rule</b> — Registered = grey, Verified = yellow, Trusted = ink+yellow. Yellow only ever earns its place here and on primary actions.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 TRUST INDICATORS IN CONTEXT -->
+  <section class="section" id="context">
+    <div class="section-head"><span class="section-no">07</span><h2 class="h2">Trust indicators in context</h2></div>
+    <div class="twocol">
+      <div>
+        <p class="cap" style="margin-bottom:16px">The badge on a directory profile card —</p>
+        <div class="pcard">
+          <div class="pc-top">
+            <div class="avatar">AS</div>
+            <div>
+              <div class="pc-name">Acme Solutions
+                <span class="vbadge vb-inline verified"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg></span><span class="vb-label">Verified</span></span>
+              </div>
+              <div class="pc-role">IT consulting · Petaling Jaya, Selangor</div>
+            </div>
+          </div>
+          <div class="pc-foot">
+            <button class="btn btn-secondary btn-sm">Save contact</button>
+            <button class="btn btn-ghost btn-sm">Connect</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="cap" style="margin-bottom:16px">The official-record card — verified facts, set in mono —</p>
+        <div class="record">
+          <div class="rhead">
+            <span class="src">SSM record</span>
+            <span class="status approved"><span class="dot"></span>Active</span>
+          </div>
+          <div class="rbody">
+            <div class="line"><span class="k">Entity</span><span class="v">Acme Solutions Sdn Bhd</span></div>
+            <div class="line"><span class="k">Reg. no.</span><span class="v data">201901023456</span></div>
+            <div class="line"><span class="k">Registered</span><span class="v data">14 Mar 2019</span></div>
+            <div class="line"><span class="k">Type</span><span class="v">Sdn Bhd (01)</span></div>
+            <div class="line"><span class="k">Director</span><span class="v">Tan Wei Ming ✓ matched</span></div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:16px">Pulling these facts from the SSM registry — rather than asking the user to type them — is what makes verification feel instant and premium instead of bureaucratic.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>ABRI Design System · Deliverable 2 — foundations &amp; verification badge. Tokens are CSS custom properties (<span class="data">--ink, --yellow, --grey-*</span>) ready to lift into the build. Next: the verification flow, wired from these components.</p>
+  </footer>
+
+</div>
+
+<script>
+  // Light, optional enhancement: keyboard-focusable inline badges reveal their meaning via title.
+  // Kept minimal and reduced-motion safe; no storage, no external calls.
+  document.querySelectorAll('.vb-inline').forEach(function(b){
+    var label = b.querySelector('.vb-label');
+    if(label){ b.setAttribute('tabindex','0'); b.setAttribute('role','img'); b.setAttribute('aria-label', label.textContent + ' verification badge'); }
+  });
+</script>
+</body>
+</html>

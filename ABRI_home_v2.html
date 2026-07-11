@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABRI — The Verified Business Network</title>
+<meta name="description" content="ABRI verifies companies against official SSM records, so you can do business with confidence — not guesswork.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#141413; --white:#fff;
+    --surface:#f8f7f4; --surface-2:#f1f0ec;
+    --grey-100:#eceae5; --grey-200:#e2dfd9; --grey-300:#d2cfc8;
+    --grey-500:#8b877e; --grey-600:#6c685f;
+    --yellow:#f4b400; --yellow-hi:#ffc21f; --yellow-soft:#fdf3d4; --yellow-ink:#3a2c00;
+    --font:"Manrope",-apple-system,system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --shadow-card:0 6px 24px -8px rgba(20,20,19,.16);
+    --shadow-hero:0 24px 60px -24px rgba(20,20,19,.28);
+    --r-sm:6px; --r-md:10px; --r-lg:16px;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{scroll-behavior:smooth}
+  body{font-family:var(--font);background:var(--surface);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--grey-500)}
+  section{padding:104px 0}
+  @media(max-width:768px){section{padding:60px 0}}
+
+  .skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:#fff;padding:10px 16px;z-index:99}
+  .skip:focus{left:0}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:15px;font-weight:700;
+    border-radius:var(--r-sm);padding:13px 22px;border:1px solid transparent;cursor:pointer;
+    transition:background .15s,border-color .15s,transform .15s,box-shadow .15s;line-height:1}
+  .btn:hover{transform:translateY(-1px)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .btn-primary{background:var(--yellow);color:var(--yellow-ink)}
+  .btn-primary:hover{background:var(--yellow-hi);box-shadow:var(--shadow-card)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--grey-300)}
+  .btn-ghost:hover{background:var(--surface-2)}
+  .btn-ink{background:var(--ink);color:#fff}
+  .btn-ink:hover{background:#000}
+
+  .nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid transparent;transition:border-color .2s}
+  .nav.scrolled{border-bottom-color:var(--grey-200)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+  .brand-mark{width:30px;height:30px;border-radius:7px;background:var(--ink);display:grid;place-items:center;color:var(--yellow);font-size:16px;font-weight:800}
+  .nav-links{display:flex;gap:28px;font-size:14px;font-weight:600;color:var(--grey-600)}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{display:flex;gap:10px;align-items:center}
+  .nav .btn{padding:10px 16px;font-size:14px}
+  .burger{display:none;background:none;border:1px solid var(--grey-300);border-radius:6px;padding:8px 10px;font-size:16px;cursor:pointer}
+  @media(max-width:920px){.nav-links{display:none}.burger{display:block}.nav-cta .btn-ghost{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:96px 0 110px;overflow:hidden}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:64px;align-items:center}
+  @media(max-width:920px){.hero-grid{grid-template-columns:1fr;gap:48px}.hero{padding:56px 0 64px}}
+  h1{font-size:clamp(40px,5.2vw,62px);line-height:1.06;font-weight:800;letter-spacing:-.028em}
+  h1 em{font-style:normal;position:relative;white-space:nowrap}
+  h1 em::after{content:"";position:absolute;left:-2px;right:-2px;bottom:5px;height:16px;background:var(--yellow-soft);z-index:-1;border-radius:3px}
+  .hero .lead{font-size:19px;color:var(--grey-600);margin:22px 0 32px;max-width:32rem}
+  .hero-ctas{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-trust{display:flex;align-items:center;gap:9px;margin-top:26px;font-size:13px;color:var(--grey-500)}
+
+  .stage{position:relative}
+  .pcard{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);box-shadow:var(--shadow-hero);padding:28px;max-width:430px;margin-left:auto;position:relative}
+  @media(max-width:920px){.pcard{margin:0 auto}}
+  .pcard-top{display:flex;gap:16px;align-items:flex-start}
+  .plogo{width:56px;height:56px;border-radius:12px;background:var(--ink);color:var(--yellow);display:grid;place-items:center;font-weight:800;font-size:20px;flex:none}
+  .pname{font-size:19px;font-weight:800;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .pmeta{font-size:13.5px;color:var(--grey-600);margin-top:3px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;border:1px solid var(--grey-200);border-radius:999px;padding:4px 10px;background:#fff}
+  .chip.tier{border-color:var(--ink)}
+  .verline{margin:18px 0;border:1px solid var(--grey-200);border-radius:var(--r-md);overflow:hidden}
+  .verline .vh{display:flex;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--grey-200);padding:8px 14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey-500)}
+  .verline .vb{padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.7}
+  .verline .ok{color:var(--yellow-ink);background:var(--yellow-soft);border-radius:4px;padding:0 5px}
+  .vouchline{border-left:2px solid var(--grey-200);padding-left:14px;margin:16px 0 4px}
+  .vouchline p{font-style:italic;font-size:14px;color:#4a473f}
+  .vouchline .who{display:flex;align-items:center;gap:7px;margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--grey-500)}
+  .pactions{display:flex;gap:10px;margin-top:18px}
+  .pactions .btn{padding:10px 15px;font-size:13.5px;flex:1;justify-content:center}
+
+  .seal{width:44px;height:44px;flex:none;position:relative}
+  .seal svg{width:100%;height:100%;display:block}
+  .seal .ring{fill:var(--yellow)}
+  .seal .tick{stroke:var(--yellow-ink);stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:30;stroke-dashoffset:30}
+  .seal.play .tick{animation:draw .45s ease .5s forwards}
+  .seal.play::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--yellow);opacity:0;animation:pulse .9s ease .95s}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @keyframes pulse{0%{opacity:.7;transform:scale(.8)}100%{opacity:0;transform:scale(1.25)}}
+  .mini-seal{width:20px;height:20px;border-radius:50%;background:var(--yellow);display:inline-grid;place-items:center;flex:none}
+  .mini-seal svg{width:60%;height:60%;stroke:var(--yellow-ink);stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .tap-hint{position:absolute;right:-8px;top:-16px;background:var(--ink);color:#fff;font-family:var(--mono);font-size:10.5px;padding:6px 11px;border-radius:999px;letter-spacing:.06em}
+  @media(max-width:920px){.tap-hint{right:8px}}
+
+  .sec-head{max-width:640px;margin-bottom:52px}
+  .sec-head.center{margin-left:auto;margin-right:auto;text-align:center}
+  h2{font-size:clamp(28px,3.4vw,40px);line-height:1.12;font-weight:800;letter-spacing:-.022em;margin-top:12px}
+  .sec-head p{color:var(--grey-600);font-size:17px;margin-top:14px}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:step}
+  @media(max-width:860px){.steps{grid-template-columns:1fr}}
+  .step{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);padding:30px;transition:box-shadow .15s,transform .15s}
+  .step:hover{box-shadow:var(--shadow-card);transform:translateY(-2px)}
+  .step::before{counter-increment:step;content:counter(step);font-family:var(--mono);font-size:12px;color:var(--yellow-ink);background:var(--yellow);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:600;margin-bottom:18px}
+  .step h3{font-size:19px;font-weight:800;margin-bottom:8px}
+  .step p{font-size:14.5px;color:var(--grey-600)}
+  .step .mono-tag{display:inline-block;margin-top:16px;font-family:var(--mono);font-size:11.5px;color:var(--grey-500);background:var(--surface-2);border-radius:5px;padding:4px 9px}
+  .quiet-pain{text-align:center;margin-top:44px;font-size:15px;color:var(--grey-500);font-style:italic}
+
+  /* badge + vouch combined */
+  .trust-band{background:#fff;border-top:1px solid var(--grey-200);border-bottom:1px solid var(--grey-200)}
+  .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:72px}
+  @media(max-width:860px){.tiers{grid-template-columns:1fr}}
+  .tier-card{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);padding:28px}
+  .tier-card.hero-tier{border-color:var(--yellow);background:linear-gradient(180deg,var(--yellow-soft),#fff 55%)}
+  .tier-card h3{font-size:16.5px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .tier-card p{font-size:14.5px;color:var(--grey-600)}
+  .tier-card .earn{margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--grey-500)}
+  .soon{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--grey-300);border-radius:999px;padding:3px 8px;color:var(--grey-500)}
+
+  .vouch-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+  @media(max-width:920px){.vouch-grid{grid-template-columns:1fr;gap:40px}}
+  .vouch-demo{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:26px;max-width:420px}
+  .vouch-demo .q{font-size:16.5px;font-style:italic;color:#3d3a34;line-height:1.55}
+  .vouch-demo .who{display:flex;align-items:center;gap:9px;margin-top:14px}
+  .vouch-demo .who .nm{font-weight:700;font-size:13.5px}
+  .vouch-demo .who .vf{font-family:var(--mono);font-size:11px;color:var(--grey-500)}
+  .vouch-demo .loop{border-top:1px solid var(--grey-100);margin-top:18px;padding-top:16px;display:flex;gap:10px}
+  .vouch-demo .loop .btn{flex:1;justify-content:center;padding:10px;font-size:13px}
+  .checklist{display:grid;gap:16px;margin-top:26px;padding:0}
+  .checklist li{display:grid;grid-template-columns:24px 1fr;gap:12px;list-style:none;font-size:15.5px;color:var(--grey-600)}
+  .checklist b{color:var(--ink)}
+
+  /* nfc */
+  .nfc-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:64px;align-items:center}
+  @media(max-width:920px){.nfc-grid{grid-template-columns:1fr;gap:44px}}
+  .tap-scene{position:relative;width:360px;height:300px;margin:0 auto}
+  .nfc-card{position:absolute;top:16px;left:0;width:300px;height:182px;border-radius:16px;background:linear-gradient(145deg,#1d1c19,#141413);color:#f3f1ec;padding:22px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow-hero);border:1px solid #000;transform:rotate(-6deg);z-index:1}
+  .nfc-card .k{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#7d7970}
+  .nfc-card .nm{font-size:19px;font-weight:800}
+  .nfc-card .foot{display:flex;justify-content:space-between;align-items:flex-end}
+  .nfc-card .mk{font-weight:800;font-size:14px}
+  .nfc-card .mk b{background:var(--yellow);color:var(--ink);border-radius:4px;padding:0 5px;margin-right:4px}
+  .nfc-card .wave{font-family:var(--mono);font-size:10.5px;color:#7d7970}
+  .mini-phone{position:absolute;right:0;bottom:0;width:170px;height:250px;background:#fff;border:1px solid var(--grey-300);border-radius:22px;box-shadow:var(--shadow-hero);padding:14px 12px;z-index:2}
+  .mini-phone .cam{width:44px;height:5px;border-radius:20px;background:var(--grey-200);margin:0 auto 12px}
+  .mini-phone .row{display:flex;gap:8px;align-items:center}
+  .mini-phone .lg{width:26px;height:26px;border-radius:7px;background:var(--ink);color:var(--yellow);display:grid;place-items:center;font-size:11px;font-weight:800}
+  .mini-phone .nm2{font-size:11px;font-weight:800}
+  .mini-phone .verified-tag{margin-top:10px;background:var(--yellow-soft);border:1px solid var(--yellow);border-radius:6px;font-family:var(--mono);font-size:8.5px;padding:5px 7px;color:var(--yellow-ink)}
+  .mini-phone .l{height:6px;border-radius:3px;background:var(--surface-2);margin-top:8px}
+  .mini-phone .l.s{width:60%}
+  .tap-ring{position:absolute;left:196px;top:150px;width:36px;height:36px;border-radius:50%;border:2px solid var(--yellow);z-index:3;animation:ringpulse 2s ease infinite}
+  @keyframes ringpulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+
+  /* pricing */
+  .plans{display:grid;grid-template-columns:repeat(2,minmax(0,380px));gap:20px;justify-content:center}
+  @media(max-width:860px){.plans{grid-template-columns:1fr}}
+  .plan{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);padding:32px;display:flex;flex-direction:column;gap:8px}
+  .plan.featured{border-color:var(--ink);box-shadow:var(--shadow-card);position:relative}
+  .plan .flag{position:absolute;top:-12px;left:26px;background:var(--ink);color:#fff;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px}
+  .plan h3{font-size:16px;font-weight:800}
+  .plan .price{font-size:32px;font-weight:800;letter-spacing:-.02em}
+  .plan .price small{font-size:14px;font-weight:600;color:var(--grey-500)}
+  .plan ul{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:9px}
+  .plan li{display:grid;grid-template-columns:20px 1fr;gap:8px;font-size:14px;color:var(--grey-600)}
+  .plan .value-line{margin-top:14px;font-size:13.5px;font-style:italic;color:var(--grey-500);border-top:1px solid var(--grey-100);padding-top:14px}
+  .plan .btn{margin-top:18px;justify-content:center}
+  .founding-note{max-width:640px;margin:44px auto 0;text-align:center;background:var(--surface-2);border-radius:var(--r-md);padding:20px 28px;font-size:14.5px;color:var(--grey-600)}
+  .founding-note b{color:var(--ink)}
+  .browse-note{text-align:center;margin-top:22px;font-size:14px;color:var(--grey-500)}
+  .browse-note a{font-weight:700;color:var(--ink);border-bottom:2px solid var(--yellow)}
+
+  /* final */
+  .final{background:var(--ink);border-radius:var(--r-lg);padding:72px 48px;text-align:center;color:#fff}
+  @media(max-width:768px){.final{padding:48px 24px}}
+  .final h2{color:#fff}
+  .final p{color:#a5a198;margin:14px auto 8px;max-width:46ch}
+  .final .reassure{font-family:var(--mono);font-size:12.5px;color:#8a857a;margin-bottom:28px}
+
+  footer{border-top:1px solid var(--grey-200);padding:56px 0 40px}
+  .foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;margin-bottom:40px}
+  @media(max-width:768px){.foot-grid{grid-template-columns:1fr 1fr}}
+  .foot-grid h4{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey-500);margin-bottom:14px}
+  .foot-grid a{display:block;font-size:14px;color:var(--grey-600);padding:4px 0}
+  .foot-grid a:hover{color:var(--ink)}
+  .foot-base{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid var(--grey-200);padding-top:24px;font-size:13px;color:var(--grey-500)}
+  .foot-lockup{display:flex;align-items:center;gap:8px}
+
+  .sticky-cta{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--grey-200);padding:12px 16px;display:none;z-index:60}
+  .sticky-cta .btn{width:100%;justify-content:center}
+  @media(max-width:768px){.sticky-cta.show{display:block}}
+
+  .rv{opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease}
+  .rv.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .rv{opacity:1;transform:none}
+    .seal .tick{stroke-dashoffset:0}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#"><span class="brand-mark">A</span>ABRI</a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#trust">The badge</a>
+      <a href="#pricing">Membership</a>
+      <a href="#">Directory</a>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#">Log in</a>
+      <a class="btn btn-primary" href="ABRI_register.html">Claim your business</a>
+      <button class="burger" aria-label="Open menu">☰</button>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- 1 · HERO -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">The verified business network · Malaysia</span>
+      <h1>Do business with companies you can <em>trust</em>.</h1>
+      <p class="lead">Every company on ABRI is verified against official SSM records — so the first handshake starts with proof, not guesswork.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="ABRI_register.html">Claim your business</a>
+        <a class="btn btn-ghost" href="#">Browse verified companies</a>
+      </div>
+      <div class="hero-trust">
+        <span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>
+        Anchored to official Companies Commission of Malaysia data
+      </div>
+    </div>
+    <div class="stage">
+      <div class="pcard" role="img" aria-label="Example verified ABRI company profile showing SSM verification and a peer vouch">
+        <span class="tap-hint">● live · tapped just now</span>
+        <div class="pcard-top">
+          <div class="plogo" aria-hidden="true">M</div>
+          <div>
+            <div class="pname">Meridian Accounting
+              <span class="seal" id="heroSeal" aria-hidden="true">
+                <svg viewBox="0 0 44 44"><circle class="ring" cx="22" cy="22" r="22"/><path class="tick" d="M13 23l6 6 12-14"/></svg>
+              </span>
+            </div>
+            <div class="pmeta">Accounting &amp; tax · Petaling Jaya · Member since 2026</div>
+            <div style="margin-top:8px"><span class="chip tier">★ Trusted Business</span></div>
+          </div>
+        </div>
+        <div class="verline">
+          <div class="vh"><span>SSM record</span><span>✓ checked 24 Jun 2026</span></div>
+          <div class="vb">Reg. 201801019345 · <span class="ok">Active</span> · Authorised representative confirmed</div>
+        </div>
+        <div class="vouchline">
+          <p>“Sorted our SSM filing in a day — completely reliable.”</p>
+          <div class="who"><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Sentul Corp Services · verified vouch</div>
+        </div>
+        <div class="pactions">
+          <button class="btn btn-ink">Save contact</button>
+          <button class="btn btn-ghost">Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- 2 · HOW IT WORKS -->
+<section id="how" style="padding-top:20px">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">How ABRI works</span>
+      <h2>Verified in minutes, not days.</h2>
+    </div>
+    <div class="steps rv">
+      <div class="step">
+        <h3>Claim</h3>
+        <p>Enter your SSM number. We pull your official company record — you don't type it, we retrieve it.</p>
+        <span class="mono-tag">SSM 2018·01·019345</span>
+      </div>
+      <div class="step">
+        <h3>Verify</h3>
+        <p>We match you to the registered company and confirm you're authorised to represent it. Directors verify automatically.</p>
+        <span class="mono-tag">✓ director match</span>
+      </div>
+      <div class="step">
+        <h3>Connect</h3>
+        <p>Your verified profile goes live. Be found, share by tap, and build relationships you can prove.</p>
+        <span class="mono-tag">profile · live</span>
+      </div>
+    </div>
+    <p class="quiet-pain rv">Because by the time you've vetted someone the old way, the opportunity's usually gone.</p>
+  </div>
+</section>
+
+<!-- 3 · THE BADGE + VOUCHING (combined trust band) -->
+<section id="trust" class="trust-band">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">The verification difference</span>
+      <h2>A badge that actually means something.</h2>
+      <p>Not a sticker anyone can buy. Every state on ABRI is earned a specific way — and everyone can see how.</p>
+    </div>
+    <div class="tiers rv">
+      <div class="tier-card hero-tier">
+        <h3><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>SSM-Verified</h3>
+        <p>The company legally exists and is active, and a real, authorised person stands behind it.</p>
+        <div class="earn">Earned: registry match + director confirmation</div>
+      </div>
+      <div class="tier-card">
+        <h3>★ Trusted Business</h3>
+        <p>Vouched for by verified peers — ten businesses have staked their own name on this one.</p>
+        <div class="earn">Earned: 10 verified vouches</div>
+      </div>
+      <div class="tier-card">
+        <h3>Network Leader <span class="soon">coming</span></h3>
+        <p>The highest status — reserved for members who give the most back to the network.</p>
+        <div class="earn">Earned: 25 received · 10 given</div>
+      </div>
+    </div>
+
+    <div class="vouch-grid">
+      <div class="rv">
+        <span class="eyebrow">Vouching · how status is earned</span>
+        <h2 style="font-size:clamp(24px,2.8vw,32px)">Credibility from peers who stake their name on it.</h2>
+        <ul class="checklist">
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Only verified members can vouch</b> — one vouch per business, tied publicly to the voucher's own profile.</span></li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Every vouch can carry a testimonial</b> — 140 characters, quotable, living on your profile permanently.</span></li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Generosity comes back</b> — thank your voucher, vouch back, and both profiles grow.</span></li>
+        </ul>
+      </div>
+      <div class="rv">
+        <div class="vouch-demo" role="img" aria-label="Example vouch: a verified peer testimonial with thank and vouch-back actions">
+          <p class="q">“Our go-to for anything tax. Responsive, honest, and they know SME realities.”</p>
+          <div class="who">
+            <span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>
+            <div><div class="nm">Nimbus IT Consulting</div><div class="vf">verified vouch · Jun 2026</div></div>
+          </div>
+          <div class="loop">
+            <button class="btn btn-primary">Thank them</button>
+            <button class="btn btn-ghost">Vouch back</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · NFC -->
+<section>
+  <div class="wrap nfc-grid">
+    <div class="rv">
+      <div class="tap-scene" role="img" aria-label="The ABRI NFC card being tapped to a phone, which instantly shows the verified profile">
+        <div class="nfc-card">
+          <div>
+            <div class="k">Verified business network</div>
+            <div class="nm" style="margin-top:8px">Meridian<br>Accounting</div>
+          </div>
+          <div class="foot">
+            <span class="wave">tap to verify ›››</span>
+            <span class="mk"><b>A</b>ABRI</span>
+          </div>
+        </div>
+        <span class="tap-ring" aria-hidden="true"></span>
+        <div class="mini-phone" aria-hidden="true">
+          <div class="cam"></div>
+          <div class="row"><div class="lg">M</div><div class="nm2">Meridian Accounting</div></div>
+          <div class="verified-tag">✓ SSM-VERIFIED · ACTIVE</div>
+          <div class="l"></div><div class="l"></div><div class="l s"></div>
+        </div>
+      </div>
+      <p style="text-align:center;margin-top:18px;font-family:var(--mono);font-size:11.5px;color:var(--grey-500)">[ replace with product photography before launch ]</p>
+    </div>
+    <div class="rv">
+      <span class="eyebrow">The card</span>
+      <h2>One tap. Your whole verified identity.</h2>
+      <p style="color:var(--grey-600);font-size:17px;margin-top:14px;max-width:34rem">Tap your ABRI card to any phone — no app needed. They instantly see your verified company, your vouches, and your live SSM status. Verification renders first, before contact details. It's the business card that proves itself.</p>
+      <div style="margin-top:26px"><a class="btn btn-ink" href="#pricing">See membership</a>
+      <span style="display:block;margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--grey-500)">card included with membership</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 · MEMBERSHIP -->
+<section id="pricing" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow">Membership</span>
+      <h2>Simple, transparent membership.</h2>
+      <p>One good connection covers the year. Everything below is annual — ABRI is a network you join, not software you subscribe to.</p>
+    </div>
+    <div class="plans rv">
+      <div class="plan featured">
+        <span class="flag">Standard</span>
+        <h3>For the business owner</h3>
+        <div class="price">RM490 <small>/ year</small></div>
+        <ul>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Full verified profile + SSM badge</li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>NFC card included</li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Directory presence · vouching</li>
+        </ul>
+        <div class="value-line">One referral from a verified partner typically covers this several times over.</div>
+        <a class="btn btn-primary" href="ABRI_register.html">Claim your business</a>
+      </div>
+      <div class="plan">
+        <h3>Business — for teams</h3>
+        <div class="price">RM1,490 <small>/ year</small></div>
+        <ul>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Up to 10 verified team profiles</li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Multiple NFC cards</li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Priority support</li>
+        </ul>
+        <div class="value-line">One trusted profile for the whole team — not ten different cards.</div>
+        <a class="btn btn-ghost" href="ABRI_register.html">Talk to us</a>
+      </div>
+    </div>
+
+    <div class="founding-note rv">
+      <b>Founding 100 — by invitation only.</b> The first hundred members of ABRI are hand-picked businesses invited to anchor the network. Founding members carry the founding badge permanently. If you believe your business belongs in the first hundred, <a href="#" style="font-weight:700;border-bottom:2px solid var(--yellow)">request an invitation →</a>
+    </div>
+
+    <div class="browse-note rv">Just want to look around first? <a href="ABRI_register.html">Create a free account</a> — browse verified businesses, no card required. Verification is what unlocks the network.</div>
+  </div>
+</section>
+
+<!-- 6 · FINAL CTA -->
+<section id="claim" style="padding-top:0">
+  <div class="wrap">
+    <div class="final rv">
+      <h2>Claim your business in five minutes.</h2>
+      <p>Free to start. Verified the moment your SSM record checks out.</p>
+      <div class="reassure">takes ~5 minutes for most directors · no documents required for the automatic match</div>
+      <a class="btn btn-primary" href="ABRI_register.html" style="font-size:16px;padding:15px 28px">Claim your business</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#"><span class="brand-mark">A</span>ABRI</a>
+        <p style="font-size:13.5px;color:var(--grey-500);max-width:26rem;margin-top:12px">The verified business network — where every member is SSM-verified, vouched for by real peers, and trusted from day one.</p>
+      </div>
+      <div><h4>Product</h4><a href="#how">How it works</a><a href="#trust">The badge</a><a href="#pricing">Membership</a><a href="#">Directory</a></div>
+      <div><h4>Company</h4><a href="#">About</a><a href="#">Contact</a><a href="#">FAQ</a></div>
+      <div><h4>Legal</h4><a href="#">Privacy</a><a href="#">Terms</a></div>
+    </div>
+    <div class="foot-base">
+      <span>© 2026 ABRI. All rights reserved.</span>
+      <span class="foot-lockup"><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Verified against SSM records</span>
+    </div>
+  </div>
+</footer>
+
+<div class="sticky-cta" id="stickyCta"><a class="btn btn-primary" href="ABRI_register.html">Claim your business</a></div>
+
+<script>
+  const nav=document.getElementById('nav');
+  addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>8),{passive:true});
+  addEventListener('load',()=>document.getElementById('heroSeal').classList.add('play'));
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+  const sticky=document.getElementById('stickyCta');
+  addEventListener('scroll',()=>{
+    const half=(document.body.scrollHeight-innerHeight)*.5;
+    sticky.classList.toggle('show',scrollY>half&&scrollY<document.body.scrollHeight-innerHeight-600);
+  },{passive:true});
+</script>
+</body>
+</html>
