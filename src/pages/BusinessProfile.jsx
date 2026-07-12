@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { businesses } from "@/data/businesses";
 import { Button } from "@/components/ui/button";
-import { VerificationBadge } from "@/components/verification-badge/VerificationBadge";
+import { VerificationBadge } from "@/components/badge/VerificationBadge";
 
 function BusinessProfile() {
   const { id } = useParams();

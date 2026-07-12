@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { VerificationIcon } from "@/components/ui/VerificationIcon";
-import { VerificationBadge } from "@/components/verification-badge/VerificationBadge";
+import { VerificationIcon } from "@/components/badge/VerificationIcon";
+import { VerificationBadge } from "@/components/badge/VerificationBadge";
 
 function Hero() {
   return (
@@ -66,9 +66,7 @@ function Hero() {
                   Accounting &amp; tax · Petaling Jaya · Member since 2026
                 </div>
                 <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full border border-ink bg-white px-2.5 py-[5px]">
-                    <VerificationBadge tier="verified" size="inline" />
-                  </span>
+                  <VerificationBadge tier="verified" size="inline" chip />
                 </div>
               </div>
             </div>

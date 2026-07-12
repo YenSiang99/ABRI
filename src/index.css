@@ -101,7 +101,8 @@
   --yellow-hi: #ffc21f;
   --yellow-soft: #fdf3d4;
   --yellow-ink: #3a2c00;
-  --danger: #b42318;
+  --danger:   
+  ;
   --danger-soft: #fdecea;
 
   /* ---- Semantic slots, mapped to the palette above ---- */
@@ -189,4 +190,61 @@
   section[id] {
     scroll-margin-top: 69px;
   }
+}
+
+/* ---- Member workspace (/app) theme, ported verbatim from the Lovable
+   dashboard build — near-black primary, yellow accent, warm cream
+   sidebar. Distinct from the marketing site's yellow-primary palette
+   above, so it's scoped to .app-theme rather than merged into :root. ---- */
+.app-theme {
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 1.75rem;
+
+  /* Lovable's styles.css never registers a custom font — it renders in the
+     plain system stack, unlike the marketing site's Manrope/IBM Plex Mono.
+     --font-sans alone won't retheme text: html already applies font-sans as
+     a resolved value that just inherits down, so it has to be re-applied
+     here too. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+
+  --background: oklch(0.985 0.008 90);
+  --foreground: oklch(0.18 0.01 60);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 60);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 60);
+  --primary: oklch(0.2 0.01 60);
+  --primary-foreground: oklch(0.985 0.008 90);
+  --secondary: oklch(0.955 0.012 85);
+  --secondary-foreground: oklch(0.2 0.01 60);
+  --muted: oklch(0.955 0.012 85);
+  --muted-foreground: oklch(0.5 0.015 70);
+  --accent: oklch(0.83 0.16 82);
+  --accent-foreground: oklch(0.2 0.01 60);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.9 0.012 80);
+  --input: oklch(0.9 0.012 80);
+  --ring: oklch(0.83 0.16 82);
+  --sidebar: oklch(0.975 0.01 88);
+  --sidebar-foreground: oklch(0.18 0.01 60);
+  --sidebar-primary: oklch(0.2 0.01 60);
+  --sidebar-primary-foreground: oklch(0.985 0.008 90);
+  --sidebar-accent: oklch(0.94 0.014 85);
+  --sidebar-accent-foreground: oklch(0.2 0.01 60);
+  --sidebar-border: oklch(0.9 0.012 80);
+  --sidebar-ring: oklch(0.83 0.16 82);
 }

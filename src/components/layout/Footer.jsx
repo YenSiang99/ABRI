@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { VerificationIcon } from "@/components/ui/VerificationIcon";
+import { VerificationIcon } from "@/components/badge/VerificationIcon";
 
 const FOOTER_COLUMNS = [
   {

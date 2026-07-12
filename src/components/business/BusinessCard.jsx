@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { VerificationBadge } from "@/components/verification-badge/VerificationBadge";
+import { VerificationBadge } from "@/components/badge/VerificationBadge";
 
 function BusinessCard({ business }) {
   return (
@@ -20,9 +20,7 @@ function BusinessCard({ business }) {
             {business.category} · {business.location}
           </div>
           <div className="mt-2.5">
-            <span className="inline-flex items-center rounded-full border border-ink bg-white px-2.5 py-[5px]">
-              <VerificationBadge tier={business.tier} size="inline" />
-            </span>
+            <VerificationBadge tier={business.tier} size="inline" chip />
           </div>
         </div>
       </div>

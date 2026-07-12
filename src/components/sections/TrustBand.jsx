@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { VerificationIcon } from "@/components/ui/VerificationIcon";
+import { VerificationIcon } from "@/components/badge/VerificationIcon";
 import { cn } from "@/lib/utils";
 
 const TIERS = [
