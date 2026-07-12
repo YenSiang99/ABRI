@@ -6,10 +6,10 @@ const FOOTER_COLUMNS = [
   {
     heading: "Product",
     links: [
-      { href: "#how", label: "How it works" },
-      { href: "#trust", label: "The badge" },
-      { href: "#pricing", label: "Membership" },
-      { href: "#", label: "Directory" },
+      { href: "/#how", label: "How it works" },
+      { href: "/#trust", label: "The badge" },
+      { href: "/#pricing", label: "Membership" },
+      { to: "/directory", label: "Directory" },
     ],
   },
   {
@@ -55,15 +55,25 @@ function Footer() {
               <h4 className="mb-3.5 text-xs tracking-[0.1em] text-grey-500 uppercase">
                 {column.heading}
               </h4>
-              {column.links.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="block py-1 text-sm text-grey-600 hover:text-ink"
-                >
-                  {link.label}
-                </a>
-              ))}
+              {column.links.map((link) =>
+                link.to ? (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    className="block py-1 text-sm text-grey-600 hover:text-ink"
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className="block py-1 text-sm text-grey-600 hover:text-ink"
+                  >
+                    {link.label}
+                  </a>
+                ),
+              )}
             </div>
           ))}
         </div>

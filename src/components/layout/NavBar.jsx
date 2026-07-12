@@ -3,10 +3,10 @@ import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
-  { href: "#how", label: "How it works" },
-  { href: "#trust", label: "The badge" },
-  { href: "#pricing", label: "Membership" },
-  { href: "#", label: "Directory" },
+  { href: "/#how", label: "How it works" },
+  { href: "/#trust", label: "The badge" },
+  { href: "/#pricing", label: "Membership" },
+  { to: "/directory", label: "Directory" },
 ];
 
 function NavBar() {
@@ -39,15 +39,25 @@ function NavBar() {
         </Link>
 
         <div className="hidden items-center gap-7 text-sm font-semibold text-grey-600 lg:flex">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="transition-colors hover:text-ink"
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((link) =>
+            link.to ? (
+              <Link
+                key={link.label}
+                to={link.to}
+                className="transition-colors hover:text-ink"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href}
+                className="transition-colors hover:text-ink"
+              >
+                {link.label}
+              </a>
+            ),
+          )}
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -78,16 +88,27 @@ function NavBar() {
       {open && (
         <div className="border-t border-grey-200 bg-white px-6 py-4 lg:hidden">
           <div className="flex flex-col gap-1">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="rounded-sm px-2 py-2.5 text-sm font-semibold text-grey-600 hover:bg-surface-2 hover:text-ink"
-              >
-                {link.label}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) =>
+              link.to ? (
+                <Link
+                  key={link.label}
+                  to={link.to}
+                  onClick={() => setOpen(false)}
+                  className="rounded-sm px-2 py-2.5 text-sm font-semibold text-grey-600 hover:bg-surface-2 hover:text-ink"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-sm px-2 py-2.5 text-sm font-semibold text-grey-600 hover:bg-surface-2 hover:text-ink"
+                >
+                  {link.label}
+                </a>
+              ),
+            )}
             <Link
               to="/login"
               onClick={() => setOpen(false)}
