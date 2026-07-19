@@ -101,8 +101,7 @@
   --yellow-hi: #ffc21f;
   --yellow-soft: #fdf3d4;
   --yellow-ink: #3a2c00;
-  --danger:   
-  ;
+  --danger: #dc2626;
   --danger-soft: #fdecea;
 
   /* ---- Semantic slots, mapped to the palette above ---- */
@@ -155,6 +154,7 @@
   --muted-foreground: var(--grey-400);
   --accent: #26251f;
   --accent-foreground: var(--surface);
+  --danger: #f87171;
   --destructive: var(--danger);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 18%);

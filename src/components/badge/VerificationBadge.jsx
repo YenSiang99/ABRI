@@ -7,14 +7,14 @@ const markVariants = cva(
   {
     variants: {
       tier: {
-        registered: "bg-grey-100 text-black",
+        registered: "bg-grey-100 text-black dark:bg-grey-700 dark:text-surface",
         verified: "bg-yellow ",
-        trusted: "bg-ink text-yellow",
-        T0: "bg-transparent border border-dashed border-grey-300 text-grey-500",
-        T1: "bg-grey-100 text-grey-600",
+        trusted: "bg-ink text-yellow dark:bg-grey-700",
+        T0: "bg-transparent border border-dashed border-grey-300 text-grey-500 dark:border-border dark:text-muted-foreground",
+        T1: "bg-grey-100 text-grey-600 dark:bg-grey-700 dark:text-muted-foreground",
         T2: "bg-yellow",
-        T3: "bg-ink text-yellow",
-        T4: "bg-ink text-yellow",
+        T3: "bg-ink text-yellow dark:bg-grey-700",
+        T4: "bg-ink text-yellow dark:bg-grey-700",
       },
       size: {
         inline: "w-[18px] h-[18px]",
@@ -68,11 +68,11 @@ function VerificationBadge({ tier, size = "profile", subtitle, chip = false, cla
         <Icon className={SIZE_ICON_CLASS[size]} />
       </span>
       {size === "inline" ? (
-        <span className="text-xs font-bold">{TierLabel}</span>
+        <span className="text-xs font-bold dark:text-foreground">{TierLabel}</span>
       ) : (
         <span className="flex flex-col">
-          <span className="text-sm font-bold leading-tight">{TierLabel}</span>
-          <span className="text-xs text-grey-500 mt-0.5">{Subtitle}</span>
+          <span className="text-sm font-bold leading-tight dark:text-foreground">{TierLabel}</span>
+          <span className="text-xs text-grey-500 mt-0.5 dark:text-muted-foreground">{Subtitle}</span>
         </span>
       )}
     </span>
@@ -83,7 +83,7 @@ function VerificationBadge({ tier, size = "profile", subtitle, chip = false, cla
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border border-ink bg-white px-2.5 py-1.5",
+        "inline-flex items-center rounded-full border border-ink bg-white px-2.5 py-1.5 dark:border-grey-600 dark:bg-card",
         className,
       )}
     >

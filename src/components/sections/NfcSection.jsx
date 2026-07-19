@@ -30,11 +30,11 @@ function NfcSection() {
             <span className="absolute top-[150px] left-[196px] z-3 size-9 animate-ping rounded-full border-2 border-yellow" />
             <div
               aria-hidden="true"
-              className="absolute right-0 bottom-0 z-2 w-[170px] rounded-[22px] border border-grey-300 bg-white p-3.5 px-3 shadow-md"
+              className="absolute right-0 bottom-0 z-2 w-[170px] rounded-[22px] border border-grey-300 bg-white p-3.5 px-3 text-ink shadow-md dark:border-border dark:bg-card dark:text-foreground"
             >
-              <div className="mx-auto mb-3 h-[5px] w-11 rounded-full bg-grey-200" />
+              <div className="mx-auto mb-3 h-[5px] w-11 rounded-full bg-grey-200 dark:bg-muted" />
               <div className="flex items-center gap-2">
-                <div className="grid size-[26px] place-items-center rounded-[7px] bg-ink text-[11px] font-extrabold text-yellow">
+                <div className="grid size-[26px] place-items-center rounded-[7px] bg-ink text-[11px] font-extrabold text-yellow dark:bg-grey-700">
                   M
                 </div>
                 <div className="text-[11px] font-extrabold">
@@ -44,24 +44,24 @@ function NfcSection() {
               <div className="mt-2.5 rounded-md border border-yellow bg-yellow-soft px-[7px] py-[5px] font-mono text-[8.5px] text-yellow-ink">
                 ✓ SSM-VERIFIED · ACTIVE
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-surface-2" />
-              <div className="mt-2 h-1.5 rounded-full bg-surface-2" />
-              <div className="mt-2 h-1.5 w-3/5 rounded-full bg-surface-2" />
+              <div className="mt-2 h-1.5 rounded-full bg-surface-2 dark:bg-muted" />
+              <div className="mt-2 h-1.5 rounded-full bg-surface-2 dark:bg-muted" />
+              <div className="mt-2 h-1.5 w-3/5 rounded-full bg-surface-2 dark:bg-muted" />
             </div>
           </div>
-          <p className="mt-4 text-center font-mono text-[11.5px] text-grey-500">
+          <p className="mt-4 text-center font-mono text-[11.5px] text-grey-500 dark:text-muted-foreground">
             [ replace with product photography before launch ]
           </p>
         </div>
 
         <div>
-          <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase">
+          <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
             The card
           </span>
-          <h2 className="mt-3 text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-ink">
+          <h2 className="mt-3 text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
             One tap. Your whole verified identity.
           </h2>
-          <p className="mt-3.5 max-w-[34rem] text-[17px] text-grey-600">
+          <p className="mt-3.5 max-w-[34rem] text-[17px] text-grey-600 dark:text-muted-foreground">
             Tap your ABRI card to any phone — no app needed. They instantly
             see your verified company, your vouches, and your live SSM
             status. Verification renders first, before contact details. It's
@@ -70,11 +70,11 @@ function NfcSection() {
           <div className="mt-[26px]">
             <a
               href="#pricing"
-              className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-ink px-[22px] py-[13px] text-[15px] leading-none font-bold text-white transition-colors hover:bg-black"
+              className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-ink px-[22px] py-[13px] text-[15px] leading-none font-bold text-white transition-colors hover:bg-black dark:bg-grey-700 dark:hover:bg-grey-600"
             >
               See membership
             </a>
-            <span className="mt-3 block font-mono text-xs text-grey-500">
+            <span className="mt-3 block font-mono text-xs text-grey-500 dark:text-muted-foreground">
               card included with membership
             </span>
           </div>

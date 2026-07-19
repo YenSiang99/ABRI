@@ -7,9 +7,9 @@ const iconVariants = cva(
   {
     variants: {
       tier: {
-        registered: "bg-grey-100 text-grey-600",
+        registered: "bg-grey-100 text-grey-600 dark:bg-grey-700 dark:text-muted-foreground",
         verified: "bg-yellow text-yellow-ink",
-        trusted: "bg-ink text-yellow",
+        trusted: "bg-ink text-yellow dark:bg-grey-700",
       },
       size: {
         small: "w-[18px] h-[18px]",
