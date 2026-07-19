@@ -1,10 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
-import { getBusiness } from "@/data/appMockData";
+import { getBusiness } from "@/lib/store/businesses";
 import { toast } from "@/lib/toast";
 
 function VouchListItem({ vouch, mode }) {
-  const otherId = mode === "received" ? vouch.fromId : vouch.toId;
+  const otherId = mode === "received" ? vouch.fromBusinessId : vouch.toBusinessId;
   const other = getBusiness(otherId);
   if (!other) return null;
 
@@ -20,7 +20,7 @@ function VouchListItem({ vouch, mode }) {
             <AppTierBadge tier={other.tier} />
           </div>
           <div className="text-xs text-muted-foreground">
-            {other.industry} · {vouch.date}
+            {other.category} · {vouch.date}
           </div>
         </div>
       </div>

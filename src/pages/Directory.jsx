@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { businesses } from "@/data/businesses";
+import { useBusinesses } from "@/lib/store/businesses";
 import { BusinessCard } from "@/components/business/BusinessCard";
 
 const TIER_FILTERS = [
@@ -13,6 +13,7 @@ const TIER_FILTERS = [
 ];
 
 function Directory() {
+  const businesses = useBusinesses();
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
 
@@ -28,13 +29,13 @@ function Directory() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
-      <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase">
+      <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
         The verified business network
       </span>
-      <h1 className="mt-3 text-[clamp(28px,3.4vw,38px)] font-extrabold tracking-[-0.02em] text-ink">
+      <h1 className="mt-3 text-[clamp(28px,3.4vw,38px)] font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
         Directory
       </h1>
-      <p className="mt-2 max-w-[36rem] text-[15px] text-grey-600">
+      <p className="mt-2 max-w-[36rem] text-[15px] text-grey-600 dark:text-muted-foreground">
         Browse businesses seeded from public registry data, claimed by their
         owners, and SSM-verified.
       </p>
@@ -46,7 +47,7 @@ function Directory() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name or category"
-          className="w-full rounded-sm border border-grey-300 py-2.5 pr-3.5 pl-10 text-sm text-ink outline-none focus:border-ink"
+          className="w-full rounded-sm border border-grey-300 py-2.5 pr-3.5 pl-10 text-sm text-ink outline-none focus:border-ink dark:border-border dark:text-foreground dark:focus:border-yellow"
         />
       </div>
 
@@ -59,8 +60,8 @@ function Directory() {
             className={cn(
               "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
               tierFilter === filter.value
-                ? "border-ink bg-ink text-yellow"
-                : "border-grey-300 text-grey-600 hover:bg-surface-2",
+                ? "border-ink bg-ink text-yellow dark:border-grey-700 dark:bg-grey-700"
+                : "border-grey-300 text-grey-600 hover:bg-surface-2 dark:border-border dark:text-muted-foreground dark:hover:bg-muted",
             )}
           >
             {filter.label}
@@ -68,7 +69,7 @@ function Directory() {
         ))}
       </div>
 
-      <div className="mt-4 text-[13px] text-grey-500">
+      <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
         {filtered.length} {filtered.length === 1 ? "business" : "businesses"}
       </div>
 
@@ -79,7 +80,7 @@ function Directory() {
           ))}
         </div>
       ) : (
-        <div className="mt-16 text-center text-grey-500">
+        <div className="mt-16 text-center text-grey-500 dark:text-muted-foreground">
           {q
             ? `No businesses match "${query}".`
             : "No businesses match this filter."}

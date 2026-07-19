@@ -6,17 +6,17 @@ function BusinessCard({ business }) {
   return (
     <Link
       to={`/business/${business.id}`}
-      className="block rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md"
+      className="block rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-border dark:bg-card"
     >
       <div className="flex items-start gap-4">
-        <div className="grid size-12 flex-none place-items-center rounded-xl bg-ink text-lg font-extrabold text-yellow">
+        <div className="grid size-12 flex-none place-items-center rounded-xl bg-ink text-lg font-extrabold text-yellow dark:bg-grey-700">
           {business.name.charAt(0)}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-[17px] font-extrabold text-ink">
+          <div className="truncate text-[17px] font-extrabold text-ink dark:text-foreground">
             {business.name}
           </div>
-          <div className="mt-[3px] text-[13.5px] text-grey-600">
+          <div className="mt-[3px] text-[13.5px] text-grey-600 dark:text-muted-foreground">
             {business.category} · {business.location}
           </div>
           <div className="mt-2.5">
@@ -24,10 +24,12 @@ function BusinessCard({ business }) {
           </div>
         </div>
       </div>
-      <div className="mt-4 text-[13px] text-grey-500">
-        {business.vouchCount > 0
-          ? `${business.vouchCount} vouches`
-          : "No vouches yet"}
+      <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
+        {business.tier === "T1"
+          ? "Vouches unlock after SSM verification"
+          : business.vouchCount > 0
+            ? `${business.vouchCount} vouches`
+            : "No vouches yet"}
       </div>
     </Link>
   );

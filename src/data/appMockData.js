@@ -1,33 +1,15 @@
-export const tierLabel = {
-  T0: "Listed",
-  T1: "Claimed",
-  T2: "SSM-Verified",
-  T3: "Identity-Verified",
-  T4: "Transaction-Trusted",
-};
-
-export const ladderLabel = {
-  none: "New Member",
-  first: "First Vouch",
-  top20: "Top 20%",
-  trusted: "Trusted Business",
-  leader: "Network Leader",
-};
-
-export const currentUser = {
+// Minimal placeholder so introductions/activity entries that reference "the
+// logged-in business" (id "u_me") still resolve via getBusiness() below.
+// Real account/business state now lives in AuthContext + src/lib/store.js —
+// this file only feeds Network.jsx, Introductions.jsx, and Dashboard's
+// suggested-peers strip, which are out of scope for the real tier system.
+const MOCK_SELF = {
   id: "u_me",
   name: "Meridian Accounting",
   industry: "Accounting & tax",
   corridor: "Petaling Jaya",
-  ssm: "201801019345",
   tier: "T2",
   ladder: "trusted",
-  vouchesReceived: 12,
-  vouchesGiven: 8,
-  memberSince: "Jan 2026",
-  about:
-    "Boutique chartered accounting practice serving founder-led SMEs across the Klang Valley. SSM filings, tax advisory, and monthly bookkeeping.",
-  services: ["SSM filings", "Tax advisory", "Bookkeeping", "Payroll"],
 };
 
 export const businesses = [
@@ -201,22 +183,6 @@ export const businesses = [
   },
 ];
 
-export const vouchesReceived = [
-  { id: "v1", fromId: "b_sentul", toId: "u_me", testimonial: "Sorted our SSM filing in a day — completely reliable.", date: "3 days ago" },
-  { id: "v2", fromId: "b_lumen", toId: "u_me", testimonial: "Best tax mind I've worked with in KL. Referred three clients already.", date: "1 week ago" },
-  { id: "v3", fromId: "b_pandan", toId: "u_me", testimonial: "Deeply hands-on on our audit. Actually returns calls.", date: "2 weeks ago" },
-  { id: "v4", fromId: "b_terra", toId: "u_me", testimonial: "Rare combination of technical depth and clear communication.", date: "3 weeks ago" },
-  { id: "v5", fromId: "b_atlas", toId: "u_me", testimonial: "Steered us through a messy year-end. Grateful.", date: "1 month ago" },
-  { id: "v6", fromId: "b_orbit", toId: "u_me", testimonial: "Set up our books from scratch in a week.", date: "1 month ago" },
-];
-
-export const vouchesGiven = [
-  { id: "g1", fromId: "u_me", toId: "b_sentul", testimonial: "Our go-to co-sec. Filings never miss a deadline.", date: "5 days ago" },
-  { id: "g2", fromId: "u_me", toId: "b_lumen", testimonial: "Drafted our shareholders agreement — every clause defensible.", date: "2 weeks ago" },
-  { id: "g3", fromId: "u_me", toId: "b_pandan", testimonial: "Payroll runs on rails since we moved to them.", date: "3 weeks ago" },
-  { id: "g4", fromId: "u_me", toId: "b_atlas", testimonial: "Broker who actually reads the policy language.", date: "1 month ago" },
-];
-
 export const activity = [
   { id: "a1", type: "vouch_received", actorId: "b_sentul", message: "vouched for you", date: "3 days ago" },
   { id: "a2", type: "profile_view", message: "3 profile views from Bangsar corridor", date: "4 days ago" },
@@ -227,6 +193,68 @@ export const activity = [
 ];
 
 export function getBusiness(id) {
-  if (id === currentUser.id) return currentUser;
+  if (id === MOCK_SELF.id) return MOCK_SELF;
   return businesses.find((b) => b.id === id);
 }
+
+export const introductions = [
+  {
+    id: "i1",
+    direction: "incoming",
+    requesterId: "b_ember",
+    targetId: "u_me",
+    viaId: "b_sentul",
+    note: "Looking for a hands-on accountant for our seed-stage D2C brand. Sentul Corp said you'd be the right call.",
+    date: "2 days ago",
+    status: "pending",
+  },
+  {
+    id: "i2",
+    direction: "incoming",
+    requesterId: "b_north",
+    targetId: "u_me",
+    viaId: "b_pandan",
+    note: "Need help sorting out 2 years of messy books before we raise. Pandan Payroll vouched hard for you.",
+    date: "5 days ago",
+    status: "pending",
+  },
+  {
+    id: "i3",
+    direction: "outgoing",
+    requesterId: "u_me",
+    targetId: "b_koda",
+    viaId: "b_lumen",
+    note: "Fitting out a new PJ office in Q3. Would love 15 min to see if you're the right fit.",
+    date: "1 week ago",
+    status: "pending",
+  },
+  {
+    id: "i4",
+    direction: "incoming",
+    requesterId: "b_orbit",
+    targetId: "u_me",
+    viaId: "b_atlas",
+    note: "Client of ours needs a second opinion on a tax matter. Thanks in advance.",
+    date: "2 weeks ago",
+    status: "accepted",
+  },
+  {
+    id: "i5",
+    direction: "outgoing",
+    requesterId: "u_me",
+    targetId: "b_terra",
+    viaId: "b_finch",
+    note: "Would value a quick coffee on cross-border GST — Finch said you're the best in KL.",
+    date: "3 weeks ago",
+    status: "accepted",
+  },
+];
+
+export const nfcTaps = [
+  { id: "t1", location: "Menara KLK, Damansara", device: "iPhone 15", date: "Today, 3:42pm", ledToProfileView: true },
+  { id: "t2", location: "Bangsar Village, KL", device: "Pixel 8", date: "Today, 11:20am", ledToProfileView: true },
+  { id: "t3", location: "KLCC, KL", device: "iPhone 14", date: "Yesterday, 5:10pm", ledToProfileView: false },
+  { id: "t4", location: "One Utama, PJ", device: "Samsung S24", date: "2 days ago", ledToProfileView: true },
+  { id: "t5", location: "The Gardens Mall, KL", device: "iPhone 15 Pro", date: "3 days ago", ledToProfileView: true },
+  { id: "t6", location: "Publika, Solaris Dutamas", device: "iPhone 13", date: "4 days ago", ledToProfileView: false },
+];
