@@ -14,6 +14,11 @@ function ClaimantLine({ business }) {
   return (
     <div className="mt-2 text-[13px] text-grey-600">
       Claimed by <strong>{account.name}</strong> ({account.role}) · {account.email}
+      {business.verificationMethod === "domain-auto" && (
+        <span className="ml-2 rounded-full border border-grey-300 px-2 py-0.5 text-[11px] font-bold text-grey-600">
+          Domain-verified
+        </span>
+      )}
     </div>
   );
 }

@@ -2,10 +2,15 @@ import { createContext, useContext, useState } from "react";
 
 import * as businessStore from "@/lib/store/businesses";
 import * as accountStore from "@/lib/store/accounts";
+import { createVerificationToken } from "@/lib/store/emailVerifications";
 
 const AuthContext = createContext(null);
 
 const SESSION_KEY = "abri:session:v1";
+// Manually-reviewed claims can sit for days before an admin approves, so the
+// confirmation link minted at approval time needs a much longer window than
+// the domain-match link (which is expected to be clicked in one sitting).
+const MANUAL_APPROVAL_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function getInitialSession() {
   if (typeof window === "undefined") return null;
@@ -41,8 +46,13 @@ function AuthProvider({ children }) {
     if (claimedBusiness?.claimStatus === "pending") {
       return {
         ok: false,
-        error:
-          "Your claim is still pending admin review. We'll email you once it's approved — usually within a couple of business days.",
+        error: "We're still verifying your claim. We'll email you a confirmation link once that's ready.",
+      };
+    }
+    if (!found.emailVerified) {
+      return {
+        ok: false,
+        error: "Please confirm your email using the link we sent before logging in.",
       };
     }
 
@@ -90,7 +100,10 @@ function AuthProvider({ children }) {
       role: repRole,
       password,
       businessId: claimedBusiness.id,
-      emailVerified: true,
+      // Not verified yet either way — the domain-match path sets this true
+      // the moment its (immediate) confirmation link is clicked; the manual
+      // path sets it true once its (delayed, admin-gated) link is clicked.
+      emailVerified: false,
       phoneVerified: true,
     });
 
@@ -106,8 +119,56 @@ function AuthProvider({ children }) {
     return businessStore.setTier(businessId, "T1");
   }
 
+  // Approving here does NOT log the claimant in or fully verify their email
+  // — it only clears the business-affiliation gate. A confirmation link is
+  // minted at this point (not before), the same action the domain-match
+  // path performs immediately at submission time, so the claimant's final
+  // step — click a link, get signed in — is identical either way. The
+  // claimant retrieves it via the /claim-status lookup page, since they
+  // have no session to check back with.
   function approveClaim(businessId) {
-    return businessStore.approveClaim(businessId);
+    const approved = businessStore.approveClaim(businessId);
+    const account = approved?.claimedByAccountId
+      ? accountStore.getAccount(approved.claimedByAccountId)
+      : null;
+    if (account) {
+      createVerificationToken({
+        email: account.email,
+        businessId,
+        accountId: account.id,
+        ttlMs: MANUAL_APPROVAL_TOKEN_TTL_MS,
+      });
+    }
+    return approved;
+  }
+
+  // Completes a claim that was auto-verified via company domain match:
+  // creates the account/business (still starting "pending", same as the
+  // manual path) then immediately auto-approves and signs the claimant in
+  // directly. Deliberately bypasses login()'s pending-claim gate rather than
+  // calling it — login() reads `businesses` from this render's closure,
+  // which would still reflect the pre-mutation snapshot taken just above.
+  function completeDomainVerifiedClaim(claimPayload) {
+    const result = claimOrRegister(claimPayload);
+    if (!result.ok) return result;
+
+    businessStore.autoApproveClaim(result.business.id);
+    accountStore.setEmailVerified(result.account.id, true);
+    persistSession({ accountId: result.account.id });
+    return { ok: true, business: result.business, account: result.account };
+  }
+
+  // Completes the manual-review path's final step: the account and business
+  // were already created (pending) at submission time and already approved
+  // by an admin — this just confirms the claimant controls the email the
+  // link was sent to, and signs them in.
+  function completeManualVerifiedClaim({ accountId }) {
+    const account = accountStore.getAccount(accountId);
+    if (!account) return { ok: false, error: "Account not found." };
+
+    accountStore.setEmailVerified(accountId, true);
+    persistSession({ accountId });
+    return { ok: true, account };
   }
 
   // Rejects a pending claim or revokes one already approved — either way the
@@ -136,6 +197,8 @@ function AuthProvider({ children }) {
     markSsmVerified,
     revokeSsmVerification,
     approveClaim,
+    completeDomainVerifiedClaim,
+    completeManualVerifiedClaim,
     removeClaim,
   };
 

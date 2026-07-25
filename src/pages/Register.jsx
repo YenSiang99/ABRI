@@ -3,6 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 
 import { useBusinesses } from "@/lib/store/businesses";
+import { createVerificationToken } from "@/lib/store/emailVerifications";
+import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,7 @@ function Register() {
 
   const [step, setStep] = useState(preselected ? "details" : "search");
   const [submittedName, setSubmittedName] = useState("");
+  const [linkToken, setLinkToken] = useState(null);
   const [form, setForm] = useState(
     preselected
       ? {
@@ -55,6 +58,11 @@ function Register() {
       : EMPTY_FORM,
   );
   const [errors, setErrors] = useState({});
+
+  const matchedBusiness = form.businessId
+    ? (businesses.find((b) => b.id === form.businessId) ?? null)
+    : null;
+  const domainMatch = matchesBusinessDomain(form.repEmail, matchedBusiness);
 
   function selectBusiness(business) {
     setForm({
@@ -108,9 +116,8 @@ function Register() {
     setStep("verify");
   }
 
-  function handleVerifySubmit({ emailCode, phoneCode }) {
+  function handleVerifySubmit({ phoneCode }) {
     const nextErrors = {};
-    if (emailCode.trim().length < 4) nextErrors.emailCode = "Enter the code we sent";
     if (phoneCode.trim().length < 4) nextErrors.phoneCode = "Enter the code we sent";
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
@@ -124,6 +131,26 @@ function Register() {
     }
     setSubmittedName(form.businessName);
     setStep("submitted");
+  }
+
+  // Domain-match path: nothing is created yet (mirrors the OTP path only
+  // calling claimOrRegister after verification succeeds) — we just mint a
+  // token holding this claim's payload and simulate "sending" it. The claim
+  // is only actually created once that link is opened (VerifyClaimLink.jsx).
+  function handleSendVerificationLink(phoneCode) {
+    const nextErrors = {};
+    if (phoneCode.trim().length < 4) nextErrors.phoneCode = "Enter the code we sent";
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
+    const record = createVerificationToken({
+      email: form.repEmail,
+      businessId: form.businessId,
+      claimPayload: form,
+    });
+    setLinkToken(record.token);
   }
 
   return (
@@ -161,11 +188,16 @@ function Register() {
           <VerifyStep
             form={form}
             errors={errors}
+            domainMatch={domainMatch}
+            linkToken={linkToken}
             onBack={() => setStep("personal")}
             onSubmit={handleVerifySubmit}
+            onSendLink={handleSendVerificationLink}
           />
         )}
-        {step === "submitted" && <SubmittedStep businessName={submittedName} />}
+        {step === "submitted" && (
+          <SubmittedStep businessName={submittedName} email={form.repEmail} />
+        )}
       </div>
     </div>
   );
@@ -435,7 +467,8 @@ function PersonalStep({ form, errors, onChange, onBack, onSubmit }) {
   );
 }
 
-function SubmittedStep({ businessName }) {
+function SubmittedStep({ businessName, email }) {
+  const statusHref = email ? `/claim-status?email=${encodeURIComponent(email)}` : "/claim-status";
   return (
     <div>
       <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
@@ -445,29 +478,86 @@ function SubmittedStep({ businessName }) {
         Claim submitted
       </h1>
       <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-        Thanks — your claim on {businessName || "this business"} is now pending
-        admin review. We manually check that you're authorised to represent
-        the business before granting login access; you'll get an email once
-        it's approved. This is separate from (and happens before) SSM
-        verification.
+        Thanks — we're finishing verification on your claim for {businessName || "this business"}.
+        We'll send a confirmation link to {email || "your email"} once that's ready — you can
+        check on it anytime. This is separate from (and happens before) SSM verification.
       </p>
-      <Link
-        to="/directory"
-        className="mt-8 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
-      >
-        Back to directory
-      </Link>
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link
+          to={statusHref}
+          className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+        >
+          Check claim status
+        </Link>
+        <Link
+          to="/directory"
+          className="inline-flex items-center gap-2 rounded-sm border border-grey-300 px-5 py-2.5 text-[14px] font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
+        >
+          Back to directory
+        </Link>
+      </div>
     </div>
   );
 }
 
-function VerifyStep({ form, errors, onBack, onSubmit }) {
-  const [emailCode, setEmailCode] = useState("");
+// Both branches render the same shape — a label, one line of status copy,
+// then either a clickable simulated link or a plain "later" message — so
+// that watching the page tells an observer as little as possible about
+// which path was taken beyond the one difference that's unavoidable: this
+// branch has a link available right now and the other doesn't yet.
+function DomainEmailVerification({ email, linkToken }) {
+  return (
+    <div>
+      <label className={labelClass}>Email verification</label>
+      {linkToken ? (
+        <div className="mt-3 rounded-md border border-grey-200 bg-surface-2 p-4 dark:border-border dark:bg-muted">
+          <p className="text-[12.5px] font-bold text-ink dark:text-foreground">
+            Simulated email — sent to {email}
+          </p>
+          <p className="mt-1 text-[12.5px] text-grey-600 dark:text-muted-foreground">
+            In production this link would arrive in your inbox. For this demo, click it
+            directly below to simulate opening it from {email}.
+          </p>
+          <Link
+            to={`/verify-claim/${linkToken}`}
+            className="mt-3 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2 text-[13px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi"
+          >
+            Open verification link
+          </Link>
+        </div>
+      ) : (
+        <p className="mt-1.5 text-[12.5px] text-grey-600 dark:text-muted-foreground">
+          We'll send a confirmation link to <strong>{email}</strong>. Enter the code sent
+          to your phone below, then continue.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PendingEmailVerification({ email }) {
+  return (
+    <div>
+      <label className={labelClass}>Email verification</label>
+      <p className="mt-1.5 text-[12.5px] text-grey-600 dark:text-muted-foreground">
+        We'll send a confirmation link to <strong>{email}</strong> once we've finished
+        verifying your details. Enter the code sent to your phone below, then continue —
+        you'll be able to check on this anytime afterwards.
+      </p>
+    </div>
+  );
+}
+
+function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, onSendLink }) {
   const [phoneCode, setPhoneCode] = useState("");
 
   function handleSubmit(e) {
     e.preventDefault();
-    onSubmit({ emailCode, phoneCode });
+    if (domainMatch) {
+      onSendLink(phoneCode);
+      return;
+    }
+    onSubmit({ phoneCode });
   }
 
   return (
@@ -479,30 +569,17 @@ function VerifyStep({ form, errors, onBack, onSubmit }) {
         Verify it's you
       </h1>
       <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-        This confirms you control {form.repEmail || "your email"} and{" "}
-        {form.repPhone || "your phone"} — it doesn't confirm you own the
-        business. We'll manually cross-check {form.businessName || "your business"}{" "}
-        against SSM records separately before showing the SSM-Verified badge.
+        We need to confirm a few more things before finishing your claim on{" "}
+        {form.businessName || "this business"}. Enter the code sent to your phone, and
+        we'll take care of the rest by email.
       </p>
 
       <div className="mt-6 flex flex-col gap-4">
-        <div>
-          <label className={labelClass}>
-            Code sent to {form.repEmail || "your email"}{" "}
-            <span className="font-normal text-grey-500 dark:text-muted-foreground">
-              (demo — enter any 4+ digit code)
-            </span>
-          </label>
-          <input
-            type="text"
-            value={emailCode}
-            onChange={(e) => setEmailCode(e.target.value)}
-            placeholder="123456"
-            className={cn(fieldClass, "mt-1.5")}
-            autoFocus
-          />
-          {errors.emailCode && <p className={errorClass}>{errors.emailCode}</p>}
-        </div>
+        {domainMatch ? (
+          <DomainEmailVerification email={form.repEmail} linkToken={linkToken} />
+        ) : (
+          <PendingEmailVerification email={form.repEmail} />
+        )}
 
         <div>
           <label className={labelClass}>
@@ -516,17 +593,12 @@ function VerifyStep({ form, errors, onBack, onSubmit }) {
             value={phoneCode}
             onChange={(e) => setPhoneCode(e.target.value)}
             placeholder="123456"
+            disabled={Boolean(domainMatch && linkToken)}
             className={cn(fieldClass, "mt-1.5")}
+            autoFocus
           />
           {errors.phoneCode && <p className={errorClass}>{errors.phoneCode}</p>}
         </div>
-
-        <button
-          type="button"
-          className="self-start text-[13px] font-bold text-ink underline-offset-2 hover:underline dark:text-foreground"
-        >
-          Resend codes
-        </button>
       </div>
 
       {errors.submit && <p className={cn(errorClass, "mt-4")}>{errors.submit}</p>}
@@ -539,12 +611,14 @@ function VerifyStep({ form, errors, onBack, onSubmit }) {
         >
           Back
         </button>
-        <button
-          type="submit"
-          className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
-        >
-          Verify &amp; finish
-        </button>
+        {!(domainMatch && linkToken) && (
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+          >
+            Continue
+          </button>
+        )}
       </div>
     </form>
   );

@@ -6,6 +6,7 @@ const businesses = [
     tier: "T2",
     vouchCount: 14,
     location: "Petaling Jaya",
+    domain: "meridianaccounting.my",
     description:
       "Full-service accounting and tax filing for SMEs, with a focus on fast SSM annual return turnaround.",
   },
@@ -16,6 +17,7 @@ const businesses = [
     tier: "T2",
     vouchCount: 21,
     location: "Kuala Lumpur",
+    domain: "sentulcorpservices.my",
     description:
       "Company secretarial services covering incorporation, statutory filings, and compliance advisory.",
   },
@@ -26,6 +28,7 @@ const businesses = [
     tier: "T2",
     vouchCount: 9,
     location: "Bangsar",
+    domain: "bangsarlegalpartners.my",
     description:
       "Commercial law firm specialising in contracts, corporate structuring, and dispute resolution.",
   },
@@ -36,6 +39,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 3,
     location: "Subang Jaya",
+    domain: "clearpathcorpsec.my",
     description:
       "Boutique company secretarial practice serving early-stage and growth-stage businesses.",
   },
@@ -46,6 +50,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 5,
     location: "Shah Alam",
+    domain: "novatechconsulting.my",
     description:
       "IT infrastructure and systems consulting for SMEs migrating to cloud-based operations.",
   },
@@ -56,6 +61,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 2,
     location: "Puchong",
+    domain: "puchongtaxadvisory.my",
     description:
       "Tax planning and compliance advisory for owner-managed businesses across the Klang Valley.",
   },
@@ -66,6 +72,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Kuala Lumpur",
+    domain: "klsecretarialgroup.my",
     description:
       "Company secretarial firm listed from public SSM registry data. Not yet claimed by an owner.",
   },
@@ -76,6 +83,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Petaling Jaya",
+    domain: "damansaralawchambers.my",
     description:
       "Legal practice listed from public registry data. Not yet claimed by an owner.",
   },
@@ -86,6 +94,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Subang Jaya",
+    domain: "subangitsolutions.my",
     description:
       "IT services provider listed from public registry data. Not yet claimed by an owner.",
   },
@@ -96,6 +105,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Shah Alam",
+    domain: "shahalamcorpadvisors.my",
     description:
       "Corporate secretarial firm listed from public registry data. Not yet claimed by an owner.",
   },
@@ -106,6 +116,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Kuala Lumpur",
+    domain: "cherasaccountinghub.my",
     description:
       "Accounting practice listed from public registry data. Not yet claimed by an owner.",
   },
@@ -116,6 +127,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Kuala Lumpur",
+    domain: "gombaksecretarialservices.my",
     description:
       "Company secretarial firm listed from public registry data. Not yet claimed by an owner.",
   },
@@ -126,6 +138,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 1,
     location: "Subang Jaya",
+    domain: "usjcorpsecpartners.my",
     description:
       "Company secretarial services for SMEs in the USJ and Subang commercial corridor.",
   },
@@ -136,6 +149,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Petaling Jaya",
+    domain: "kelanajayalawassociates.my",
     description:
       "Legal practice listed from public registry data. Not yet claimed by an owner.",
   },
@@ -146,6 +160,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Kuala Lumpur",
+    domain: "montkiaraaccountingco.my",
     description:
       "Accounting practice listed from public registry data. Not yet claimed by an owner.",
   },
@@ -156,6 +171,7 @@ const businesses = [
     tier: "T2",
     vouchCount: 11,
     location: "Kuala Lumpur",
+    domain: "brickfieldscorpservices.my",
     description:
       "Company secretarial and compliance firm serving professional-services clients across KL.",
   },
@@ -166,6 +182,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Shah Alam",
+    domain: "klangitpartners.my",
     description:
       "IT consulting firm listed from public registry data. Not yet claimed by an owner.",
   },
@@ -176,6 +193,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 4,
     location: "Kuala Lumpur",
+    domain: "ttdicorpsecstudio.my",
     description:
       "Company secretarial studio supporting startups and SMEs through incorporation and compliance.",
   },
@@ -186,6 +204,7 @@ const businesses = [
     tier: "T1",
     vouchCount: 2,
     location: "Subang Jaya",
+    domain: "sunwaylegalgroup.my",
     description:
       "Commercial and corporate law practice serving the Sunway and Subang business corridor.",
   },
@@ -196,6 +215,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Puchong",
+    domain: "puchongcorpsechub.my",
     description:
       "Company secretarial firm listed from public registry data. Not yet claimed by an owner.",
   },
@@ -206,6 +226,7 @@ const businesses = [
     tier: "T2",
     vouchCount: 7,
     location: "Kuala Lumpur",
+    domain: "bangsarsouthaccounting.my",
     description:
       "Accounting and tax advisory firm with a client base of professional-services SMEs.",
   },
@@ -216,6 +237,7 @@ const businesses = [
     tier: "T0",
     vouchCount: 0,
     location: "Petaling Jaya",
+    domain: "petalingjayacorpregistry.my",
     description:
       "Company secretarial firm listed from public registry data. Not yet claimed by an owner.",
   },

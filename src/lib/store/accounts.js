@@ -73,6 +73,20 @@ function deleteAccount(id) {
   persistAccounts();
 }
 
+function updateAccount(id, updater) {
+  const all = loadAccounts();
+  const idx = all.findIndex((a) => a.id === id);
+  if (idx === -1) return null;
+  const next = { ...all[idx], ...updater(all[idx]) };
+  accountCache = [...all.slice(0, idx), next, ...all.slice(idx + 1)];
+  persistAccounts();
+  return next;
+}
+
+function setEmailVerified(id, value) {
+  return updateAccount(id, () => ({ emailVerified: value }));
+}
+
 function seedDemoAccountsIfNeeded() {
   loadAccounts();
   if (accountCache.length > 0) return;
@@ -104,4 +118,12 @@ function seedDemoAccountsIfNeeded() {
 
 seedDemoAccountsIfNeeded();
 
-export { useAccounts, findAccountByEmail, getAccount, createAccount, verifyPassword, deleteAccount };
+export {
+  useAccounts,
+  findAccountByEmail,
+  getAccount,
+  createAccount,
+  verifyPassword,
+  deleteAccount,
+  setEmailVerified,
+};

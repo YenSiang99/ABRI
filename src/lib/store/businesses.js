@@ -127,10 +127,16 @@ function seedBusinessRecord(raw, allSeed) {
     description: raw.description,
     services: CATEGORY_SERVICES[raw.category] ?? [],
     ssm: raw.tier === "T0" ? "" : ssmFor(raw.id),
+    // The business's own canonical domain, set at seed/import time (or later
+    // by an admin) — never editable by a claimant. Used to auto-verify a
+    // claim when the claimant's email is on this same domain. Absent for
+    // businesses with no known domain, which always require manual review.
+    domain: raw.domain ?? null,
     claimedByAccountId: null,
     // Seed data represents claims that were already established before this
     // approval workflow existed, so they start pre-approved.
     claimStatus: raw.tier === "T0" ? null : "approved",
+    verificationMethod: raw.tier === "T0" ? null : "manual",
     createdAt: now,
     updatedAt: now,
   };
@@ -258,8 +264,12 @@ function claimOrCreateBusiness({ businessId, name, category, location, ssm, desc
     description: description || `${name} — newly registered on ABRI.`,
     services: CATEGORY_SERVICES[category] ?? [],
     ssm: ssm || ssmFor(id),
+    // A manually-registered business has no established domain to check
+    // against, so it always goes through manual review.
+    domain: null,
     claimedByAccountId: null,
     claimStatus: "pending",
+    verificationMethod: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -273,7 +283,18 @@ function setBusinessOwner(businessId, accountId) {
 }
 
 function approveClaim(businessId) {
-  return updateBusiness(businessId, () => ({ claimStatus: "approved" }));
+  return updateBusiness(businessId, () => ({ claimStatus: "approved", verificationMethod: "manual" }));
+}
+
+// Approves a claim without admin involvement, because the claimant proved
+// control of an inbox on the business's own registered domain. Tagged with
+// verificationMethod so it stays distinguishable from a manual admin
+// approval (e.g. for an audit trail in AdminReview later).
+function autoApproveClaim(businessId) {
+  return updateBusiness(businessId, () => ({
+    claimStatus: "approved",
+    verificationMethod: "domain-auto",
+  }));
 }
 
 // Used both to reject a pending claim and to revoke one already approved
@@ -285,6 +306,7 @@ function removeClaim(businessId) {
     ssm: "",
     claimedByAccountId: null,
     claimStatus: null,
+    verificationMethod: null,
   }));
 }
 
@@ -301,6 +323,7 @@ export {
   listVouchesGivenBy,
   setBusinessOwner,
   approveClaim,
+  autoApproveClaim,
   removeClaim,
   tierLabel,
   ladderLabel,
