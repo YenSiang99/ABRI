@@ -15,6 +15,13 @@ function Row({ label, value, mono }) {
   );
 }
 
+// Uses whatever host the app is actually running on (Vercel preview/prod
+// domain today, abri.my once that's live) rather than a hardcoded domain,
+// so the displayed landing URL always matches a link that really works.
+function landingHost() {
+  return typeof window !== "undefined" ? window.location.host : "abri.my";
+}
+
 function Card() {
   const { business } = useAuth();
 
@@ -94,7 +101,7 @@ function Card() {
           <div className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
             <Row label="Card ID" value="ABRI-0187" mono />
             <Row label="Chip" value="NTAG 424 DNA" />
-            <Row label="Landing URL" value={`abri.my/m/${business.id}`} mono />
+            <Row label="Landing URL" value={`${landingHost()}/m/${business.id}`} mono />
           </div>
 
           <div className="mt-6 flex flex-col gap-2">
