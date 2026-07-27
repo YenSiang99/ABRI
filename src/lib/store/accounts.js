@@ -28,6 +28,15 @@ function getAccountsSnapshot() {
   return loadAccounts();
 }
 
+// Forces a fresh read from localStorage, discarding the in-memory cache —
+// see refreshBusinesses in businesses.js for why this is needed at login.
+function refreshAccounts() {
+  accountCache = null;
+  loadAccounts();
+  accountListeners.forEach((cb) => cb());
+  return accountCache;
+}
+
 function useAccounts() {
   return useSyncExternalStore(subscribeAccounts, getAccountsSnapshot);
 }
@@ -126,4 +135,5 @@ export {
   verifyPassword,
   deleteAccount,
   setEmailVerified,
+  refreshAccounts,
 };

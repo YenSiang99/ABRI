@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 
-import { useBusinesses } from "@/lib/store/businesses";
+import { useBusinesses, getBusiness } from "@/lib/store/businesses";
 import { createVerificationToken } from "@/lib/store/emailVerifications";
 import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   repRole: "",
   password: "",
   confirmPassword: "",
+  connectTarget: null,
 };
 
 const fieldClass =
@@ -42,6 +43,13 @@ function Register() {
   const preselected = businesses.find(
     (b) => b.id === preselectedId && b.tier === "T0",
   );
+  // The business this claimant scanned a card for and wants to connect
+  // with once registration completes — carried as a query param (not
+  // router state) because the manual-review path can finish days later, in
+  // a different tab, after clicking the emailed confirmation link.
+  const connectTarget = searchParams.get("connect");
+  const connectBusiness = connectTarget ? getBusiness(connectTarget) : null;
+  const baseForm = { ...EMPTY_FORM, connectTarget };
 
   const [step, setStep] = useState(preselected ? "details" : "search");
   const [submittedName, setSubmittedName] = useState("");
@@ -49,13 +57,13 @@ function Register() {
   const [form, setForm] = useState(
     preselected
       ? {
-          ...EMPTY_FORM,
+          ...baseForm,
           businessId: preselected.id,
           businessName: preselected.name,
           category: preselected.category,
           location: preselected.location,
         }
-      : EMPTY_FORM,
+      : baseForm,
   );
   const [errors, setErrors] = useState({});
 
@@ -66,7 +74,7 @@ function Register() {
 
   function selectBusiness(business) {
     setForm({
-      ...EMPTY_FORM,
+      ...baseForm,
       businessId: business.id,
       businessName: business.name,
       category: business.category,
@@ -76,7 +84,7 @@ function Register() {
   }
 
   function startManualEntry() {
-    setForm(EMPTY_FORM);
+    setForm(baseForm);
     setStep("details");
   }
 
@@ -196,7 +204,11 @@ function Register() {
           />
         )}
         {step === "submitted" && (
-          <SubmittedStep businessName={submittedName} email={form.repEmail} />
+          <SubmittedStep
+            businessName={submittedName}
+            email={form.repEmail}
+            connectBusinessName={connectBusiness?.name}
+          />
         )}
       </div>
     </div>
@@ -467,7 +479,7 @@ function PersonalStep({ form, errors, onChange, onBack, onSubmit }) {
   );
 }
 
-function SubmittedStep({ businessName, email }) {
+function SubmittedStep({ businessName, email, connectBusinessName }) {
   const statusHref = email ? `/claim-status?email=${encodeURIComponent(email)}` : "/claim-status";
   return (
     <div>
@@ -482,6 +494,12 @@ function SubmittedStep({ businessName, email }) {
         We'll send a confirmation link to {email || "your email"} once that's ready — you can
         check on it anytime. This is separate from (and happens before) SSM verification.
       </p>
+      {connectBusinessName && (
+        <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
+          You'll be connected with {connectBusinessName} on ABRI once your registration is
+          verified.
+        </p>
+      )}
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           to={statusHref}
@@ -535,7 +553,7 @@ function DomainEmailVerification({ email, linkToken }) {
   );
 }
 
-function PendingEmailVerification({ email }) {
+function PendingEmailVerification({ email, connectBusinessName }) {
   return (
     <div>
       <label className={labelClass}>Email verification</label>
@@ -543,6 +561,9 @@ function PendingEmailVerification({ email }) {
         We'll send a confirmation link to <strong>{email}</strong> once we've finished
         verifying your details. Enter the code sent to your phone below, then continue —
         you'll be able to check on this anytime afterwards.
+        {connectBusinessName && (
+          <> You'll be connected with <strong>{connectBusinessName}</strong> once that's done.</>
+        )}
       </p>
     </div>
   );
@@ -550,6 +571,7 @@ function PendingEmailVerification({ email }) {
 
 function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, onSendLink }) {
   const [phoneCode, setPhoneCode] = useState("");
+  const connectBusiness = form.connectTarget ? getBusiness(form.connectTarget) : null;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -578,7 +600,7 @@ function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, on
         {domainMatch ? (
           <DomainEmailVerification email={form.repEmail} linkToken={linkToken} />
         ) : (
-          <PendingEmailVerification email={form.repEmail} />
+          <PendingEmailVerification email={form.repEmail} connectBusinessName={connectBusiness?.name} />
         )}
 
         <div>

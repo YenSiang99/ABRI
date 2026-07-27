@@ -3,6 +3,8 @@ import { createContext, useContext, useState } from "react";
 import * as businessStore from "@/lib/store/businesses";
 import * as accountStore from "@/lib/store/accounts";
 import { createVerificationToken } from "@/lib/store/emailVerifications";
+import { addConnection } from "@/lib/store/connections";
+import { addPendingConnection, consumePendingConnections } from "@/lib/store/pendingConnections";
 
 const AuthContext = createContext(null);
 
@@ -33,16 +35,33 @@ function AuthProvider({ children }) {
     setSession(next);
     if (next) {
       window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      // Single choke point every session-establishing path runs through
+      // (login, domain-verified claim, manual-verified claim) — materialize
+      // any NFC-scan connection this account queued while it had no session
+      // yet, rather than hooking each call site separately.
+      const sessionAccount = accountStore.getAccount(next.accountId);
+      if (sessionAccount?.businessId) {
+        const targetBusinessIds = consumePendingConnections(next.accountId);
+        targetBusinessIds.forEach((businessId) => {
+          addConnection(sessionAccount.businessId, businessId, "nfc_scan");
+        });
+      }
     } else {
       window.localStorage.removeItem(SESSION_KEY);
     }
   }
 
   function login(email, password) {
+    // Re-read from localStorage before checking anything — this account's
+    // claim may have been approved by an admin in a different tab/session,
+    // which only wrote to localStorage, not this tab's in-memory cache.
+    accountStore.refreshAccounts();
+    businessStore.refreshBusinesses();
+
     const found = accountStore.verifyPassword(email, password);
     if (!found) return { ok: false, error: "Incorrect email or password." };
 
-    const claimedBusiness = businesses.find((b) => b.id === found.businessId);
+    const claimedBusiness = businessStore.getBusiness(found.businessId);
     if (claimedBusiness?.claimStatus === "pending") {
       return {
         ok: false,
@@ -80,6 +99,7 @@ function AuthProvider({ children }) {
     repPhone,
     repRole,
     password,
+    connectTarget,
   }) {
     if (accountStore.findAccountByEmail(repEmail)) {
       return { ok: false, error: "An account with this email already exists — log in instead." };
@@ -108,6 +128,14 @@ function AuthProvider({ children }) {
     });
 
     businessStore.setBusinessOwner(claimedBusiness.id, newAccount.id);
+
+    // Guards scanning-then-claiming the same T0 listing (nothing to
+    // self-connect to) — everything else queues, since this account may not
+    // get a session for days yet (see persistSession).
+    if (connectTarget && connectTarget !== claimedBusiness.id) {
+      addPendingConnection({ accountId: newAccount.id, businessId: connectTarget });
+    }
+
     return { ok: true, business: claimedBusiness, account: newAccount };
   }
 
@@ -163,6 +191,11 @@ function AuthProvider({ children }) {
   // by an admin — this just confirms the claimant controls the email the
   // link was sent to, and signs them in.
   function completeManualVerifiedClaim({ accountId }) {
+    // Same reasoning as login(): this link may be opened in a tab whose
+    // cache predates the admin's approval, so re-read before trusting it.
+    accountStore.refreshAccounts();
+    businessStore.refreshBusinesses();
+
     const account = accountStore.getAccount(accountId);
     if (!account) return { ok: false, error: "Account not found." };
 

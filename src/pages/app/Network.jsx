@@ -1,103 +1,86 @@
-import { useState } from "react";
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { AppBusinessCard } from "@/components/app/AppBusinessCard";
-import { businesses } from "@/data/appMockData";
-import { cn } from "@/lib/utils";
+import { MapPin, Radio, Users } from "lucide-react";
 
-const TIER_FILTERS = [
-  { value: "all", label: "All tiers" },
-  { value: "T1", label: "Claimed" },
-  { value: "T2", label: "SSM-Verified" },
-  { value: "T3", label: "Identity-Verified" },
-];
+import { Button } from "@/components/ui/button";
+import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { useConnectionsFor, removeConnection } from "@/lib/store/connections";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/lib/toast";
 
-const CORRIDORS = ["All corridors", ...Array.from(new Set(businesses.map((b) => b.corridor)))];
+function ConnectionCard({ connection }) {
+  const { business, connectionId, source } = connection;
+  const initial = business.name.charAt(0);
+
+  function handleRemove() {
+    removeConnection(connectionId);
+    toast(`Removed ${business.name} from your network`);
+  }
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-lg font-semibold text-background">
+          {initial}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-base font-semibold text-foreground">{business.name}</div>
+          <div className="mt-0.5 flex items-center gap-1.5 truncate text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 shrink-0" /> {business.location}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        <AppTierBadge tier={business.tier} />
+        {source === "nfc_scan" && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+            <Radio className="h-3 w-3" /> Card tap
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">
+        <span className="text-muted-foreground">{business.category}</span>
+        <Button size="sm" variant="secondary" onClick={handleRemove}>
+          Remove
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function Network() {
-  const [q, setQ] = useState("");
-  const [tier, setTier] = useState("all");
-  const [corridor, setCorridor] = useState("All corridors");
-
-  const results = businesses.filter((b) => {
-    const matchesQ =
-      !q || b.name.toLowerCase().includes(q.toLowerCase()) || b.industry.toLowerCase().includes(q.toLowerCase());
-    const matchesTier = tier === "all" || b.tier === tier;
-    const matchesCorridor = corridor === "All corridors" || b.corridor === corridor;
-    return matchesQ && matchesTier && matchesCorridor;
-  });
+  const { business } = useAuth();
+  const connections = useConnectionsFor(business?.id);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <div>
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Directory
-        </div>
+        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Your network</div>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-          The verified network
+          Connections
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Real, SSM-verified businesses in the Klang Valley professional-services corridor.
+          Everyone you've connected with by tapping cards or being tapped.
         </p>
       </div>
 
-      <div className="mt-8 space-y-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-12 pl-10 text-base"
-            placeholder="Search by business name or industry…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {TIER_FILTERS.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setTier(t.value)}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
-                tier === t.value
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-card text-foreground hover:bg-secondary",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-          <span className="mx-1 self-center text-border">·</span>
-          {CORRIDORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCorridor(c)}
-              className={cn(
-                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
-                corridor === c
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-card text-foreground hover:bg-secondary",
-              )}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="mt-6 text-sm text-muted-foreground">
-        {results.length} {results.length === 1 ? "business" : "businesses"}
+        {connections.length} {connections.length === 1 ? "connection" : "connections"}
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {results.map((b) => (
-          <AppBusinessCard key={b.id} business={b} />
+        {connections.map((c) => (
+          <ConnectionCard key={c.connectionId} connection={c} />
         ))}
       </div>
 
-      {results.length === 0 && (
+      {connections.length === 0 && (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center">
-          <div className="text-sm text-muted-foreground">No businesses match those filters.</div>
+          <Users className="mx-auto h-8 w-8 text-muted-foreground" />
+          <div className="mt-3 text-sm text-muted-foreground">
+            No connections yet — tap someone's ABRI card, or have them tap yours, to add them
+            here.
+          </div>
         </div>
       )}
     </div>

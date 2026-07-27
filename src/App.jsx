@@ -8,6 +8,7 @@ import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/Login";
 import { Directory } from "@/pages/Directory";
 import { BusinessProfile } from "@/pages/BusinessProfile";
+import { CardTap } from "@/pages/CardTap";
 import { Register } from "@/pages/Register";
 import { VerifyClaimLink } from "@/pages/VerifyClaimLink";
 import { ClaimStatus } from "@/pages/ClaimStatus";
@@ -41,6 +42,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/directory" element={<Directory />} />
           <Route path="/business/:id" element={<BusinessProfile />} />
+          <Route path="/m/:businessId" element={<CardTap />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-claim/:token" element={<VerifyClaimLink />} />
           <Route path="/claim-status" element={<ClaimStatus />} />

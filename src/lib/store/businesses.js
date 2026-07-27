@@ -170,6 +170,17 @@ function getBusinessesSnapshot() {
   return loadBusinesses();
 }
 
+// Forces a fresh read from localStorage, discarding the in-memory cache —
+// used at login so a claim approved from another tab/session (which only
+// wrote to localStorage, not this tab's cache) is picked up immediately
+// instead of requiring a full page reload.
+function refreshBusinesses() {
+  businessCache = null;
+  loadBusinesses();
+  businessListeners.forEach((cb) => cb());
+  return businessCache;
+}
+
 function useBusinesses() {
   return useSyncExternalStore(subscribeBusinesses, getBusinessesSnapshot);
 }
@@ -316,6 +327,7 @@ export {
   useBusinesses,
   useBusiness,
   getBusiness,
+  refreshBusinesses,
   claimOrCreateBusiness,
   setTier,
   updateBusinessProfile,

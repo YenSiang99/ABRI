@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
-import { findAccountByEmail } from "@/lib/store/accounts";
-import { getBusiness } from "@/lib/store/businesses";
+import { findAccountByEmail, refreshAccounts } from "@/lib/store/accounts";
+import { getBusiness, refreshBusinesses } from "@/lib/store/businesses";
 import { findActiveToken } from "@/lib/store/emailVerifications";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,12 @@ const labelClass = "text-[13px] font-bold text-ink dark:text-foreground";
 // path never logs them in until they click the (delayed) confirmation link,
 // so this is their only way back once they close the "claim submitted" page.
 function lookupStatus(email) {
+  // This page has no session to key off of, so a claimant may check back
+  // here in a tab that's been open since before an admin approved their
+  // claim — always re-read from localStorage rather than the cached state.
+  refreshAccounts();
+  refreshBusinesses();
+
   const account = findAccountByEmail(email);
   if (!account) {
     return { kind: "not-found" };
