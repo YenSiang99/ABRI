@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -29,6 +30,7 @@ function AppLayout() {
             <Menu className="h-4 w-4" />
           </button>
           <div className="text-sm text-muted-foreground">The verified business network</div>
+          <ThemeToggle className="ml-auto" />
         </header>
         <main className="flex-1">
           <Outlet />
