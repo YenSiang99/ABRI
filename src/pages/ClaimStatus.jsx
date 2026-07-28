@@ -7,8 +7,11 @@ import { getBusiness, refreshBusinesses } from "@/lib/store/businesses";
 import { findActiveToken } from "@/lib/store/emailVerifications";
 import { cn } from "@/lib/utils";
 
+// text-base (not text-sm) below md: inputs under 16px make iOS Safari
+// auto-zoom on focus, and the zoom tends to stick around after navigating
+// away in an SPA.
 const fieldClass =
-  "w-full rounded-sm border border-grey-300 px-3.5 py-2.5 text-sm text-ink outline-none focus:border-ink dark:border-border dark:text-foreground dark:focus:border-yellow";
+  "w-full rounded-sm border border-grey-300 px-3.5 py-2.5 text-base md:text-sm text-ink outline-none focus:border-ink dark:border-border dark:text-foreground dark:focus:border-yellow";
 const labelClass = "text-[13px] font-bold text-ink dark:text-foreground";
 
 // Lets a claimant check on their claim without a session — the manual-review
