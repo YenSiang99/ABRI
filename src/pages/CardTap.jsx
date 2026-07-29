@@ -22,6 +22,7 @@ function BackLink() {
 }
 
 function CardPanel({ business, children }) {
+  const location = useLocation();
   return (
     <div className="mt-6 rounded-3xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -53,6 +54,7 @@ function CardPanel({ business, children }) {
         </div>
         <Link
           to={`/business/${business.id}`}
+          state={{ from: location, label: "Back to tapped card" }}
           className="inline-flex items-center gap-1.5 rounded-full border border-grey-300 px-3.5 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
         >
           View business profile <ArrowUpRight className="h-3.5 w-3.5" />

@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
 import { useBusiness, getBusiness } from "@/lib/store/businesses";
@@ -30,20 +30,33 @@ function VouchCard({ vouch }) {
   );
 }
 
+// Arriving via a Link that set state={{ from, label }} (the NFC tap page,
+// the Network tab) returns you there instead of always dropping back to
+// the directory — a bookmark or direct visit has no such state, so it
+// falls back to the directory in that case.
+function useBackLink() {
+  const location = useLocation();
+  return {
+    to: location.state?.from ?? "/directory",
+    label: location.state?.label ?? "Back to directory",
+  };
+}
+
 function BusinessProfile() {
   const { id } = useParams();
   const business = useBusiness(id);
+  const backLink = useBackLink();
 
   if (!business) {
     return (
       <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
         <p className="text-grey-600 dark:text-muted-foreground">We couldn't find that business.</p>
         <Link
-          to="/directory"
+          to={backLink.to}
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-ink hover:underline dark:text-foreground"
         >
           <ArrowLeft className="size-4" />
-          Back to directory
+          {backLink.label}
         </Link>
       </div>
     );
@@ -56,11 +69,11 @@ function BusinessProfile() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <Link
-        to="/directory"
+        to={backLink.to}
         className="inline-flex items-center gap-1.5 text-sm font-bold text-grey-600 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Back to directory
+        {backLink.label}
       </Link>
 
       <div className="mt-6 rounded-3xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card md:p-8">

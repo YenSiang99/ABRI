@@ -1,4 +1,5 @@
-import { MapPin, Radio, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowUpRight, MapPin, Radio, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
@@ -40,9 +41,19 @@ function ConnectionCard({ connection }) {
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">
         <span className="text-muted-foreground">{business.category}</span>
-        <Button size="sm" variant="secondary" onClick={handleRemove}>
-          Remove
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            render={<Link to={`/business/${business.id}`} state={{ from: "/app/network", label: "Back to network" }} />}
+            nativeButton={false}
+          >
+            Profile <ArrowUpRight className="h-3.5 w-3.5" />
+          </Button>
+          <Button size="sm" variant="secondary" onClick={handleRemove}>
+            Remove
+          </Button>
+        </div>
       </div>
     </div>
   );
