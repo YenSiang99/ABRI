@@ -1,11 +1,19 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, MapPin, Radio, Users } from "lucide-react";
+import { ArrowUpRight, MapPin, Radio, Link2, Search, Users } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { useConnectionsFor, removeConnection } from "@/lib/store/connections";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
+
+const SOURCE_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "nfc_scan", label: "Card tap" },
+  { value: "directory", label: "Connected in app" },
+];
 
 function ConnectionCard({ connection }) {
   const { business, connectionId, source } = connection;
@@ -32,9 +40,13 @@ function ConnectionCard({ connection }) {
 
       <div className="mt-4 flex flex-wrap gap-1.5">
         <AppTierBadge tier={business.tier} />
-        {source === "nfc_scan" && (
+        {source === "nfc_scan" ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
             <Radio className="h-3 w-3" /> Card tap
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+            <Link2 className="h-3 w-3" /> Connected in app
           </span>
         )}
       </div>
@@ -45,7 +57,7 @@ function ConnectionCard({ connection }) {
           <Button
             size="sm"
             variant="outline"
-            render={<Link to={`/business/${business.id}`} state={{ from: "/app/network", label: "Back to network" }} />}
+            render={<Link to={`/app/business/${business.id}`} state={{ from: "/app/network", label: "Back to network" }} />}
             nativeButton={false}
           >
             Profile <ArrowUpRight className="h-3.5 w-3.5" />
@@ -62,6 +74,16 @@ function ConnectionCard({ connection }) {
 function Network() {
   const { business } = useAuth();
   const connections = useConnectionsFor(business?.id);
+  const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all");
+
+  const q = query.trim().toLowerCase();
+  const filtered = connections.filter((c) => {
+    const matchesSource = sourceFilter === "all" || c.source === sourceFilter;
+    const matchesQuery =
+      !q || c.business.name.toLowerCase().includes(q) || c.business.category.toLowerCase().includes(q);
+    return matchesSource && matchesQuery;
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -75,17 +97,50 @@ function Network() {
         </p>
       </div>
 
-      <div className="mt-6 text-sm text-muted-foreground">
-        {connections.length} {connections.length === 1 ? "connection" : "connections"}
+      {connections.length > 0 && (
+        <>
+          <div className="relative mt-6 max-w-md">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name or category"
+              className="w-full rounded-lg border border-border bg-background py-2 pr-3 pl-9 text-sm text-foreground outline-none focus:border-ring"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {SOURCE_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setSourceFilter(filter.value)}
+                className={cn(
+                  "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
+                  sourceFilter === filter.value
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 text-sm text-muted-foreground">
+        {filtered.length} {filtered.length === 1 ? "connection" : "connections"}
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {connections.map((c) => (
+        {filtered.map((c) => (
           <ConnectionCard key={c.connectionId} connection={c} />
         ))}
       </div>
 
-      {connections.length === 0 && (
+      {connections.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center">
           <Users className="mx-auto h-8 w-8 text-muted-foreground" />
           <div className="mt-3 text-sm text-muted-foreground">
@@ -93,6 +148,12 @@ function Network() {
             here.
           </div>
         </div>
+      ) : (
+        filtered.length === 0 && (
+          <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+            {q ? `No connections match "${query}".` : "No connections match this filter."}
+          </div>
+        )
       )}
     </div>
   );

@@ -229,6 +229,12 @@ function addVouch(toBusinessId, { fromBusinessId, fromName, testimonial }) {
   });
 }
 
+const VOUCHABLE_TIERS = new Set(["T2", "T3", "T4"]);
+
+function isVouchable(target, fromBusinessId) {
+  return Boolean(target) && target.id !== fromBusinessId && VOUCHABLE_TIERS.has(target.tier);
+}
+
 function listVouchesGivenBy(businessId) {
   return loadBusinesses().flatMap((b) =>
     b.vouches
@@ -333,6 +339,8 @@ export {
   updateBusinessProfile,
   addVouch,
   listVouchesGivenBy,
+  VOUCHABLE_TIERS,
+  isVouchable,
   setBusinessOwner,
   approveClaim,
   autoApproveClaim,

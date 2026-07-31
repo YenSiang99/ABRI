@@ -4,6 +4,7 @@ import {
   UserCircle,
   Handshake,
   Compass,
+  Search,
   LogOut,
   X,
   ShieldCheck,
@@ -20,6 +21,7 @@ const WORKSPACE_ITEMS = [
   { title: "My Profile", url: "/app/profile", icon: UserCircle },
   { title: "Vouches", url: "/app/vouches", icon: Handshake, lockWhenPending: true },
   { title: "Network", url: "/app/network", icon: Compass },
+  { title: "Directory", url: "/app/directory", icon: Search },
 ];
 
 const TRUST_ITEMS = [

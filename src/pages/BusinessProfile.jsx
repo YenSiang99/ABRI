@@ -1,11 +1,16 @@
+import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
-import { useBusiness, getBusiness } from "@/lib/store/businesses";
+import { useBusiness, getBusiness, isVouchable } from "@/lib/store/businesses";
+import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { LockedFeature } from "@/components/app/LockedFeature";
+import { VouchDialog } from "@/components/app/VouchDialog";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/lib/toast";
 
 function VouchCard({ vouch }) {
   const from = getBusiness(vouch.fromBusinessId);
@@ -34,18 +39,35 @@ function VouchCard({ vouch }) {
 // the Network tab) returns you there instead of always dropping back to
 // the directory — a bookmark or direct visit has no such state, so it
 // falls back to the directory in that case.
-function useBackLink() {
+function useBackLink(inApp) {
   const location = useLocation();
   return {
-    to: location.state?.from ?? "/directory",
+    to: location.state?.from ?? (inApp ? "/app/directory" : "/directory"),
     label: location.state?.label ?? "Back to directory",
   };
 }
 
-function BusinessProfile() {
+function BusinessProfile({ inApp = false }) {
   const { id } = useParams();
   const business = useBusiness(id);
-  const backLink = useBackLink();
+  const backLink = useBackLink(inApp);
+  const { business: actingBusiness } = useAuth();
+  useConnectionsFor(actingBusiness?.id); // subscribe so alreadyConnected re-renders after a connect
+  const [vouchOpen, setVouchOpen] = useState(false);
+  const canVouch =
+    inApp && actingBusiness?.tier !== "T1" && isVouchable(business, actingBusiness?.id);
+  const canConnect =
+    inApp &&
+    actingBusiness &&
+    business &&
+    actingBusiness.id !== business.id &&
+    business.tier !== "T0";
+  const alreadyConnected = canConnect && areConnected(actingBusiness.id, business.id);
+
+  function handleConnect() {
+    addConnection(actingBusiness.id, business.id, SOURCE_DIRECTORY);
+    toast.success(`Connected with ${business.name}`);
+  }
 
   if (!business) {
     return (
@@ -99,6 +121,21 @@ function BusinessProfile() {
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <VerificationBadge tier={business.tier} size="inline" chip />
+                {canConnect &&
+                  (alreadyConnected ? (
+                    <Button size="sm" variant="secondary" disabled>
+                      Connected
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={handleConnect}>
+                      Connect
+                    </Button>
+                  ))}
+                {canVouch && (
+                  <Button size="sm" variant="outline" onClick={() => setVouchOpen(true)}>
+                    Vouch
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -260,6 +297,10 @@ function BusinessProfile() {
             )}
           </TabsContent>
         </Tabs>
+      )}
+
+      {canVouch && (
+        <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} />
       )}
     </div>
   );

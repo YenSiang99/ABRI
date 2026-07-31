@@ -17,6 +17,7 @@ import { Dashboard } from "@/pages/app/Dashboard";
 import { Profile } from "@/pages/app/Profile";
 import { Vouches } from "@/pages/app/Vouches";
 import { Network } from "@/pages/app/Network";
+import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Verify } from "@/pages/app/Verify";
 import { Introductions } from "@/pages/app/Introductions";
 import { Card } from "@/pages/app/Card";
@@ -53,6 +54,8 @@ function App() {
             <Route path="profile" element={<Profile />} />
             <Route path="vouches" element={<Vouches />} />
             <Route path="network" element={<Network />} />
+            <Route path="directory" element={<AppDirectory />} />
+            <Route path="business/:id" element={<BusinessProfile inApp />} />
             <Route path="verify" element={<Verify />} />
             <Route path="introductions" element={<Introductions />} />
             <Route path="card" element={<Card />} />

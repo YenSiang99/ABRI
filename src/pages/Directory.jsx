@@ -4,13 +4,7 @@ import { cn } from "@/lib/utils";
 
 import { useBusinesses } from "@/lib/store/businesses";
 import { BusinessCard } from "@/components/business/BusinessCard";
-
-const TIER_FILTERS = [
-  { value: "all", label: "All" },
-  { value: "T0", label: "Unclaimed" },
-  { value: "T1", label: "Claimed" },
-  { value: "T2", label: "SSM-Verified" },
-];
+import { TIER_FILTERS, filterBusinesses } from "@/lib/directoryFilter";
 
 function Directory() {
   const businesses = useBusinesses();
@@ -18,14 +12,7 @@ function Directory() {
   const [tierFilter, setTierFilter] = useState("all");
 
   const q = query.trim().toLowerCase();
-  const filtered = businesses.filter((b) => {
-    const matchesQuery =
-      !q ||
-      b.name.toLowerCase().includes(q) ||
-      b.category.toLowerCase().includes(q);
-    const matchesTier = tierFilter === "all" || b.tier === tierFilter;
-    return matchesQuery && matchesTier;
-  });
+  const filtered = filterBusinesses(businesses, { query, tierFilter });
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">

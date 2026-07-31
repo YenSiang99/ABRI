@@ -5,6 +5,8 @@ import { getBusiness } from "./businesses";
 
 const CONNECTIONS_KEY = "abri:connections:v1";
 
+const SOURCE_DIRECTORY = "directory";
+
 let connectionCache = null;
 const connectionListeners = new Set();
 
@@ -118,4 +120,5 @@ export {
   listConnectionsFor,
   useConnectionsFor,
   refreshConnections,
+  SOURCE_DIRECTORY,
 };
