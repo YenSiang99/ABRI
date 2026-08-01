@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 
-import { useBusinesses, getBusiness } from "@/lib/store/businesses";
-import { createVerificationToken } from "@/lib/store/emailVerifications";
+import { fetchBusinesses, fetchBusiness } from "@/lib/api/businesses";
 import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -20,6 +19,7 @@ const EMPTY_FORM = {
   businessName: "",
   category: CATEGORIES[0],
   location: "",
+  domain: null,
   regNumber: "",
   repName: "",
   repEmail: "",
@@ -39,41 +39,64 @@ const labelClass = "text-[13px] font-bold text-ink dark:text-foreground";
 const errorClass = "mt-1 text-[12.5px] text-red-600 dark:text-red-400";
 
 function Register() {
-  const businesses = useBusinesses();
   const { claimOrRegister } = useAuth();
   const [searchParams] = useSearchParams();
   const preselectedId = searchParams.get("business");
-  const preselected = businesses.find(
-    (b) => b.id === preselectedId && b.tier === "T0",
-  );
   // The business this claimant scanned a card for and wants to connect
   // with once registration completes — carried as a query param (not
   // router state) because the manual-review path can finish days later, in
   // a different tab, after clicking the emailed confirmation link.
   const connectTarget = searchParams.get("connect");
-  const connectBusiness = connectTarget ? getBusiness(connectTarget) : null;
+  const [connectBusinessInfo, setConnectBusinessInfo] = useState(null);
   const baseForm = { ...EMPTY_FORM, connectTarget };
 
-  const [step, setStep] = useState(preselected ? "details" : "search");
+  const [step, setStep] = useState("search");
   const [submittedName, setSubmittedName] = useState("");
   const [linkToken, setLinkToken] = useState(null);
-  const [form, setForm] = useState(
-    preselected
-      ? {
-          ...baseForm,
-          businessId: preselected.id,
-          businessName: preselected.name,
-          category: preselected.category,
-          location: preselected.location,
-        }
-      : baseForm,
-  );
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState(baseForm);
   const [errors, setErrors] = useState({});
 
-  const matchedBusiness = form.businessId
-    ? (businesses.find((b) => b.id === form.businessId) ?? null)
-    : null;
-  const domainMatch = matchesBusinessDomain(form.repEmail, matchedBusiness);
+  // Pre-fills the claim form from a "Claim your business" link on an
+  // unclaimed listing's profile page — only takes if the business is still
+  // T0 by the time this loads (it may have been claimed by someone else
+  // in the meantime).
+  useEffect(() => {
+    if (!preselectedId) return;
+    let cancelled = false;
+    fetchBusiness(preselectedId)
+      .then((business) => {
+        if (cancelled || business.tier !== "T0") return;
+        setForm((f) => ({
+          ...f,
+          businessId: business.id,
+          businessName: business.name,
+          category: business.category,
+          location: business.location,
+          domain: business.domain,
+        }));
+        setStep("details");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [preselectedId]);
+
+  useEffect(() => {
+    if (!connectTarget) return;
+    let cancelled = false;
+    fetchBusiness(connectTarget)
+      .then((business) => {
+        if (!cancelled) setConnectBusinessInfo(business);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [connectTarget]);
+
+  const domainMatch = matchesBusinessDomain(form.repEmail, { domain: form.domain });
 
   function selectBusiness(business) {
     setForm({
@@ -82,6 +105,7 @@ function Register() {
       businessName: business.name,
       category: business.category,
       location: business.location,
+      domain: business.domain,
     });
     setStep("details");
   }
@@ -127,28 +151,12 @@ function Register() {
     setStep("verify");
   }
 
-  function handleVerifySubmit({ phoneCode }) {
-    const nextErrors = {};
-    if (phoneCode.trim().length < 4) nextErrors.phoneCode = "Enter the code we sent";
-    if (Object.keys(nextErrors).length) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    const result = claimOrRegister(form);
-    if (!result.ok) {
-      setErrors({ submit: result.error });
-      return;
-    }
-    setSubmittedName(form.businessName);
-    setStep("submitted");
-  }
-
-  // Domain-match path: nothing is created yet (mirrors the OTP path only
-  // calling claimOrRegister after verification succeeds) — we just mint a
-  // token holding this claim's payload and simulate "sending" it. The claim
-  // is only actually created once that link is opened (VerifyClaimLink.jsx).
-  function handleSendVerificationLink(phoneCode) {
+  // Submits the claim to the backend regardless of the client-side
+  // domainMatch guess — the backend makes the real call on which path this
+  // lands on (see routes/businesses.js POST /claim) and this branches on
+  // its response: requiresEmailVerification shows the (real) verification
+  // link inline; requiresAdminApproval moves straight to "submitted".
+  async function handleVerifySubmit({ phoneCode }) {
     const nextErrors = {};
     if (phoneCode.trim().length < 4) nextErrors.phoneCode = "Enter the code we sent";
     if (Object.keys(nextErrors).length) {
@@ -156,12 +164,20 @@ function Register() {
       return;
     }
     setErrors({});
-    const record = createVerificationToken({
-      email: form.repEmail,
-      businessId: form.businessId,
-      claimPayload: form,
-    });
-    setLinkToken(record.token);
+    setSubmitting(true);
+    const result = await claimOrRegister(form);
+    setSubmitting(false);
+
+    if (!result.ok) {
+      setErrors({ submit: result.error });
+      return;
+    }
+    if (result.requiresEmailVerification) {
+      setLinkToken(result.token);
+      return;
+    }
+    setSubmittedName(form.businessName);
+    setStep("submitted");
   }
 
   return (
@@ -176,7 +192,7 @@ function Register() {
 
       <div className="mt-6 rounded-lg border border-grey-200 bg-white p-8 dark:border-border dark:bg-card">
         {step === "search" && (
-          <SearchStep businesses={businesses} onSelect={selectBusiness} onManual={startManualEntry} />
+          <SearchStep onSelect={selectBusiness} onManual={startManualEntry} />
         )}
         {step === "details" && (
           <DetailsStep
@@ -201,16 +217,17 @@ function Register() {
             errors={errors}
             domainMatch={domainMatch}
             linkToken={linkToken}
+            submitting={submitting}
+            connectBusinessName={connectBusinessInfo?.name}
             onBack={() => setStep("personal")}
             onSubmit={handleVerifySubmit}
-            onSendLink={handleSendVerificationLink}
           />
         )}
         {step === "submitted" && (
           <SubmittedStep
             businessName={submittedName}
             email={form.repEmail}
-            connectBusinessName={connectBusiness?.name}
+            connectBusinessName={connectBusinessInfo?.name}
           />
         )}
       </div>
@@ -218,17 +235,37 @@ function Register() {
   );
 }
 
-function SearchStep({ businesses, onSelect, onManual }) {
+function SearchStep({ onSelect, onManual }) {
   const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const matches = q
-    ? businesses.filter(
-        (b) =>
-          b.tier === "T0" &&
-          (b.name.toLowerCase().includes(q) ||
-            b.category.toLowerCase().includes(q)),
-      )
-    : [];
+  const [results, setResults] = useState([]);
+  const [status, setStatus] = useState("idle");
+  const [searchedFor, setSearchedFor] = useState(null);
+  const q = query.trim();
+
+  useEffect(() => {
+    if (!q) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetchBusinesses({ search: q, tier: "T0" })
+        .then((businesses) => {
+          if (cancelled) return;
+          setResults(businesses);
+          setStatus("ready");
+          setSearchedFor(q);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setStatus("error");
+          setSearchedFor(q);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [q]);
+
+  const isSearching = q && searchedFor !== q;
 
   return (
     <div>
@@ -257,8 +294,14 @@ function SearchStep({ businesses, onSelect, onManual }) {
 
       {q && (
         <div className="mt-4 flex flex-col gap-2">
-          {matches.length > 0 ? (
-            matches.map((business) => (
+          {isSearching ? (
+            <p className="text-[13.5px] text-grey-500 dark:text-muted-foreground">Searching…</p>
+          ) : status === "error" ? (
+            <p className="text-[13.5px] text-grey-500 dark:text-muted-foreground">
+              Something went wrong searching. Please try again.
+            </p>
+          ) : results.length > 0 ? (
+            results.map((business) => (
               <button
                 key={business.id}
                 type="button"
@@ -522,8 +565,8 @@ function SubmittedStep({ businessName, email, connectBusinessName }) {
 }
 
 // Both branches render the same shape — a label, one line of status copy,
-// then either a clickable simulated link or a plain "later" message — so
-// that watching the page tells an observer as little as possible about
+// then either a clickable verification link or a plain "later" message —
+// so that watching the page tells an observer as little as possible about
 // which path was taken beyond the one difference that's unavoidable: this
 // branch has a link available right now and the other doesn't yet.
 function DomainEmailVerification({ email, linkToken }) {
@@ -572,16 +615,11 @@ function PendingEmailVerification({ email, connectBusinessName }) {
   );
 }
 
-function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, onSendLink }) {
+function VerifyStep({ form, errors, domainMatch, linkToken, submitting, connectBusinessName, onBack, onSubmit }) {
   const [phoneCode, setPhoneCode] = useState("");
-  const connectBusiness = form.connectTarget ? getBusiness(form.connectTarget) : null;
 
   function handleSubmit(e) {
     e.preventDefault();
-    if (domainMatch) {
-      onSendLink(phoneCode);
-      return;
-    }
     onSubmit({ phoneCode });
   }
 
@@ -603,7 +641,7 @@ function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, on
         {domainMatch ? (
           <DomainEmailVerification email={form.repEmail} linkToken={linkToken} />
         ) : (
-          <PendingEmailVerification email={form.repEmail} connectBusinessName={connectBusiness?.name} />
+          <PendingEmailVerification email={form.repEmail} connectBusinessName={connectBusinessName} />
         )}
 
         <div>
@@ -618,7 +656,7 @@ function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, on
             value={phoneCode}
             onChange={(e) => setPhoneCode(e.target.value)}
             placeholder="123456"
-            disabled={Boolean(domainMatch && linkToken)}
+            disabled={Boolean(linkToken)}
             className={cn(fieldClass, "mt-1.5")}
             autoFocus
           />
@@ -636,12 +674,13 @@ function VerifyStep({ form, errors, domainMatch, linkToken, onBack, onSubmit, on
         >
           Back
         </button>
-        {!(domainMatch && linkToken) && (
+        {!linkToken && (
           <button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+            disabled={submitting}
+            className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:opacity-60"
           >
-            Continue
+            {submitting ? "Submitting…" : "Continue"}
           </button>
         )}
       </div>

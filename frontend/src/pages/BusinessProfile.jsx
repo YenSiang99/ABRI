@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
-import { useBusiness, getBusiness, isVouchable } from "@/lib/store/businesses";
+import { isVouchable } from "@/lib/store/businesses";
+import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,18 +14,16 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
 
 function VouchCard({ vouch }) {
-  const from = getBusiness(vouch.fromBusinessId);
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-5 dark:border-border dark:bg-card">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ink text-sm font-semibold text-yellow dark:bg-foreground dark:text-background">
-          {vouch.fromName.charAt(0)}
+          {vouch.fromBusiness.name.charAt(0)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-ink dark:text-foreground">{vouch.fromName}</div>
+          <div className="font-semibold text-ink dark:text-foreground">{vouch.fromBusiness.name}</div>
           <div className="text-xs text-grey-500 dark:text-muted-foreground">
-            {from ? `${from.category} · ` : ""}
-            {vouch.date}
+            {vouch.fromBusiness.category} · {new Date(vouch.createdAt).toLocaleDateString()}
           </div>
         </div>
       </div>
@@ -49,11 +48,35 @@ function useBackLink(inApp) {
 
 function BusinessProfile({ inApp = false }) {
   const { id } = useParams();
-  const business = useBusiness(id);
   const backLink = useBackLink(inApp);
   const { business: actingBusiness } = useAuth();
   useConnectionsFor(actingBusiness?.id); // subscribe so alreadyConnected re-renders after a connect
   const [vouchOpen, setVouchOpen] = useState(false);
+  const [business, setBusiness] = useState(null);
+  const [error, setError] = useState(null);
+  const [loadedId, setLoadedId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBusiness(id)
+      .then((result) => {
+        if (cancelled) return;
+        setBusiness(result);
+        setError(null);
+        setLoadedId(id);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.status === 404 ? "notfound" : "error");
+        setLoadedId(id);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const status = loadedId !== id ? "loading" : (error ?? "ready");
+
   const canVouch =
     inApp && actingBusiness?.tier !== "T1" && isVouchable(business, actingBusiness?.id);
   const canConnect =
@@ -69,10 +92,22 @@ function BusinessProfile({ inApp = false }) {
     toast.success(`Connected with ${business.name}`);
   }
 
-  if (!business) {
+  if (status === "loading") {
     return (
       <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
-        <p className="text-grey-600 dark:text-muted-foreground">We couldn't find that business.</p>
+        <p className="text-grey-600 dark:text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  if (status !== "ready") {
+    return (
+      <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
+        <p className="text-grey-600 dark:text-muted-foreground">
+          {status === "notfound"
+            ? "We couldn't find that business."
+            : "Something went wrong loading this business. Please try again."}
+        </p>
         <Link
           to={backLink.to}
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-ink hover:underline dark:text-foreground"
@@ -86,7 +121,7 @@ function BusinessProfile({ inApp = false }) {
 
   const isUnclaimed = business.tier === "T0";
   const isPendingVerification = business.tier === "T1";
-  const { services, vouches, ssm } = business;
+  const { services, vouchesReceived, ssm } = business;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -156,7 +191,9 @@ function BusinessProfile({ inApp = false }) {
               <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
                 SSM Record
               </div>
-              <div className="mt-1 font-mono text-sm text-ink dark:text-foreground">Reg. {ssm}</div>
+              <div className="mt-1 font-mono text-sm text-ink dark:text-foreground">
+                {ssm ? `Reg. ${ssm}` : "Not yet provided"}
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
@@ -208,7 +245,7 @@ function BusinessProfile({ inApp = false }) {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="vouches">
-              Vouches ({isPendingVerification ? 0 : vouches.length})
+              Vouches ({isPendingVerification ? 0 : vouchesReceived.length})
             </TabsTrigger>
             <TabsTrigger value="card">NFC Card</TabsTrigger>
           </TabsList>
@@ -245,8 +282,8 @@ function BusinessProfile({ inApp = false }) {
                   description="Vouches unlock once this business is SSM-verified."
                 />
               </div>
-            ) : vouches.length > 0 ? (
-              vouches.map((v) => <VouchCard key={v.id} vouch={v} />)
+            ) : vouchesReceived.length > 0 ? (
+              vouchesReceived.map((v) => <VouchCard key={v.id} vouch={v} />)
             ) : (
               <p className="text-sm text-grey-500 dark:text-muted-foreground">No vouches yet.</p>
             )}
@@ -286,7 +323,7 @@ function BusinessProfile({ inApp = false }) {
                       </div>
                     </div>
                     <div className="absolute right-6 bottom-5 left-6 flex items-end justify-between font-mono text-[10px] opacity-70">
-                      <span>SSM {ssm}</span>
+                      <span>{ssm ? `SSM ${ssm}` : "SSM pending"}</span>
                       <span className="inline-flex items-center gap-1.5">
                         <Radio className="h-3 w-3" /> TAP TO VERIFY
                       </span>

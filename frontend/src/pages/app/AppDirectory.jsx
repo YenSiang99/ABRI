@@ -1,22 +1,41 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { useBusinesses } from "@/lib/store/businesses";
+import { fetchBusinesses } from "@/lib/api/businesses";
 import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
-import { TIER_FILTERS, filterBusinesses } from "@/lib/directoryFilter";
+import { TIER_FILTERS } from "@/lib/directoryFilter";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { toast } from "@/lib/toast";
 
 function AppDirectory() {
   const { business } = useAuth();
-  const businesses = useBusinesses();
   useConnectionsFor(business.id); // subscribe so alreadyConnected re-renders after a connect
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
+  const [businesses, setBusinesses] = useState([]);
+  const [status, setStatus] = useState("loading");
 
-  const filtered = filterBusinesses(businesses, { query, tierFilter, excludeId: business.id });
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetchBusinesses({ search: query.trim(), tier: tierFilter === "all" ? undefined : tierFilter })
+        .then((results) => {
+          if (cancelled) return;
+          setBusinesses(results.filter((b) => b.id !== business.id));
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setStatus("error");
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, tierFilter, business.id]);
 
   function handleConnect(target) {
     addConnection(business.id, target.id, SOURCE_DIRECTORY);
@@ -66,13 +85,19 @@ function AppDirectory() {
         ))}
       </div>
 
-      <div className="mt-4 text-sm text-muted-foreground">
-        {filtered.length} {filtered.length === 1 ? "business" : "businesses"}
-      </div>
+      {status === "ready" && (
+        <div className="mt-4 text-sm text-muted-foreground">
+          {businesses.length} {businesses.length === 1 ? "business" : "businesses"}
+        </div>
+      )}
 
-      {filtered.length > 0 ? (
+      {status === "error" ? (
+        <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+          Something went wrong loading the directory. Please try again.
+        </div>
+      ) : businesses.length > 0 ? (
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((b) => (
+          {businesses.map((b) => (
             <BusinessCard
               key={b.id}
               business={b}
@@ -86,7 +111,7 @@ function AppDirectory() {
         </div>
       ) : (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-          No businesses match your search.
+          {status === "loading" ? "Loading businesses…" : "No businesses match your search."}
         </div>
       )}
     </div>

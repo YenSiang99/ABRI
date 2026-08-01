@@ -1,18 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useBusinesses } from "@/lib/store/businesses";
+import { fetchBusinesses } from "@/lib/api/businesses";
 import { BusinessCard } from "@/components/business/BusinessCard";
-import { TIER_FILTERS, filterBusinesses } from "@/lib/directoryFilter";
+import { TIER_FILTERS } from "@/lib/directoryFilter";
 
 function Directory() {
-  const businesses = useBusinesses();
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
+  const [businesses, setBusinesses] = useState([]);
+  const [status, setStatus] = useState("loading");
 
-  const q = query.trim().toLowerCase();
-  const filtered = filterBusinesses(businesses, { query, tierFilter });
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      fetchBusinesses({ search: query.trim(), tier: tierFilter === "all" ? undefined : tierFilter })
+        .then((results) => {
+          if (cancelled) return;
+          setBusinesses(results);
+          setStatus("ready");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setStatus("error");
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, tierFilter]);
+
+  const q = query.trim();
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
@@ -56,21 +76,29 @@ function Directory() {
         ))}
       </div>
 
-      <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
-        {filtered.length} {filtered.length === 1 ? "business" : "businesses"}
-      </div>
+      {status === "ready" && (
+        <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
+          {businesses.length} {businesses.length === 1 ? "business" : "businesses"}
+        </div>
+      )}
 
-      {filtered.length > 0 ? (
+      {status === "error" ? (
+        <div className="mt-16 text-center text-grey-500 dark:text-muted-foreground">
+          Something went wrong loading the directory. Please try again.
+        </div>
+      ) : businesses.length > 0 ? (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((business) => (
+          {businesses.map((business) => (
             <BusinessCard key={business.id} business={business} />
           ))}
         </div>
       ) : (
         <div className="mt-16 text-center text-grey-500 dark:text-muted-foreground">
-          {q
-            ? `No businesses match "${query}".`
-            : "No businesses match this filter."}
+          {status === "loading"
+            ? "Loading businesses…"
+            : q
+              ? `No businesses match "${query}".`
+              : "No businesses match this filter."}
         </div>
       )}
     </div>

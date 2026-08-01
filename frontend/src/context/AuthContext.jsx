@@ -4,7 +4,8 @@ import * as businessStore from "@/lib/store/businesses";
 import * as accountStore from "@/lib/store/accounts";
 import { createVerificationToken } from "@/lib/store/emailVerifications";
 import { addConnection } from "@/lib/store/connections";
-import { addPendingConnection, consumePendingConnections } from "@/lib/store/pendingConnections";
+import { consumePendingConnections } from "@/lib/store/pendingConnections";
+import { submitBusinessClaim } from "@/lib/api/businesses";
 
 const AuthContext = createContext(null);
 
@@ -83,12 +84,18 @@ function AuthProvider({ children }) {
     persistSession(null);
   }
 
-  // Handles both entry paths from Register.jsx (claiming an existing T0
-  // listing, or registering a business not in the seed data) — both create
-  // an account and flip the business to T1 with claimStatus "pending". It
-  // deliberately does NOT log the user in: the claim needs admin approval
-  // first (see AdminReview), so login() will refuse this account until then.
-  function claimOrRegister({
+  // Submits a claim (either against an existing T0 listing or a brand new
+  // business) to the real backend — see routes/businesses.js POST /claim.
+  // Deliberately does NOT log the user in: the backend response tells the
+  // caller which of the two verification paths this claim landed on
+  // (domain-match, needs the emailed link opened; manual review, needs an
+  // admin to approve it first — see AdminReview, not yet wired to this
+  // backend). NFC-scan-then-claim auto-connect (connectTarget) is dropped
+  // here — it depended on a local-store account id that no longer exists
+  // once claims are created server-side, and there's no real /connections
+  // endpoint yet either. Needs real login/session + connections wiring
+  // before it can come back.
+  async function claimOrRegister({
     businessId,
     businessName,
     category,
@@ -99,44 +106,26 @@ function AuthProvider({ children }) {
     repPhone,
     repRole,
     password,
-    connectTarget,
   }) {
-    if (accountStore.findAccountByEmail(repEmail)) {
-      return { ok: false, error: "An account with this email already exists — log in instead." };
+    try {
+      const result = await submitBusinessClaim({
+        businessId,
+        businessName,
+        category,
+        location,
+        ssm: regNumber,
+        repName,
+        repEmail,
+        repPhone,
+        repRole,
+        password,
+      });
+      return result.requiresEmailVerification
+        ? { ok: true, requiresEmailVerification: true, token: result.token }
+        : { ok: true, requiresAdminApproval: true };
+    } catch (err) {
+      return { ok: false, error: err.message };
     }
-
-    const claimedBusiness = businessStore.claimOrCreateBusiness({
-      businessId,
-      name: businessName,
-      category,
-      location,
-      ssm: regNumber,
-    });
-
-    const newAccount = accountStore.createAccount({
-      email: repEmail,
-      phone: repPhone,
-      name: repName,
-      role: repRole,
-      password,
-      businessId: claimedBusiness.id,
-      // Not verified yet either way — the domain-match path sets this true
-      // the moment its (immediate) confirmation link is clicked; the manual
-      // path sets it true once its (delayed, admin-gated) link is clicked.
-      emailVerified: false,
-      phoneVerified: true,
-    });
-
-    businessStore.setBusinessOwner(claimedBusiness.id, newAccount.id);
-
-    // Guards scanning-then-claiming the same T0 listing (nothing to
-    // self-connect to) — everything else queues, since this account may not
-    // get a session for days yet (see persistSession).
-    if (connectTarget && connectTarget !== claimedBusiness.id) {
-      addPendingConnection({ accountId: newAccount.id, businessId: connectTarget });
-    }
-
-    return { ok: true, business: claimedBusiness, account: newAccount };
   }
 
   function markSsmVerified(businessId) {
@@ -170,40 +159,6 @@ function AuthProvider({ children }) {
     return approved;
   }
 
-  // Completes a claim that was auto-verified via company domain match:
-  // creates the account/business (still starting "pending", same as the
-  // manual path) then immediately auto-approves and signs the claimant in
-  // directly. Deliberately bypasses login()'s pending-claim gate rather than
-  // calling it — login() reads `businesses` from this render's closure,
-  // which would still reflect the pre-mutation snapshot taken just above.
-  function completeDomainVerifiedClaim(claimPayload) {
-    const result = claimOrRegister(claimPayload);
-    if (!result.ok) return result;
-
-    businessStore.autoApproveClaim(result.business.id);
-    accountStore.setEmailVerified(result.account.id, true);
-    persistSession({ accountId: result.account.id });
-    return { ok: true, business: result.business, account: result.account };
-  }
-
-  // Completes the manual-review path's final step: the account and business
-  // were already created (pending) at submission time and already approved
-  // by an admin — this just confirms the claimant controls the email the
-  // link was sent to, and signs them in.
-  function completeManualVerifiedClaim({ accountId }) {
-    // Same reasoning as login(): this link may be opened in a tab whose
-    // cache predates the admin's approval, so re-read before trusting it.
-    accountStore.refreshAccounts();
-    businessStore.refreshBusinesses();
-
-    const account = accountStore.getAccount(accountId);
-    if (!account) return { ok: false, error: "Account not found." };
-
-    accountStore.setEmailVerified(accountId, true);
-    persistSession({ accountId });
-    return { ok: true, account };
-  }
-
   // Rejects a pending claim or revokes one already approved — either way the
   // claimant's account is deleted (they lose login access) and the listing
   // reverts to unclaimed. Logs the current session out if it's the account
@@ -230,8 +185,6 @@ function AuthProvider({ children }) {
     markSsmVerified,
     revokeSsmVerification,
     approveClaim,
-    completeDomainVerifiedClaim,
-    completeManualVerifiedClaim,
     removeClaim,
   };
 

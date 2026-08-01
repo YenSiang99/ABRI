@@ -1,20 +1,98 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Lock } from "lucide-react";
 
-import { useBusinesses } from "@/lib/store/businesses";
-import { getAccount } from "@/lib/store/accounts";
-import { useAuth } from "@/context/AuthContext";
+import { fetchBusinesses } from "@/lib/api/businesses";
+import { login } from "@/lib/api/auth";
+import {
+  fetchAdminClaims,
+  approveAdminClaim,
+  rejectAdminClaim,
+  revokeAdminClaim,
+  verifySsm,
+  revokeSsm,
+} from "@/lib/api/admin";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/toast";
 
-function ClaimantLine({ business }) {
-  const account = getAccount(business.claimedByAccountId);
-  if (!account) return null;
+const fieldClass =
+  "w-full rounded-sm border border-grey-300 px-3.5 py-2.5 text-sm text-ink outline-none focus:border-ink";
+const labelClass = "text-[13px] font-bold text-ink";
+const errorClass = "mt-1 text-[12.5px] text-red-600";
+
+function LoginGate({ onSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      await onSuccess();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-12">
+      <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase">
+        Internal · not linked from any nav
+      </span>
+      <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink">
+        Admin login
+      </h1>
+      <p className="mt-2 max-w-sm text-sm text-grey-600">
+        Log in with an account on the ADMIN_EMAILS allowlist to review claims and SSM
+        verification.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-6 max-w-sm rounded-lg border border-grey-200 bg-white p-6">
+        <label className={labelClass}>Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className={cn(fieldClass, "mt-1.5")}
+          autoFocus
+        />
+        <label className={cn(labelClass, "mt-4 block")}>Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className={cn(fieldClass, "mt-1.5")}
+        />
+        {error && <p className={errorClass}>{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="mt-5 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:opacity-60"
+        >
+          {submitting ? "Logging in…" : "Log in"}
+        </button>
+      </form>
+
+      <Link to="/" className="mt-10 inline-block text-sm font-bold text-ink hover:underline">
+        ← Back to site
+      </Link>
+    </div>
+  );
+}
+
+function ClaimantLine({ account }) {
   return (
     <div className="mt-2 text-[13px] text-grey-600">
       Claimed by <strong>{account.name}</strong> ({account.role}) · {account.email}
-      {business.verificationMethod === "domain-auto" && (
+      {account.verificationMethod === "domain-auto" && (
         <span className="ml-2 rounded-full border border-grey-300 px-2 py-0.5 text-[11px] font-bold text-grey-600">
           Domain-verified
         </span>
@@ -23,12 +101,12 @@ function ClaimantLine({ business }) {
   );
 }
 
-function claimStepState(business) {
-  return business.claimStatus === "pending" ? "current" : "done";
+function claimStepState(account) {
+  return account.claimStatus === "pending" ? "current" : "done";
 }
 
-function ssmStepState(business) {
-  if (business.claimStatus !== "approved") return "locked";
+function ssmStepState(account, business) {
+  if (account.claimStatus !== "approved") return "locked";
   return business.tier === "T2" ? "done" : "current";
 }
 
@@ -89,13 +167,12 @@ function UndoAction({ children, ...props }) {
   );
 }
 
-function ReviewTimeline({ business }) {
-  const { approveClaim, removeClaim, markSsmVerified, revokeSsmVerification } = useAuth();
-  const claimStatus = claimStepState(business);
-  const ssmStatus = ssmStepState(business);
+function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
+  const claimStatus = claimStepState(account);
+  const ssmStatus = ssmStepState(account, business);
 
   function confirmRemove(message) {
-    if (window.confirm(message)) removeClaim(business.id);
+    if (window.confirm(message)) onRemove(account);
   }
 
   return (
@@ -109,7 +186,7 @@ function ReviewTimeline({ business }) {
       >
         {claimStatus === "current" ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => approveClaim(business.id)}>
+            <Button size="sm" onClick={() => onApprove(account.id)}>
               Approve claim
             </Button>
             <Button
@@ -153,7 +230,7 @@ function ReviewTimeline({ business }) {
       >
         {ssmStatus === "current" && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={() => markSsmVerified(business.id)}>
+            <Button size="sm" onClick={() => onVerifySsm(business.id)}>
               Mark as SSM-Verified
             </Button>
             <Button
@@ -170,7 +247,7 @@ function ReviewTimeline({ business }) {
           </div>
         )}
         {ssmStatus === "done" && (
-          <UndoAction onClick={() => revokeSsmVerification(business.id)}>
+          <UndoAction onClick={() => onRevokeSsm(business.id)}>
             Remove SSM verification
           </UndoAction>
         )}
@@ -179,7 +256,7 @@ function ReviewTimeline({ business }) {
   );
 }
 
-function BusinessCard({ business }) {
+function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
   return (
     <div className="rounded-lg border border-grey-200 bg-white p-5">
       <div className="font-bold text-ink">{business.name}</div>
@@ -187,43 +264,112 @@ function BusinessCard({ business }) {
         {business.category} · {business.location}
         {business.ssm ? ` · SSM ${business.ssm}` : ""}
       </div>
-      <ClaimantLine business={business} />
+      <ClaimantLine account={account} />
 
       <div className="mt-4 border-t border-grey-100 pt-4">
-        <ReviewTimeline business={business} />
+        <ReviewTimeline
+          account={account}
+          business={business}
+          onApprove={onApprove}
+          onRemove={onRemove}
+          onVerifySsm={onVerifySsm}
+          onRevokeSsm={onRevokeSsm}
+        />
       </div>
     </div>
   );
 }
 
-function businessQueue(business) {
-  if (business.claimStatus === "pending") return "pendingClaim";
+function claimQueue(account, business) {
+  if (account.claimStatus === "pending") return "pendingClaim";
+  if (!business) return null;
   if (business.tier === "T1") return "pendingSsm";
-  return "verified";
+  if (business.tier === "T2") return "verified";
+  return null;
 }
 
-function QueueList({ businesses }) {
-  if (businesses.length === 0) {
+function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
+  if (claims.length === 0) {
     return <p className="mt-10 text-sm text-grey-500">Nothing in this queue right now.</p>;
   }
   return (
     <div className="mt-6 flex flex-col gap-3">
-      {businesses.map((business) => (
-        <BusinessCard key={business.id} business={business} />
+      {claims.map(({ account, business }) => (
+        <ClaimCard
+          key={account.id}
+          account={account}
+          business={business}
+          onApprove={onApprove}
+          onRemove={onRemove}
+          onVerifySsm={onVerifySsm}
+          onRevokeSsm={onRevokeSsm}
+        />
       ))}
     </div>
   );
 }
 
 function AdminReview() {
-  const businesses = useBusinesses();
-  const claimed = businesses.filter((b) => b.claimStatus !== null);
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [accounts, setAccounts] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
+  function loadData() {
+    return Promise.all([fetchAdminClaims(), fetchBusinesses({})])
+      .then(([claims, biz]) => {
+        setAccounts(claims);
+        setBusinesses(biz);
+        setAuthStatus("ready");
+      })
+      .catch((err) => {
+        setAuthStatus("needsLogin");
+        throw err;
+      });
+  }
+
+  useEffect(() => {
+    loadData().catch(() => {});
+  }, []);
+
+  if (authStatus === "checking") {
+    return (
+      <div className="mx-auto max-w-4xl px-6 py-12 text-sm text-grey-500">Loading…</div>
+    );
+  }
+
+  if (authStatus === "needsLogin") {
+    return <LoginGate onSuccess={loadData} />;
+  }
+
+  async function withRefresh(action) {
+    try {
+      await action();
+    } catch (err) {
+      toast.error(err.message);
+      return;
+    }
+    await loadData().catch(() => {});
+  }
+
+  const onApprove = (accountId) => withRefresh(() => approveAdminClaim(accountId));
+  const onRemove = (account) =>
+    withRefresh(() =>
+      account.claimStatus === "pending" ? rejectAdminClaim(account.id) : revokeAdminClaim(account.id),
+    );
+  const onVerifySsm = (businessId) => withRefresh(() => verifySsm(businessId));
+  const onRevokeSsm = (businessId) => withRefresh(() => revokeSsm(businessId));
+
+  const businessById = new Map(businesses.map((b) => [b.id, b]));
+  const claims = accounts
+    .map((account) => ({ account, business: businessById.get(account.businessId) }))
+    .filter((c) => c.business);
 
   const queues = {
-    pendingClaim: claimed.filter((b) => businessQueue(b) === "pendingClaim"),
-    pendingSsm: claimed.filter((b) => businessQueue(b) === "pendingSsm"),
-    verified: claimed.filter((b) => businessQueue(b) === "verified"),
+    pendingClaim: claims.filter((c) => claimQueue(c.account, c.business) === "pendingClaim"),
+    pendingSsm: claims.filter((c) => claimQueue(c.account, c.business) === "pendingSsm"),
+    verified: claims.filter((c) => claimQueue(c.account, c.business) === "verified"),
   };
+
+  const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm };
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
@@ -234,13 +380,12 @@ function AdminReview() {
         Claim &amp; verification review
       </h1>
       <p className="mt-2 max-w-xl text-sm text-grey-600">
-        Stands in for the blueprint's manual admin approval queue. A new
-        claim needs to be approved before the claimant can log in; SSM
-        verification is a separate step after that. Removing a claim reverts
-        the listing to unclaimed and revokes the claimant's login.
+        A new claim needs to be approved before the claimant can log in; SSM verification is a
+        separate step after that. Removing a claim reverts the listing to unclaimed and revokes
+        the claimant's login.
       </p>
 
-      {claimed.length === 0 ? (
+      {claims.length === 0 ? (
         <p className="mt-10 text-sm text-grey-500">No claims to review yet.</p>
       ) : (
         <Tabs className="mt-8" defaultValue="pendingClaim">
@@ -254,13 +399,13 @@ function AdminReview() {
             <TabsTrigger value="verified">Verified ({queues.verified.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="pendingClaim">
-            <QueueList businesses={queues.pendingClaim} />
+            <QueueList claims={queues.pendingClaim} {...queueProps} />
           </TabsContent>
           <TabsContent value="pendingSsm">
-            <QueueList businesses={queues.pendingSsm} />
+            <QueueList claims={queues.pendingSsm} {...queueProps} />
           </TabsContent>
           <TabsContent value="verified">
-            <QueueList businesses={queues.verified} />
+            <QueueList claims={queues.verified} {...queueProps} />
           </TabsContent>
         </Tabs>
       )}
