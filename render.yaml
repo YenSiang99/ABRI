@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: abri-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm start
+    envVars:
+      # Neon connection strings — Neon dashboard → Connect → "Prisma" tab.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # Signs auth session cookies. Render generates a random value on
+      # first deploy; rotate it in the dashboard if it's ever exposed.
+      - key: JWT_SECRET
+        generateValue: true
+      # Your Vercel production domain (e.g. https://abri.vercel.app) —
+      # needed so the backend's CORS config trusts cookies from it.
+      - key: FRONTEND_URL
+        sync: false
+      # Comma-separated allowlist — accounts with one of these emails can
+      # hit /admin/*.
+      - key: ADMIN_EMAILS
+        sync: false
