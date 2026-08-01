@@ -1,0 +1,155 @@
+// Prisma schema for ABRI — modeled on the frontend's mock store layer
+// (frontend/src/lib/store/*.js), which already encodes the real entities
+// and state machine. See backend/README.md for what's intentionally
+// different from the mock (password hashing, no denormalized counts, etc).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// id is a human-readable slug (e.g. "meridian-accounting"), not a cuid —
+// matches the frontend's existing routing contract (/business/:id,
+// /m/:businessId) exactly, so the app layer must slugify on create.
+model Business {
+  id          String   @id
+  name        String
+  category    String
+  location    String
+  // T0 Listed · T1 Claimed · T2 SSM-Verified · T3 Identity-Verified · T4 Transaction-Trusted
+  // Stays T0 until some account's claim is actually APPROVED — multiple
+  // accounts can hold pending claims against a T0 business at once (see
+  // Account.claimStatus below); tier only moves once one of them wins.
+  tier        String   @default("T0")
+  description String?
+  services    String[] @default([])
+  ssm         String?
+  // Canonical email domain, set at seed/import time — used to auto-approve
+  // a claim when the claimant's email matches it. Never claimant-editable.
+  domain      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Many, not one: while unclaimed/contested, several accounts can hold
+  // competing pending claims on the same business at once (see Account
+  // .claimStatus). Once one is approved, the rest are deleted, so in
+  // steady state this is back to one — but the relation has to allow many
+  // to support both that transient dispute window AND (later) multiple
+  // legitimate team members under one business.
+  accounts           Account[]
+  vouchesReceived    Vouch[]             @relation("VouchTarget")
+  vouchesGiven       Vouch[]             @relation("VouchSource")
+  connectionsAsA     Connection[]        @relation("ConnectionA")
+  connectionsAsB     Connection[]        @relation("ConnectionB")
+  pendingConnections PendingConnection[]
+}
+
+model Account {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  phone         String
+  name          String
+  role          String
+  // Real hash (bcrypt/argon2), never plaintext — the mock store keeps
+  // plaintext passwords, which is fine for a localStorage demo and not fine
+  // for a real database.
+  passwordHash  String
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  // Not unique — several accounts can point at the same business while
+  // their claims are still pending/contested. A claim "wins" by reaching
+  // claimStatus "approved"; every other account on that businessId then
+  // gets deleted. (Bare /auth/register accounts have businessId null and
+  // claimStatus null — this field only means something once a claim exists.)
+  businessId         String?
+  business           Business? @relation(fields: [businessId], references: [id])
+  // null (not a claim) | "pending" | "approved"
+  claimStatus        String?
+  // null | "manual" | "domain-auto"
+  verificationMethod String?
+
+  pendingConnections PendingConnection[]
+}
+
+model Vouch {
+  id          String   @id @default(cuid())
+  testimonial String?
+  createdAt   DateTime @default(now())
+
+  fromBusinessId String
+  fromBusiness   Business @relation("VouchSource", fields: [fromBusinessId], references: [id])
+
+  toBusinessId String
+  toBusiness   Business @relation("VouchTarget", fields: [toBusinessId], references: [id])
+
+  // One vouch per (voucher, target) pair — the mock store didn't enforce
+  // this, but letting the same business vouch for another unlimited times
+  // undermines the signal. vouchCount/ladder are intentionally NOT stored
+  // here (unlike the mock's business.vouchCount) — derive them by counting
+  // this relation at query time so they can never drift out of sync.
+  @@unique([fromBusinessId, toBusinessId])
+}
+
+// A mutual edge — connecting via a tap (or in-app connect) links both
+// sides, so it's stored once per pair rather than as two directed rows.
+// The app layer must always store the lexicographically smaller business
+// id as businessAId so the unique constraint actually catches duplicates
+// regardless of which side scanned which card (mirrors connectionId() in
+// the mock's connections.js).
+model Connection {
+  id        String   @id @default(cuid())
+  // "nfc_scan" | "directory"
+  source    String
+  createdAt DateTime @default(now())
+
+  businessAId String
+  businessA   Business @relation("ConnectionA", fields: [businessAId], references: [id])
+
+  businessBId String
+  businessB   Business @relation("ConnectionB", fields: [businessBId], references: [id])
+
+  @@unique([businessAId, businessBId])
+}
+
+// Bridges "scanned a card while logged out" and "account actually exists
+// with a session" — a manual-review claim can take days to approve, so the
+// intent to connect is queued here and consumed the moment that account's
+// first session starts. See pendingConnections.js in the frontend for the
+// original reasoning.
+model PendingConnection {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+
+  @@unique([accountId, businessId])
+}
+
+// Stands in for "an email was sent." Two shapes depending on where in the
+// claim lifecycle it's minted (see emailVerifications.js):
+//  - claimPayload set, accountId null: domain-match path — nothing exists
+//    yet; consuming the token is what creates the account/business.
+//  - accountId set, claimPayload null: manual-review path — account/
+//    business already exist and are already approved; consuming the token
+//    just finalizes email verification and starts a session.
+model EmailVerificationToken {
+  token        String   @id @default(cuid())
+  email        String
+  businessId   String?
+  accountId    String?
+  claimPayload Json?
+  consumed     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}

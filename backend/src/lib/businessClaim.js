@@ -1,0 +1,93 @@
+import { prisma } from "../prisma.js";
+import { CATEGORY_SERVICES } from "./categoryServices.js";
+import { uniqueBusinessId } from "./slug.js";
+
+// Resolves the Business a claim is being submitted against — an existing
+// listing, or a brand new one. Deliberately does NOT touch tier or set any
+// claim status on the business — those live on the Account making the
+// claim (see schema.prisma), since several accounts can be mid-claim on
+// the same business at once. Also does NOT overwrite an existing
+// business's name/category/location from the submitted form — while a
+// listing is contested, one claimant's edits shouldn't clobber what
+// another claimant (or the original seed data) already has.
+async function findOrCreateClaimTarget({ businessId, businessName, category, location, ssm }) {
+  if (businessId) {
+    const existing = await prisma.business.findUnique({ where: { id: businessId } });
+    if (!existing) {
+      throw Object.assign(new Error("This listing isn't available to claim."), { status: 400 });
+    }
+    const alreadyApproved = await prisma.account.findFirst({
+      where: { businessId, claimStatus: "approved" },
+    });
+    if (alreadyApproved) {
+      throw Object.assign(new Error("This business has already been claimed."), { status: 400 });
+    }
+    return existing;
+  }
+
+  const id = await uniqueBusinessId(businessName);
+  return prisma.business.create({
+    data: {
+      id,
+      name: businessName,
+      category,
+      location,
+      ssm: ssm || null,
+      // A manually-registered business has no established domain to check
+      // against, so it always goes through manual review.
+      domain: null,
+      services: CATEGORY_SERVICES[category] ?? [],
+    },
+  });
+}
+
+// Approves one account's claim on a business and rejects every other
+// pending claim on the same business — a claim only ever "wins" outright,
+// never coexists with rivals (until the separate, later team-members
+// feature intentionally allows multiple approved accounts per business).
+async function approveClaimAndRejectRivals({ accountId, businessId, verificationMethod }) {
+  await prisma.account.deleteMany({
+    where: { businessId, claimStatus: "pending", id: { not: accountId } },
+  });
+
+  const account = await prisma.account.update({
+    where: { id: accountId },
+    data: { claimStatus: "approved", verificationMethod },
+  });
+  const business = await prisma.business.update({
+    where: { id: businessId },
+    data: { tier: "T1" },
+  });
+
+  return { account, business };
+}
+
+// Undoes an already-approved claim entirely — the admin's equivalent of
+// "this approval was a mistake." Unlike revoke-ssm (which steps a business
+// back exactly one tier, T2 -> T1), this always lands on T0: the account
+// making the claim is being deleted outright, so there's no intermediate
+// claim state left to fall back to.
+//
+// Deletes any queued PendingConnection rows for this account first —
+// PendingConnection.accountId is ON DELETE RESTRICT, so a bare
+// account.delete() would otherwise fail with an FK violation if the
+// account was approved but never logged in to consume them (same
+// defensive pattern as the account.deleteMany rival-cleanup above).
+//
+// Assumes exactly one approved account per business at a time (true today
+// — see approveClaimAndRejectRivals). If a future team-members feature
+// allows multiple approved accounts per business, this needs to stop
+// dropping the whole business's tier unconditionally.
+async function revokeApprovedClaim({ accountId, businessId }) {
+  await prisma.pendingConnection.deleteMany({ where: { accountId } });
+  await prisma.account.delete({ where: { id: accountId } });
+
+  const business = await prisma.business.update({
+    where: { id: businessId },
+    data: { tier: "T0" },
+  });
+
+  return { business };
+}
+
+export { findOrCreateClaimTarget, approveClaimAndRejectRivals, revokeApprovedClaim };
