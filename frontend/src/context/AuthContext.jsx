@@ -141,8 +141,8 @@ function AuthProvider({ children }) {
   // minted at this point (not before), the same action the domain-match
   // path performs immediately at submission time, so the claimant's final
   // step — click a link, get signed in — is identical either way. The
-  // claimant retrieves it via the /claim-status lookup page, since they
-  // have no session to check back with.
+  // link is emailed to the claimant, since they have no session to check
+  // back with.
   function approveClaim(businessId) {
     const approved = businessStore.approveClaim(businessId);
     const account = approved?.claimedByAccountId

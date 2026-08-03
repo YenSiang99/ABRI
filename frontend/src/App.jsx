@@ -11,7 +11,6 @@ import { BusinessProfile } from "@/pages/BusinessProfile";
 import { CardTap } from "@/pages/CardTap";
 import { Register } from "@/pages/auth/Register";
 import { VerifyClaimLink } from "@/pages/auth/VerifyClaimLink";
-import { ClaimStatus } from "@/pages/auth/ClaimStatus";
 import { AppLayout } from "@/pages/app/AppLayout";
 import { Dashboard } from "@/pages/app/Dashboard";
 import { Profile } from "@/pages/app/Profile";
@@ -46,7 +45,6 @@ function App() {
           <Route path="/m/:businessId" element={<CardTap />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-claim/:token" element={<VerifyClaimLink />} />
-          <Route path="/claim-status" element={<ClaimStatus />} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppLayout />}>

@@ -526,19 +526,18 @@ function PersonalStep({ form, errors, onChange, onBack, onSubmit }) {
 }
 
 function SubmittedStep({ businessName, email, connectBusinessName }) {
-  const statusHref = email ? `/claim-status?email=${encodeURIComponent(email)}` : "/claim-status";
   return (
     <div>
       <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
         Claim your business
       </span>
       <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
-        Claim submitted
+        Your account is being reviewed
       </h1>
       <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-        Thanks — we're finishing verification on your claim for {businessName || "this business"}.
-        We'll send a confirmation link to {email || "your email"} once that's ready — you can
-        check on it anytime. This is separate from (and happens before) SSM verification.
+        Thanks — your claim for {businessName || "this business"} is with an admin now. Once
+        it's reviewed, we'll email {email || "you"} with a confirmation link. This usually
+        takes 1–3 business days.
       </p>
       {connectBusinessName && (
         <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
@@ -548,14 +547,8 @@ function SubmittedStep({ businessName, email, connectBusinessName }) {
       )}
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
-          to={statusHref}
-          className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
-        >
-          Check claim status
-        </Link>
-        <Link
           to="/directory"
-          className="inline-flex items-center gap-2 rounded-sm border border-grey-300 px-5 py-2.5 text-[14px] font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
+          className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
         >
           Back to directory
         </Link>
@@ -604,9 +597,9 @@ function PendingEmailVerification({ email, connectBusinessName }) {
     <div>
       <label className={labelClass}>Email verification</label>
       <p className="mt-1.5 text-[12.5px] text-grey-600 dark:text-muted-foreground">
-        We'll send a confirmation link to <strong>{email}</strong> once we've finished
-        verifying your details. Enter the code sent to your phone below, then continue —
-        you'll be able to check on this anytime afterwards.
+        Once you continue, your account will be reviewed by an admin — this usually takes
+        1–3 business days. We'll send a confirmation link to <strong>{email}</strong> as soon
+        as that's done.
         {connectBusinessName && (
           <> You'll be connected with <strong>{connectBusinessName}</strong> once that's done.</>
         )}

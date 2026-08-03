@@ -72,19 +72,4 @@ function consumeToken(token) {
   return { ok: true, record: consumedRecord };
 }
 
-// Looks up a still-usable (unconsumed, unexpired) token without consuming
-// it — used by the claim-status lookup page to decide whether to show an
-// "open your verification link" action yet.
-function findActiveToken({ accountId, email }) {
-  const now = Date.now();
-  return (
-    loadVerifications().find(
-      (v) =>
-        !v.consumed &&
-        new Date(v.expiresAt).getTime() > now &&
-        (accountId ? v.accountId === accountId : v.email === email),
-    ) ?? null
-  );
-}
-
-export { createVerificationToken, consumeToken, findActiveToken };
+export { createVerificationToken, consumeToken };
