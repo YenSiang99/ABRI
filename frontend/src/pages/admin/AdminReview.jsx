@@ -202,17 +202,15 @@ function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, o
             </Button>
           </div>
         ) : (
-          ssmStatus === "done" && (
-            <UndoAction
-              onClick={() =>
-                confirmRemove(
-                  `Remove this claim on "${business.name}"? The claimant's account will be deleted and the listing will go back to unclaimed.`,
-                )
-              }
-            >
-              Remove claim
-            </UndoAction>
-          )
+          <UndoAction
+            onClick={() =>
+              confirmRemove(
+                `Remove this claim on "${business.name}"? The claimant's account will be deleted and the listing will go back to unclaimed.`,
+              )
+            }
+          >
+            Remove claim
+          </UndoAction>
         )}
       </BreadcrumbStep>
 
@@ -232,17 +230,6 @@ function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, o
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Button size="sm" onClick={() => onVerifySsm(business.id)}>
               Mark as SSM-Verified
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() =>
-                confirmRemove(
-                  `Reject SSM verification for "${business.name}"? This removes the claim entirely — the claimant's account will be deleted and the listing will go back to unclaimed.`,
-                )
-              }
-            >
-              Reject
             </Button>
           </div>
         )}
