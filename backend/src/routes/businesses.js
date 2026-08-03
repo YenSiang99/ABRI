@@ -6,6 +6,7 @@ import { matchesBusinessDomain } from "../lib/domainVerification.js";
 import { findOrCreateClaimTarget } from "../lib/businessClaim.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { sendVerificationEmail } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -133,9 +134,8 @@ router.post(
     if (matchesBusinessDomain(repEmail, knownDomain)) {
       // Nothing is created yet — consuming the link (POST
       // /auth/verify-claim/:token) is what creates the account/business
-      // and auto-approves + logs in.
-      // TODO: actually send this by email once a provider is wired up —
-      // for now, return the token directly so it can be "opened" without one.
+      // and auto-approves + logs in. Also returned directly below (handy
+      // for local dev when RESEND_API_KEY isn't set — see lib/mailer.js).
       const record = await prisma.emailVerificationToken.create({
         data: {
           email: repEmail,
@@ -144,6 +144,15 @@ router.post(
           expiresAt: new Date(Date.now() + CLAIM_TOKEN_TTL_MS),
         },
       });
+
+      await sendVerificationEmail({
+        to: repEmail,
+        subject: `Confirm your claim on ${businessName}`,
+        heading: "Confirm your claim",
+        message: `Your email matches ${businessName}'s domain, so your claim is auto-approved. Click below to verify your email and log in.`,
+        link: `${process.env.FRONTEND_URL}/verify-claim/${record.token}`,
+      });
+
       return res.json({ requiresEmailVerification: true, token: record.token });
     }
 

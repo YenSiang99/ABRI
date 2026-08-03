@@ -3,9 +3,13 @@ import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
-import { approveClaimAndRejectRivals, revokeApprovedClaim } from "../lib/businessClaim.js";
+import {
+  approveClaimAndRejectRivals,
+  revokeApprovedClaim,
+} from "../lib/businessClaim.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { sendVerificationEmail } from "../lib/mailer.js";
 
 const router = Router();
 
@@ -38,15 +42,19 @@ router.get(
 
 // Approves this account's claim and rejects (deletes) every other pending
 // claim on the same business — see approveClaimAndRejectRivals. Mints a
-// confirmation token so the claimant can verify their email and log in.
-// TODO: email this link once a provider is wired up — for now, return the
-// token directly (same placeholder as the domain-match path).
+// confirmation token, emails the claimant a link to verify their email and
+// log in, and also returns the token directly (handy for local dev when
+// RESEND_API_KEY isn't set — see lib/mailer.js).
 router.post(
   "/claims/:accountId/approve",
   asyncHandler(async (req, res) => {
-    const pending = await prisma.account.findUnique({ where: { id: req.params.accountId } });
+    const pending = await prisma.account.findUnique({
+      where: { id: req.params.accountId },
+    });
     if (!pending || pending.claimStatus !== "pending") {
-      return res.status(404).json({ error: "No pending claim found for this account." });
+      return res
+        .status(404)
+        .json({ error: "No pending claim found for this account." });
     }
 
     const { account, business } = await approveClaimAndRejectRivals({
@@ -63,7 +71,19 @@ router.post(
       },
     });
 
-    res.json({ account: serializeAccount(account), business, token: tokenRecord.token });
+    await sendVerificationEmail({
+      to: account.email,
+      subject: `Your claim on ${business.name} has been approved`,
+      heading: "Your claim was approved",
+      message: `An ABRI admin has approved your claim on ${business.name}. Click below to verify your email and log in.`,
+      link: `${process.env.FRONTEND_URL}/verify-claim/${tokenRecord.token}`,
+    });
+
+    res.json({
+      account: serializeAccount(account),
+      business,
+      token: tokenRecord.token,
+    });
   }),
 );
 
@@ -73,9 +93,13 @@ router.post(
 router.post(
   "/claims/:accountId/reject",
   asyncHandler(async (req, res) => {
-    const pending = await prisma.account.findUnique({ where: { id: req.params.accountId } });
+    const pending = await prisma.account.findUnique({
+      where: { id: req.params.accountId },
+    });
     if (!pending || pending.claimStatus !== "pending") {
-      return res.status(404).json({ error: "No pending claim found for this account." });
+      return res
+        .status(404)
+        .json({ error: "No pending claim found for this account." });
     }
 
     await prisma.account.delete({ where: { id: pending.id } });
@@ -91,9 +115,13 @@ router.post(
 router.post(
   "/claims/:accountId/revoke",
   asyncHandler(async (req, res) => {
-    const account = await prisma.account.findUnique({ where: { id: req.params.accountId } });
+    const account = await prisma.account.findUnique({
+      where: { id: req.params.accountId },
+    });
     if (!account || account.claimStatus !== "approved") {
-      return res.status(404).json({ error: "No approved claim found for this account." });
+      return res
+        .status(404)
+        .json({ error: "No approved claim found for this account." });
     }
 
     const { business } = await revokeApprovedClaim({
@@ -105,14 +133,24 @@ router.post(
   }),
 );
 
+// SSM
 router.post(
   "/businesses/:id/verify-ssm",
   asyncHandler(async (req, res) => {
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findUnique({
+      where: { id: req.params.id },
+    });
     if (!business || business.tier !== "T1") {
-      return res.status(400).json({ error: "Business must be claimed (T1) before SSM verification." });
+      return res
+        .status(400)
+        .json({
+          error: "Business must be claimed (T1) before SSM verification.",
+        });
     }
-    const updated = await prisma.business.update({ where: { id: business.id }, data: { tier: "T2" } });
+    const updated = await prisma.business.update({
+      where: { id: business.id },
+      data: { tier: "T2" },
+    });
     res.json({ business: updated });
   }),
 );
@@ -120,11 +158,18 @@ router.post(
 router.post(
   "/businesses/:id/revoke-ssm",
   asyncHandler(async (req, res) => {
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findUnique({
+      where: { id: req.params.id },
+    });
     if (!business || business.tier !== "T2") {
-      return res.status(400).json({ error: "Business isn't currently SSM-verified." });
+      return res
+        .status(400)
+        .json({ error: "Business isn't currently SSM-verified." });
     }
-    const updated = await prisma.business.update({ where: { id: business.id }, data: { tier: "T1" } });
+    const updated = await prisma.business.update({
+      where: { id: business.id },
+      data: { tier: "T1" },
+    });
     res.json({ business: updated });
   }),
 );

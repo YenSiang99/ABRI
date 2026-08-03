@@ -7,6 +7,7 @@ import { setSessionCookie, clearSessionCookie } from "../lib/cookies.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { sendVerificationEmail } from "../lib/mailer.js";
 import { findOrCreateClaimTarget, approveClaimAndRejectRivals } from "../lib/businessClaim.js";
 
 const router = Router();
@@ -48,15 +49,23 @@ router.post("/register", asyncHandler(async (req, res) => {
   });
 
   // Not logged in yet — login is gated on emailVerified (see /login below),
-  // so this mints the same kind of confirmation token as the claim paths.
-  // TODO: email this link once a provider is wired up — for now, return the
-  // token directly (same placeholder as the claim paths).
+  // so this mints the same kind of confirmation token as the claim paths,
+  // and is also returned directly below (handy for local dev when
+  // RESEND_API_KEY isn't set — see lib/mailer.js).
   const tokenRecord = await prisma.emailVerificationToken.create({
     data: {
       email: account.email,
       accountId: account.id,
       expiresAt: new Date(Date.now() + REGISTER_TOKEN_TTL_MS),
     },
+  });
+
+  await sendVerificationEmail({
+    to: account.email,
+    subject: "Confirm your ABRI account",
+    heading: "Confirm your account",
+    message: "Click below to verify your email and log in.",
+    link: `${process.env.FRONTEND_URL}/verify-claim/${tokenRecord.token}`,
   });
 
   res
