@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "../lib/password.js";
 import { signSessionToken } from "../lib/jwt.js";
 import { setSessionCookie, clearSessionCookie } from "../lib/cookies.js";
 import { serializeAccount } from "../lib/serialize.js";
+import { loadAccountView } from "../lib/accountView.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
@@ -91,7 +92,7 @@ router.post("/login", asyncHandler(async (req, res) => {
   }
 
   setSessionCookie(res, signSessionToken(account.id));
-  res.json({ account: serializeAccount(account) });
+  res.json(await loadAccountView(account.id));
 }));
 
 router.post("/logout", (req, res) => {
@@ -99,9 +100,9 @@ router.post("/logout", (req, res) => {
   res.json({ ok: true });
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  res.json({ account: serializeAccount(req.account) });
-});
+router.get("/me", requireAuth, asyncHandler(async (req, res) => {
+  res.json(await loadAccountView(req.account.id));
+}));
 
 // Consumes a link minted by either claim path (see EmailVerificationToken
 // in schema.prisma for the two shapes):
@@ -161,7 +162,7 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
     });
 
     setSessionCookie(res, signSessionToken(account.id));
-    return res.json({ account: serializeAccount(account), business });
+    return res.json(await loadAccountView(account.id));
   }
 
   const account = await prisma.account.findUnique({ where: { id: record.accountId } });
@@ -175,7 +176,7 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
   });
 
   setSessionCookie(res, signSessionToken(verified.id));
-  res.json({ account: serializeAccount(verified) });
+  res.json(await loadAccountView(verified.id));
 }));
 
 export { router as authRouter };

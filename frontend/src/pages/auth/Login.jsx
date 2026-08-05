@@ -20,13 +20,13 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
       setError("Enter your email and password to continue.");
       return;
     }
-    const result = login(email.trim(), password);
+    const result = await login(email.trim(), password);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -88,16 +88,6 @@ function Login() {
             Claim your business
           </Link>
         </p>
-
-        <div className="mt-6 rounded-md border border-dashed border-grey-300 bg-surface p-3.5 text-[12.5px] text-grey-600 dark:border-border dark:bg-muted dark:text-muted-foreground">
-          <p className="font-bold text-ink dark:text-foreground">Demo accounts</p>
-          <p className="mt-1">
-            owner@meridianaccounting.my / demo1234 — SSM-Verified (T2)
-          </p>
-          <p className="mt-0.5">
-            owner@clearpathcorpsec.my / demo1234 — Claimed, pending SSM (T1)
-          </p>
-        </div>
       </div>
     </div>
   );

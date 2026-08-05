@@ -10,8 +10,12 @@ function logout() {
   return apiFetch("/auth/logout", { method: "POST" });
 }
 
+function getMe() {
+  return apiFetch("/auth/me");
+}
+
 function verifyClaimToken(token) {
   return apiFetch(`/auth/verify-claim/${token}`, { method: "POST" });
 }
 
-export { login, logout, verifyClaimToken };
+export { login, logout, getMe, verifyClaimToken };
