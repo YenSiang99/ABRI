@@ -2,16 +2,16 @@ import { SESSION_COOKIE } from "./jwt.js";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-// In production the frontend (Vercel) and backend (Render) are different
-// sites, so the cookie has to be SameSite=None to survive a cross-site
-// fetch — which in turn requires Secure. Locally frontend/backend share
-// the "localhost" site (just different ports), so Lax + non-Secure is
-// both sufficient and necessary (a Secure cookie won't be stored over
-// plain http).
+// The frontend proxies /api/* to this backend (see frontend/vercel.json),
+// so the browser only ever talks to the Vercel origin — the backend is
+// never a cross-site request from the browser's point of view, in prod or
+// locally. That means Lax is always correct (and gives us real CSRF
+// protection, unlike None). Secure still needs to track environment: prod
+// is HTTPS-only, but a Secure cookie won't be stored over plain local http.
 const isProduction = process.env.NODE_ENV === "production";
 const baseOptions = {
   httpOnly: true,
-  sameSite: isProduction ? "none" : "lax",
+  sameSite: "lax",
   secure: isProduction,
 };
 

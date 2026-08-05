@@ -1,3 +1,7 @@
+// In production this should be "/api" — Vercel rewrites that to the Render
+// backend (see frontend/vercel.json) so the browser only ever talks to its
+// own origin, keeping the session cookie same-site. Locally it points
+// straight at the backend dev server instead, since there's no proxy.
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
 // Shared fetch wrapper for every backend route module in this directory —
