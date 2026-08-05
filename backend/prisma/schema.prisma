@@ -61,6 +61,10 @@ model Account {
   passwordHash  String
   emailVerified Boolean  @default(false)
   phoneVerified Boolean  @default(false)
+  // Grants access to /admin/* routes (see middleware/requireAdmin.js).
+  // Replaces the old ADMIN_EMAILS env-var allowlist — flip this directly in
+  // the DB (there's no admin UI for it yet) rather than editing env config.
+  isAdmin       Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   // Not unique — several accounts can point at the same business while

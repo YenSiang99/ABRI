@@ -20,7 +20,3 @@ services:
       # needed so the backend's CORS config trusts cookies from it.
       - key: FRONTEND_URL
         sync: false
-      # Comma-separated allowlist — accounts with one of these emails can
-      # hit /admin/*.
-      - key: ADMIN_EMAILS
-        sync: false
