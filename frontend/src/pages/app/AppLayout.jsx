@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { useAuth } from "@/context/AuthContext";
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAdmin } = useAuth();
+  const { pathname } = useLocation();
 
   // Portaled content (dialogs, toasts) mounts to document.body, outside this
   // subtree, so the theme class has to live on body for them to inherit it.
@@ -15,6 +18,14 @@ function AppLayout() {
     document.body.classList.add("app-theme");
     return () => document.body.classList.remove("app-theme");
   }, []);
+
+  // Admin accounts have no business, so every other /app/* page (which
+  // assumes one exists — see AppSidebar/Dashboard) would break for them.
+  // Keep admins confined to /app/admin instead of teaching each page about
+  // the admin case.
+  if (isAdmin && pathname !== "/app/admin") {
+    return <Navigate to="/app/admin" replace />;
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-background">

@@ -1,6 +1,7 @@
 import { prisma } from "../prisma.js";
 import { serializeAccount } from "./serialize.js";
 import { ladderFor } from "./vouchLadder.js";
+import { isAdminEmail } from "../middleware/requireAdmin.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
 // the frontend expects: vouchCount/ladder derived at read time (never
@@ -45,7 +46,7 @@ async function loadAccountView(accountId) {
 
   const { business, ...accountFields } = account;
   return {
-    account: serializeAccount(accountFields),
+    account: { ...serializeAccount(accountFields), isAdmin: isAdminEmail(accountFields.email) },
     business: business ? serializeBusiness(business) : null,
   };
 }

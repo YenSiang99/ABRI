@@ -31,7 +31,7 @@ function AuthProvider({ children }) {
       const data = await apiLogin(email, password);
       setAccount(data.account);
       setBusiness(data.business);
-      return { ok: true };
+      return { ok: true, isAdmin: Boolean(data.account?.isAdmin) };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -86,6 +86,7 @@ function AuthProvider({ children }) {
     account,
     business,
     isAuthenticated: Boolean(account),
+    isAdmin: Boolean(account?.isAdmin),
     loading,
     login,
     logout,

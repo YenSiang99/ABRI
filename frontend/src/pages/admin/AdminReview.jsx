@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Check, Lock } from "lucide-react";
 
 import { fetchBusinesses } from "@/lib/api/businesses";
-import { login } from "@/lib/api/auth";
 import {
   fetchAdminClaims,
   approveAdminClaim,
@@ -16,84 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-
-const fieldClass =
-  "w-full rounded-sm border border-grey-300 px-3.5 py-2.5 text-sm text-ink outline-none focus:border-ink";
-const labelClass = "text-[13px] font-bold text-ink";
-const errorClass = "mt-1 text-[12.5px] text-red-600";
-
-function LoginGate({ onSuccess }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await login(email, password);
-      await onSuccess();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
-      <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase">
-        Internal · not linked from any nav
-      </span>
-      <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink">
-        Admin login
-      </h1>
-      <p className="mt-2 max-w-sm text-sm text-grey-600">
-        Log in with an account on the ADMIN_EMAILS allowlist to review claims and SSM
-        verification.
-      </p>
-
-      <form onSubmit={handleSubmit} className="mt-6 max-w-sm rounded-lg border border-grey-200 bg-white p-6">
-        <label className={labelClass}>Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={cn(fieldClass, "mt-1.5")}
-          autoFocus
-        />
-        <label className={cn(labelClass, "mt-4 block")}>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={cn(fieldClass, "mt-1.5")}
-        />
-        {error && <p className={errorClass}>{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-5 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:opacity-60"
-        >
-          {submitting ? "Logging in…" : "Log in"}
-        </button>
-      </form>
-
-      <Link to="/" className="mt-10 inline-block text-sm font-bold text-ink hover:underline">
-        ← Back to site
-      </Link>
-    </div>
-  );
-}
+import { useAuth } from "@/context/AuthContext";
 
 function ClaimantLine({ account }) {
   return (
-    <div className="mt-2 text-[13px] text-grey-600">
+    <div className="mt-2 text-[13px] text-muted-foreground">
       Claimed by <strong>{account.name}</strong> ({account.role}) · {account.email}
       {account.verificationMethod === "domain-auto" && (
-        <span className="ml-2 rounded-full border border-grey-300 px-2 py-0.5 text-[11px] font-bold text-grey-600">
+        <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
           Domain-verified
         </span>
       )}
@@ -120,9 +49,9 @@ function BreadcrumbStep({ label, sublabel, status, isLast, children }) {
         <span
           className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
-            status === "done" && "border-ink bg-ink text-white",
+            status === "done" && "border-foreground bg-foreground text-background",
             status === "current" && "border-yellow bg-yellow text-yellow-ink",
-            status === "locked" && "border-grey-300 bg-white text-grey-400",
+            status === "locked" && "border-border bg-card text-muted-foreground",
           )}
         >
           {status === "done" ? (
@@ -135,7 +64,7 @@ function BreadcrumbStep({ label, sublabel, status, isLast, children }) {
         </span>
         {!isLast && (
           <span
-            className={cn("mt-1 w-[2px] flex-1", status === "done" ? "bg-ink" : "bg-grey-200")}
+            className={cn("mt-1 w-[2px] flex-1", status === "done" ? "bg-foreground" : "bg-border")}
           />
         )}
       </div>
@@ -143,12 +72,12 @@ function BreadcrumbStep({ label, sublabel, status, isLast, children }) {
         <div
           className={cn(
             "text-[13px] font-bold",
-            status === "locked" ? "text-grey-400" : "text-ink",
+            status === "locked" ? "text-muted-foreground" : "text-foreground",
           )}
         >
           {label}
         </div>
-        <div className="text-[11.5px] text-grey-500">{sublabel}</div>
+        <div className="text-[11.5px] text-muted-foreground">{sublabel}</div>
         {children}
       </div>
     </div>
@@ -245,15 +174,15 @@ function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, o
 
 function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
   return (
-    <div className="rounded-lg border border-grey-200 bg-white p-5">
-      <div className="font-bold text-ink">{business.name}</div>
-      <div className="mt-0.5 text-[13px] text-grey-600">
+    <div className="rounded-lg border border-border bg-card p-5">
+      <div className="font-bold text-foreground">{business.name}</div>
+      <div className="mt-0.5 text-[13px] text-muted-foreground">
         {business.category} · {business.location}
         {business.ssm ? ` · SSM ${business.ssm}` : ""}
       </div>
       <ClaimantLine account={account} />
 
-      <div className="mt-4 border-t border-grey-100 pt-4">
+      <div className="mt-4 border-t border-border pt-4">
         <ReviewTimeline
           account={account}
           business={business}
@@ -277,7 +206,7 @@ function claimQueue(account, business) {
 
 function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
   if (claims.length === 0) {
-    return <p className="mt-10 text-sm text-grey-500">Nothing in this queue right now.</p>;
+    return <p className="mt-10 text-sm text-muted-foreground">Nothing in this queue right now.</p>;
   }
   return (
     <div className="mt-6 flex flex-col gap-3">
@@ -297,34 +226,36 @@ function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
 }
 
 function AdminReview() {
-  const [authStatus, setAuthStatus] = useState("checking");
+  const { isAdmin } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
   const [businesses, setBusinesses] = useState([]);
+
   function loadData() {
     return Promise.all([fetchAdminClaims(), fetchBusinesses({})])
       .then(([claims, biz]) => {
         setAccounts(claims);
         setBusinesses(biz);
-        setAuthStatus("ready");
       })
       .catch((err) => {
-        setAuthStatus("needsLogin");
+        toast.error(err.message);
         throw err;
-      });
+      })
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => {
     loadData().catch(() => {});
   }, []);
 
-  if (authStatus === "checking") {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-12 text-sm text-grey-500">Loading…</div>
-    );
+  // ProtectedRoute + AppLayout already keep non-admins out of /app/admin;
+  // this is a fallback in case that ever changes underneath this page.
+  if (!isAdmin) {
+    return <Navigate to="/app" replace />;
   }
 
-  if (authStatus === "needsLogin") {
-    return <LoginGate onSuccess={loadData} />;
+  if (loading) {
+    return <div className="mx-auto max-w-4xl px-6 py-12 text-sm text-muted-foreground">Loading…</div>;
   }
 
   async function withRefresh(action) {
@@ -360,23 +291,20 @@ function AdminReview() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase">
-        Internal · not linked from any nav
-      </span>
-      <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink">
+      <h1 className="text-2xl font-extrabold tracking-[-0.02em] text-foreground">
         Claim &amp; verification review
       </h1>
-      <p className="mt-2 max-w-xl text-sm text-grey-600">
+      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
         A new claim needs to be approved before the claimant can log in; SSM verification is a
         separate step after that. Removing a claim reverts the listing to unclaimed and revokes
         the claimant's login.
       </p>
 
       {claims.length === 0 ? (
-        <p className="mt-10 text-sm text-grey-500">No claims to review yet.</p>
+        <p className="mt-10 text-sm text-muted-foreground">No claims to review yet.</p>
       ) : (
         <Tabs className="mt-8" defaultValue="pendingClaim">
-          <TabsList variant="line" className="border-b border-grey-200">
+          <TabsList variant="line" className="border-b border-border">
             <TabsTrigger value="pendingClaim">
               Pending claim ({queues.pendingClaim.length})
             </TabsTrigger>
@@ -396,10 +324,6 @@ function AdminReview() {
           </TabsContent>
         </Tabs>
       )}
-
-      <Link to="/" className="mt-10 inline-block text-sm font-bold text-ink hover:underline">
-        ← Back to site
-      </Link>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 
 import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
@@ -57,9 +57,10 @@ function App() {
             <Route path="verify" element={<Verify />} />
             <Route path="introductions" element={<Introductions />} />
             <Route path="card" element={<Card />} />
+            <Route path="admin" element={<AdminReview />} />
           </Route>
         </Route>
-        <Route path="/admin" element={<AdminReview />} />
+        <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
       </Routes>
     </>
   );

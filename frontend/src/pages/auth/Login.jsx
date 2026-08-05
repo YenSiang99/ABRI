@@ -32,7 +32,9 @@ function Login() {
       return;
     }
     setError("");
-    navigate(location.state?.from?.pathname ?? "/app", { replace: true });
+    navigate(location.state?.from?.pathname ?? (result.isAdmin ? "/app/admin" : "/app"), {
+      replace: true,
+    });
   }
 
   return (
