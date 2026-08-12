@@ -41,12 +41,26 @@ model Business {
   // steady state this is back to one — but the relation has to allow many
   // to support both that transient dispute window AND (later) multiple
   // legitimate team members under one business.
+  // "basic" | "premium" | "enterprise" — determines the vouch-giving cap
+  // (see lib/vouchCap.js). Founding-100 businesses are auto-assigned
+  // "premium" at claim-approval time (see approveClaimAndRejectRivals in
+  // lib/businessClaim.js). Deliberately never surfaced as a profile badge —
+  // it sits next to two other tier axes (verification tier, vouch ladder)
+  // and must not read as a third kind of trust signal.
+  membershipPlan String @default("basic")
+
   accounts           Account[]
   vouchesReceived    Vouch[]             @relation("VouchTarget")
   vouchesGiven       Vouch[]             @relation("VouchSource")
   connectionsAsA     Connection[]        @relation("ConnectionA")
   connectionsAsB     Connection[]        @relation("ConnectionB")
   pendingConnections PendingConnection[]
+  flagsRaised        VouchFlag[]         @relation("FlagRaisedBy")
+  flagsAgainst       VouchFlag[]         @relation("FlagAgainst")
+  activityEvents     ActivityEvent[]     @relation("ActivityEventOwner")
+  activityAsActor    ActivityEvent[]     @relation("ActivityEventActor")
+  vouchRevisions     VouchRevision[]     @relation("VouchRevisionAuthor")
+  vouchActionsAsActor VouchAction[]      @relation("VouchActionActor")
 }
 
 model Account {
@@ -80,12 +94,88 @@ model Account {
   verificationMethod String?
 
   pendingConnections PendingConnection[]
+  // Admin-only back-relations: the vouch interventions this account made and
+  // the reports it ruled on. Empty for every non-admin account.
+  vouchActionsAsAdmin VouchAction[] @relation("VouchActionAdminActor")
+  vouchFlagsResolved  VouchFlag[]   @relation("VouchFlagResolver")
 }
 
+// The vouch feature is three tables, and which one a piece of text lives in
+// is the whole design:
+//
+//   Vouch          — the workflow header. Mutable. Current state only.
+//   VouchRevision  — every version of the GIVER's testimonial. Insert-only.
+//   VouchAction    — every state transition, including the RECEIVER's
+//                    revert and cancel notes. Insert-only.
+//
+// The rule that makes the audit trail work: no table holds a text column
+// that is ever UPDATEd. A revise inserts a revision, it does not overwrite
+// one; a revert inserts an action, it does not overwrite one. The
+// header points at the live revision rather than carrying a copy of its
+// text, so there is exactly one place each piece of authored text exists
+// and no way for the history to disagree with the current state.
+//
+// A vouch is receiver-gated before it counts as a trust signal — mirrors
+// how LinkedIn recommendations need the recipient's approval before going
+// live, rather than a bilateral edit negotiation. The receiver has four
+// actions and each is one transition:
+//   pending -> published (accept; counts toward vouchCount/ladder)
+//   pending -> cancelled (cancel, or 14 days pass untouched — see
+//     lib/vouchExpiry.js for the lazy, no-cron expiry check)
+//   pending -> reverted (revert: sent back to be edited, capped at
+//     maxRevisions rounds, so the loop can't run forever)
+//   pending|reverted -> under_review (flag: suspended, an admin's move)
+// and the giver's revise closes the loop:
+//   reverted -> pending (new revision; revisionCount += 1)
+// under_review is the one status no business can leave. An admin picks one
+// of three exits (see POST /admin/vouch-reviews/:id/decide):
+//   under_review -> pending   (returned to the receiver; flag dismissed)
+//   under_review -> reverted  (sent back to the giver to fix; flag upheld)
+//   under_review -> cancelled (killed; flag upheld)
+// cancelled rows are never deleted — a fresh POST /vouches on a cancelled
+// pair resets this same row in place (see routes/vouches.js) rather than
+// requiring a delete-then-recreate dance, so @@unique keeps meaning
+// "exactly one row per pair, ever, reused across attempts."
 model Vouch {
-  id          String   @id @default(cuid())
-  testimonial String?
-  createdAt   DateTime @default(now())
+  id String @id @default(cuid())
+
+  // "pending"      — the receiver's move
+  // "reverted"     — sent back to the giver to edit; their move
+  // "under_review" — flagged by the receiver; an admin's move, and the one
+  //                  in-flight status the 14-day expiry doesn't touch
+  // "published" / "cancelled" — terminal (closedAt set)
+  // See the diagram at the top of src/routes/vouches.js.
+  status String @default("pending")
+
+  // Pointer to the live testimonial, not a copy of its text. The previous
+  // shape kept a denormalized `testimonial` string here and that column is
+  // exactly where history went to die — a revise overwrote it in place, so
+  // "what did revision 1 actually say" became unanswerable. Reads that
+  // want the current text join through this.
+  currentRevisionId String?        @unique
+  currentRevision   VouchRevision? @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
+
+  // Which submission cycle this row is on. Starts at 1 and increments
+  // each time a cancelled row is resubmitted through POST /vouches. Child
+  // rows carry the attempt they belong to, so a fresh attempt starts with
+  // a clean slate instead of inheriting the previous attempt's change
+  // requests — while the old rows stay as history rather than being
+  // deleted. (An alternative shape would be one row per attempt with a
+  // partial unique index on the active ones; this keeps the plain
+  // @@unique below meaningful, which is what enforces the anti-spam rule.)
+  attempt       Int @default(1)
+  // Rounds used within the CURRENT attempt only (reset to 0 on resubmit).
+  revisionCount Int @default(0)
+  // Per-row rather than a global constant so a specific vouch can be given
+  // more rounds later without a migration.
+  maxRevisions  Int @default(2)
+
+  // Bumped on every state transition — drives the 14-day lazy-expiry check.
+  lastActionAt DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  // Set when the vouch reaches a terminal status. Distinguishes "settled"
+  // from "in flight" without having to enumerate status values.
+  closedAt     DateTime?
 
   fromBusinessId String
   fromBusiness   Business @relation("VouchSource", fields: [fromBusinessId], references: [id])
@@ -93,12 +183,176 @@ model Vouch {
   toBusinessId String
   toBusiness   Business @relation("VouchTarget", fields: [toBusinessId], references: [id])
 
+  revisions VouchRevision[] @relation("VouchRevisions")
+  actions   VouchAction[]
+  flags     VouchFlag[]
+
   // One vouch per (voucher, target) pair — the mock store didn't enforce
   // this, but letting the same business vouch for another unlimited times
   // undermines the signal. vouchCount/ladder are intentionally NOT stored
   // here (unlike the mock's business.vouchCount) — derive them by counting
-  // this relation at query time so they can never drift out of sync.
+  // published rows in this relation at query time so they can never drift
+  // out of sync.
   @@unique([fromBusinessId, toBusinessId])
+  // GET /vouches/requests filters on exactly these two pairs.
+  @@index([toBusinessId, status])
+  @@index([fromBusinessId, status])
+}
+
+// Every version of the giver's testimonial, one row per submit or revise.
+// Never updated, only inserted — that invariant is the entire reason this
+// table exists, so nothing here should ever appear in an UPDATE.
+model VouchRevision {
+  id      String @id @default(cuid())
+  vouchId String
+  vouch   Vouch  @relation("VouchRevisions", fields: [vouchId], references: [id])
+  attempt Int
+
+  // 1 = the attempt's original submission, 2.. = successive revisions.
+  // 1-based because it's shown to users ("Revision 2 of 3"), and an
+  // off-by-one in a label is worse than one in an array index.
+  revisionNumber Int
+  comment        String
+
+  // Always the giver — denormalized off vouch.fromBusinessId so a revision
+  // is self-describing when read on its own (e.g. from an admin query).
+  createdById String
+  createdBy   Business @relation("VouchRevisionAuthor", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  actions   VouchAction[]
+  flags     VouchFlag[]
+  currentOf Vouch?        @relation("CurrentRevision")
+
+  @@unique([vouchId, attempt, revisionNumber])
+  @@index([vouchId])
+}
+
+// Append-only log of every state transition — the timeline UI reads this
+// and nothing else. Distinct from ActivityEvent, which is a per-business
+// notification feed keyed on businessId with no vouchId and therefore
+// can't reconstruct a single vouch's history.
+//
+// `comment` is the RECEIVER's text (why they want changes, why they
+// cancelled). It lives on the action rather than in its own table because
+// it only ever exists as the payload of one specific transition — giving
+// it a separate home meant a note could in principle outlive, or drift
+// from, the action that produced it. The giver's text is never here; that
+// belongs in VouchRevision, reachable via revisionId.
+model VouchAction {
+  id      String @id @default(cuid())
+  vouchId String
+  vouch   Vouch  @relation(fields: [vouchId], references: [id])
+  attempt Int
+
+  // Giver:    "submit" | "revise"
+  // Receiver: "accept" | "revert" | "cancel" | "flag"
+  // Admin:    "admin_return" | "admin_revert" | "admin_cancel"
+  // System:   "expire"
+  action String
+
+  // Which testimonial version this action concerns: the one created (for
+  // submit/revise) or the one being responded to (for revert, cancel,
+  // accept). This is what answers "which testimonial was the second
+  // revert about" — it pins the action to the exact text in front of
+  // the actor at the time, rather than to whatever the vouch says now.
+  revisionId String?
+  revision   VouchRevision? @relation(fields: [revisionId], references: [id])
+
+  // Null for "expire" and for every admin_* action — neither the system nor
+  // an admin is a party to the vouch, and an admin reading the log has to be
+  // able to tell a real cancel from a timeout or an intervention.
+  actorId String?
+  actor   Business? @relation("VouchActionActor", fields: [actorId], references: [id])
+
+  // Set only on admin_* actions, where actorId is null: which admin made the
+  // call. An Account rather than a Business because admins have no business
+  // (see AppLayout.jsx's admin redirect), which is the whole reason actorId
+  // can't carry them. Never serialized to the two businesses — they see that
+  // "an admin" ruled, not who; see serializeAction in lib/vouchTurn.js.
+  actorAccountId String?
+  actorAccount   Account? @relation("VouchActionAdminActor", fields: [actorAccountId], references: [id])
+
+  comment String?
+
+  fromStatus String?
+  toStatus   String
+
+  createdAt DateTime @default(now())
+
+  @@index([vouchId, createdAt])
+}
+
+// A report an admin is meant to read, raised by either side.
+//
+// The two directions are NOT symmetric, and the asymmetry is the point:
+//   receiver -> giver ("abusive_content"/"other") suspends the live vouch
+//     in "under_review", because the thing being reported is a testimonial
+//     that hasn't been published yet and shouldn't proceed while in doubt;
+//   giver -> receiver ("unfair_cancel") is tracking-only, because by then
+//     the vouch is already terminal — there's nothing left to suspend, and
+//     the report exists to surface a business that cancels in bad faith
+//     repeatedly.
+// See routes/admin.js for the review queue.
+model VouchFlag {
+  id      String @id @default(cuid())
+  vouchId String
+  vouch   Vouch  @relation(fields: [vouchId], references: [id])
+
+  raisedByBusinessId String
+  raisedByBusiness   Business @relation("FlagRaisedBy", fields: [raisedByBusinessId], references: [id])
+
+  againstBusinessId String
+  againstBusiness   Business @relation("FlagAgainst", fields: [againstBusinessId], references: [id])
+
+  // Raised by the receiver: "abusive_content" | "other"
+  // Raised by the giver:    "unfair_cancel"
+  reason String
+  note   String?
+  // The exact testimonial version that was flagged. Used to be a copied
+  // `testimonialSnapshot` string, which existed only because the live text
+  // could be overwritten out from under it — now that revisions are
+  // immutable, pointing at one is strictly better: same guarantee, no
+  // duplicated text to fall out of sync.
+  revisionId String?
+  revision   VouchRevision? @relation(fields: [revisionId], references: [id])
+
+  status    String   @default("open") // "open" | "reviewed"
+  // How it was judged, recorded separately from `status` because "an admin
+  // looked at this" and "an admin agreed with it" are different facts and
+  // only the second one is worth counting. This is the column a
+  // repeat-offender signal reads: upheld flags against a business over time,
+  // rather than raw flag volume, which anyone can inflate by complaining.
+  // Null while status is "open".
+  outcome              String?   // "upheld" | "dismissed"
+  resolvedAt           DateTime?
+  resolvedByAccountId  String?
+  resolvedByAccount    Account?  @relation("VouchFlagResolver", fields: [resolvedByAccountId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([vouchId])
+}
+
+// Powers the give-first reciprocity loop's notify step (Dashboard.jsx's
+// "Recent activity") — businessId is whose feed this appears in,
+// actorBusinessId is the other party. type values (see
+// lib/activityEvents.js for the message-text map): "vouch_submitted"
+// (-> receiver), "vouch_published" / "vouch_cancelled" / "vouch_reverted" /
+// "vouch_flagged" (-> giver), "vouch_revised" (-> receiver).
+model ActivityEvent {
+  id         String  @id @default(cuid())
+  businessId String
+  business   Business @relation("ActivityEventOwner", fields: [businessId], references: [id])
+
+  actorBusinessId String?
+  actorBusiness   Business? @relation("ActivityEventActor", fields: [actorBusinessId], references: [id])
+
+  type      String
+  createdAt DateTime @default(now())
+
+  // Matches the dashboard feed's `where businessId ... orderBy createdAt desc`.
+  @@index([businessId, createdAt])
 }
 
 // A mutual edge — connecting via a tap (or in-app connect) links both

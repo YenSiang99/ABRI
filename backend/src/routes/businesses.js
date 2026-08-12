@@ -7,6 +7,9 @@ import { findOrCreateClaimTarget } from "../lib/businessClaim.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
+import { requireAuth } from "../middleware/auth.js";
+import { messageFor, pruneActivityEvents } from "../lib/activityEvents.js";
+import { ladderFor } from "../lib/vouchLadder.js";
 
 const router = Router();
 
@@ -29,13 +32,18 @@ router.get(
             }
           : {}),
       },
-      include: { _count: { select: { vouchesReceived: true } } },
+      include: { _count: { select: { vouchesReceived: { where: { status: "published" } } } } },
       orderBy: { name: "asc" },
     });
     res.json({
+      // ladder alongside vouchCount — components like VouchBadge assume
+      // every business object carries both (see
+      // components/badge/VouchBadge.jsx, which indexes an icon map by
+      // ladder with no undefined fallback).
       businesses: businesses.map(({ _count, ...business }) => ({
         ...business,
         vouchCount: _count.vouchesReceived,
+        ladder: ladderFor(_count.vouchesReceived),
       })),
     });
   }),
@@ -47,13 +55,73 @@ router.get(
     const business = await prisma.business.findUnique({
       where: { id: req.params.id },
       include: {
+        // Public profile — only ever show vouches the receiver has
+        // actually accepted (see the Vouch review state machine in
+        // schema.prisma). This route returns the raw business object
+        // (not through serializeBusiness), so the filter has to happen
+        // here rather than being inherited from a shared helper.
         vouchesReceived: {
-          include: { fromBusiness: { select: { id: true, name: true, category: true } } },
+          where: { status: "published" },
+          include: {
+            fromBusiness: { select: { id: true, name: true, category: true, tier: true } },
+            currentRevision: { select: { comment: true } },
+          },
         },
       },
     });
     if (!business) return res.status(404).json({ error: "Business not found." });
-    res.json({ business });
+
+    // Flatten the live revision's text onto each vouch as `testimonial`.
+    // The column of that name is gone (schema.prisma) — it was the copy a
+    // revise overwrote — but the public shape is unchanged, so nothing
+    // downstream needs to know a join happened.
+    res.json({
+      business: {
+        ...business,
+        vouchesReceived: business.vouchesReceived.map(({ currentRevision, ...v }) => ({
+          ...v,
+          testimonial: currentRevision?.comment ?? null,
+        })),
+      },
+    });
+  }),
+);
+
+// Powers Dashboard.jsx's "Recent activity" — the notify step of the
+// give-first reciprocity loop (vouch -> notify -> thank -> vouch back).
+// Two segments ("/me/activity"), so this never collides with GET /:id
+// above, which only matches a single path segment.
+router.get(
+  "/me/activity",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) return res.json({ activity: [] });
+
+    const events = await prisma.activityEvent.findMany({
+      where: { businessId: req.account.businessId },
+      include: { actorBusiness: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    res.json({
+      activity: events.map((e) => ({
+        id: e.id,
+        type: e.type,
+        actorId: e.actorBusinessId,
+        actorName: e.actorBusiness?.name ?? null,
+        message: messageFor(e.type, e.actorBusiness?.name),
+        date: e.createdAt,
+      })),
+    });
+
+    // Trim this business's backlog to the retention cap, after responding —
+    // pruning is housekeeping, so it must never add latency to the feed or
+    // fail the request. A no-op whenever the business is under the cap.
+    // Runs here rather than in createActivityEvent so the delete stays off
+    // the vouch write transactions; the tradeoff is that a business nobody
+    // ever logs into never gets pruned (see PRUNING note in BACKEND_STATUS.md).
+    pruneActivityEvents(prisma, req.account.businessId).catch(() => {});
   }),
 );
 

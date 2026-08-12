@@ -41,6 +41,10 @@ async function findOrCreateClaimTarget({ businessId, businessName, category, loc
   });
 }
 
+// How many businesses get the founding-100 program's free "premium"
+// membershipPlan (see schema.prisma's Business.membershipPlan comment).
+const FOUNDING_MEMBER_LIMIT = 100;
+
 // Approves one account's claim on a business and rejects every other
 // pending claim on the same business — a claim only ever "wins" outright,
 // never coexists with rivals (until the separate, later team-members
@@ -54,9 +58,24 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
     where: { id: accountId },
     data: { claimStatus: "approved", verificationMethod },
   });
+
+  // Counted AFTER the update above, so it already includes this account —
+  // "<= FOUNDING_MEMBER_LIMIT" means this is the Nth-or-earlier approval.
+  // Encodes the blueprint's founding-100 program automatically, with no
+  // manual per-business admin step (mirrors how every other admin-only
+  // flag in this codebase, e.g. Account.isAdmin, is otherwise a manual DB
+  // flip). Known minor edge case, not worth engineering around at
+  // N=100–600: if a founding business's claim is later revoked (which
+  // resets tier to T0 but doesn't touch membershipPlan) and re-claimed
+  // after 100 other businesses have since been approved, re-running this
+  // check on re-approval would downgrade it to "basic" — acceptable given
+  // revokeApprovedClaim is already framed as a full unwind.
+  const approvedCount = await prisma.account.count({ where: { claimStatus: "approved" } });
+  const membershipPlan = approvedCount <= FOUNDING_MEMBER_LIMIT ? "premium" : "basic";
+
   const business = await prisma.business.update({
     where: { id: businessId },
-    data: { tier: "T1" },
+    data: { tier: "T1", membershipPlan },
   });
 
   return { account, business };

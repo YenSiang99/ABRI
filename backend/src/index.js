@@ -7,6 +7,7 @@ import { prisma } from "./prisma.js";
 import { authRouter } from "./routes/auth.js";
 import { businessRouter } from "./routes/businesses.js";
 import { adminRouter } from "./routes/admin.js";
+import { vouchRouter } from "./routes/vouches.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -19,6 +20,7 @@ app.use(cookieParser());
 app.use("/auth", authRouter);
 app.use("/businesses", businessRouter);
 app.use("/admin", adminRouter);
+app.use("/vouches", vouchRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
