@@ -5,8 +5,28 @@
 // must be SSM-verified (T2+) to give or receive a vouch.
 const VOUCHABLE_TIERS = new Set(["T2", "T3", "T4"]);
 
-function isVouchable(target, fromBusinessId) {
-  return Boolean(target) && target.id !== fromBusinessId && VOUCHABLE_TIERS.has(target.tier);
+// The viewer's existing outgoing vouch to `targetId`, or null. Reads
+// `vouchedFor` off the logged-in business (see backend lib/accountView.js),
+// which lists only non-cancelled outgoing vouches — a cancelled pair is
+// free to vouch again, so its absence here is correct rather than missing.
+function existingVouchTo(viewerBusiness, targetId) {
+  return (viewerBusiness?.vouchedFor ?? []).find((v) => v.businessId === targetId) ?? null;
+}
+
+// "Can I submit a vouch for them right now" — the full precondition for
+// POST /vouches, not just the tier half of it. Takes the viewer's business
+// rather than its id because one vouch per pair is as much a part of the
+// rule as tier is, and splitting them across two call sites is what let the
+// second one get forgotten: every affordance checked tier, none checked
+// whether a vouch already existed, so the button rendered and the API
+// answered 409.
+function isVouchable(target, viewerBusiness) {
+  return (
+    Boolean(target) &&
+    target.id !== viewerBusiness?.id &&
+    VOUCHABLE_TIERS.has(target.tier) &&
+    !existingVouchTo(viewerBusiness, target.id)
+  );
 }
 
 // The round cap now travels on the vouch itself (Vouch.maxRevisions), so
@@ -46,6 +66,7 @@ const canRevise = (vouch) => isMyTurn(vouch) && vouch.role === "giver";
 export {
   VOUCHABLE_TIERS,
   isVouchable,
+  existingVouchTo,
   revisionCapFor,
   isMyTurn,
   isUnderReview,

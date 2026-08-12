@@ -41,7 +41,7 @@ function Dashboard() {
   useEffect(() => {
     if (pending) return;
     fetchBusinesses()
-      .then((all) => setSuggested(all.filter((b) => isVouchable(b, business.id)).slice(0, 3)))
+      .then((all) => setSuggested(all.filter((b) => isVouchable(b, business)).slice(0, 3)))
       .catch(() => {});
     fetchVouchesGiven()
       // Published only. This used to count the raw list, so declined
@@ -55,7 +55,12 @@ function Dashboard() {
     fetchMyActivity()
       .then(setActivity)
       .catch(() => {});
-  }, [pending, business.id]);
+    // `business` rather than `business.id`: the suggestion filter now reads
+    // its `vouchedFor` list too, so a business you've just vouched for has
+    // to drop out of the suggestions on the next refreshAccount(). Identity
+    // is stable between refreshes (useState in AuthContext), so this still
+    // runs once per mount.
+  }, [pending, business]);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">

@@ -88,7 +88,7 @@ function BusinessProfile({ inApp = false }) {
   }
 
   const canVouch =
-    inApp && VOUCHABLE_TIERS.has(actingBusiness?.tier) && isVouchable(business, actingBusiness?.id);
+    inApp && VOUCHABLE_TIERS.has(actingBusiness?.tier) && isVouchable(business, actingBusiness);
   const canConnect =
     inApp &&
     actingBusiness &&

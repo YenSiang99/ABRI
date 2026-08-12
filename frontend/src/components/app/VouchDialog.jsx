@@ -62,7 +62,7 @@ function VouchDialog({
   const filtered = fixed || !businesses
     ? []
     : businesses
-        .filter((b) => isVouchable(b, business.id) && b.name.toLowerCase().includes(search.toLowerCase()))
+        .filter((b) => isVouchable(b, business) && b.name.toLowerCase().includes(search.toLowerCase()))
         .slice(0, 6);
 
   async function submit() {

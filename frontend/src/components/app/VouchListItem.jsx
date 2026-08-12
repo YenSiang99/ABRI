@@ -13,6 +13,8 @@ import {
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
+import { useAuth } from "@/context/AuthContext";
+import { existingVouchTo } from "@/lib/vouchRules";
 import { flagUnfairCancel } from "@/lib/api/vouches";
 import { toast } from "@/lib/toast";
 
@@ -86,6 +88,7 @@ function FlagCancelDialog({ vouch, other, open, onOpenChange, onSuccess }) {
 // `counterparty` is the discriminator. The flat shape has no history, so
 // the timeline simply doesn't render for it.
 function VouchListItem({ vouch, mode, onChanged }) {
+  const { business } = useAuth();
   const [vouchBackOpen, setVouchBackOpen] = useState(false);
   const [vouchAgainOpen, setVouchAgainOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
@@ -105,6 +108,14 @@ function VouchListItem({ vouch, mode, onChanged }) {
   const closed = mode === "given" && vouch.status === "cancelled";
   const statusLabel = closed ? (expired ? "Expired" : "Cancelled") : null;
   const date = vouch.date ?? vouch.lastActionAt ?? vouch.createdAt;
+
+  // "Vouch back" is a fresh POST /vouches, so it's bound by the same one-
+  // per-pair rule as any other vouch — a reciprocal one already in flight or
+  // published makes it a guaranteed 409. Reciprocity is the whole point of
+  // this card, so the common case here is precisely the one that breaks:
+  // you vouch for them, they vouch back, and the button stays lit on both
+  // sides afterwards.
+  const reciprocal = mode === "received" ? existingVouchTo(business, other.id) : null;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
@@ -145,9 +156,23 @@ function VouchListItem({ vouch, mode, onChanged }) {
             <Button size="sm" variant="secondary" onClick={() => toast.success(`Thanked ${other.name}`)}>
               Thank
             </Button>
-            <Button size="sm" onClick={() => setVouchBackOpen(true)}>
-              Vouch back
-            </Button>
+            {/* Replaced by a line rather than shown disabled, per the note in
+                lib/vouchRules.js — a dead button reads as a bug, whereas
+                "already vouched" is the answer to the question the button
+                would have raised. */}
+            {reciprocal ? (
+              <span className="self-center text-xs text-muted-foreground">
+                {reciprocal.status === "published"
+                  ? "You've vouched for them too"
+                  : reciprocal.status === "under_review"
+                    ? "Your vouch for them is with an admin"
+                    : "Your vouch for them is in progress"}
+              </span>
+            ) : (
+              <Button size="sm" onClick={() => setVouchBackOpen(true)}>
+                Vouch back
+              </Button>
+            )}
           </>
         )}
         {closed && (
@@ -166,7 +191,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
         )}
       </div>
 
-      {mode === "received" && (
+      {mode === "received" && !reciprocal && (
         <VouchDialog open={vouchBackOpen} onOpenChange={setVouchBackOpen} targetBusiness={other} onSuccess={onChanged} />
       )}
       {closed && (

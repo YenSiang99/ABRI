@@ -15,13 +15,23 @@ import { ladderFor } from "./vouchLadder.js";
 // rows must never count toward vouchCount/ladder or appear in the public
 // `vouches` list.
 function serializeBusiness(business) {
-  const { vouchesReceived, ...rest } = business;
+  const { vouchesReceived, vouchesGiven, ...rest } = business;
   const published = vouchesReceived.filter((v) => v.status === "published");
   const vouchCount = published.length;
   return {
     ...rest,
     vouchCount,
     ladder: ladderFor(vouchCount),
+    // Who this business already has a vouch OUT to, and where it stands.
+    // Mirrors the 409 guard in routes/vouches.js exactly: cancelled rows are
+    // omitted because a cancelled pair may vouch again, and every other
+    // status blocks a fresh POST /vouches. Without this the client had no
+    // way to know its own outgoing vouches — /auth/me's `vouches` is the
+    // received direction — so every "vouch for them" affordance rendered
+    // unconditionally and failed on submit.
+    vouchedFor: (vouchesGiven ?? [])
+      .filter((v) => v.status !== "cancelled")
+      .map((v) => ({ businessId: v.toBusinessId, status: v.status })),
     vouches: published.map((v) => ({
       id: v.id,
       fromBusinessId: v.fromBusinessId,
@@ -53,6 +63,10 @@ async function loadAccountView(accountId) {
             },
             orderBy: { createdAt: "desc" },
           },
+          // Two scalars, no joins — this feeds the client's "can I vouch for
+          // them" gate, which needs the target and the status and nothing
+          // else. The testimonials on this side belong to /vouches/given.
+          vouchesGiven: { select: { toBusinessId: true, status: true } },
         },
       },
     },
