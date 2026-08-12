@@ -12,9 +12,11 @@ import {
   CreditCard,
   Lock,
   ClipboardCheck,
+  Flag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { tierLabel } from "@/lib/store/businesses";
 import { introductions } from "@/data/appMockData";
 
 const WORKSPACE_ITEMS = [
@@ -23,6 +25,15 @@ const WORKSPACE_ITEMS = [
   { title: "Vouches", url: "/app/vouches", icon: Handshake, lockWhenPending: true },
   { title: "Network", url: "/app/network", icon: Compass },
   { title: "Directory", url: "/app/directory", icon: Search },
+];
+
+// The admin's two queues are siblings, and the sidebar is where that has to
+// be visible. Vouch review used to be reachable only through a link on the
+// claims page, which read as though flagged vouches were part of claim
+// review — a different job on different records.
+const ADMIN_ITEMS = [
+  { title: "Claims review", url: "/app/admin", icon: ClipboardCheck },
+  { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
 ];
 
 const TRUST_ITEMS = [
@@ -34,7 +45,12 @@ const TRUST_ITEMS = [
 const pendingIntros = introductions.filter((i) => i.direction === "incoming" && i.status === "pending").length;
 
 function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut }) {
-  const isActive = (url) => (url === "/app" ? pathname === "/app" : pathname.startsWith(url));
+  // Prefix match, except for the two urls that are prefixes of their own
+  // children — /app is under everything, and /app/admin is under
+  // /app/admin/vouch-reviews. Those need an exact match or they'd light up
+  // alongside the child that's actually open.
+  const EXACT = new Set(["/app", "/app/admin"]);
+  const isActive = (url) => (EXACT.has(url) ? pathname === url : pathname.startsWith(url));
 
   return (
     <>
@@ -52,14 +68,22 @@ function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut
               Admin
             </div>
             <div className="mt-2 flex flex-col gap-1">
-              <Link
-                to="/app/admin"
-                onClick={onNavigate}
-                className="flex items-center gap-2 rounded-lg bg-sidebar-accent px-2.5 py-2 text-sm font-medium text-sidebar-accent-foreground"
-              >
-                <ClipboardCheck className="h-4 w-4" />
-                <span className="flex-1">Claims review</span>
-              </Link>
+              {ADMIN_ITEMS.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.url}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                    isActive(item.url)
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span className="flex-1">{item.title}</span>
+                </Link>
+              ))}
             </div>
           </>
         ) : (
@@ -131,7 +155,8 @@ function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut
             <div className="flex min-w-0 flex-col text-left">
               <span className="truncate text-sm font-medium text-sidebar-foreground">{business.name}</span>
               <span className="truncate text-xs text-muted-foreground">
-                {business.ssm ? `SSM ${business.ssm}` : "SSM pending"}
+                {tierLabel[business.tier] ?? "Listed"}
+                {business.ssm ? ` · ${business.ssm}` : ""}
               </span>
             </div>
           </div>

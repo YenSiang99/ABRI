@@ -26,6 +26,22 @@ function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Re-fetches /auth/me without touching `loading` — for refreshing
+  // `business` (vouches/vouchCount/ladder) after an action elsewhere in
+  // the app changes it, e.g. accepting a vouch changes *this* business's
+  // own received-vouch state, which nothing else would otherwise refresh
+  // since AuthContext only fetches once on mount.
+  async function refreshAccount() {
+    try {
+      const data = await getMe();
+      setAccount(data.account);
+      setBusiness(data.business);
+    } catch {
+      setAccount(null);
+      setBusiness(null);
+    }
+  }
+
   async function login(email, password) {
     try {
       const data = await apiLogin(email, password);
@@ -91,6 +107,7 @@ function AuthProvider({ children }) {
     login,
     logout,
     claimOrRegister,
+    refreshAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

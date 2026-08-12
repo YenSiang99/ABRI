@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Handshake,
@@ -15,8 +16,11 @@ import { AppBusinessCard } from "@/components/app/AppBusinessCard";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { useAuth } from "@/context/AuthContext";
-import { tierLabel, ladderLabel, listVouchesGivenBy } from "@/lib/store/businesses";
-import { businesses, activity, getBusiness } from "@/data/appMockData";
+import { tierLabel, ladderLabel } from "@/lib/store/businesses";
+import { fetchBusinesses } from "@/lib/api/businesses";
+import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
+import { fetchMyActivity } from "@/lib/api/activity";
+import { isVouchable } from "@/lib/vouchRules";
 
 const NEXT_TIER_STEPS = [
   { label: "SSM cross-check confirmed", done: true },
@@ -25,16 +29,33 @@ const NEXT_TIER_STEPS = [
   { label: "Verify representative identity", done: false },
 ];
 
-const VOUCH_ACTIVITY_TYPES = new Set(["vouch_received", "vouch_thanked"]);
-
 function Dashboard() {
   const { business } = useAuth();
-  const suggested = businesses.slice(0, 3);
   const pending = business.tier === "T1";
-  const vouchesGivenCount = pending ? 0 : listVouchesGivenBy(business.id).length;
-  const visibleActivity = pending
-    ? activity.filter((a) => !VOUCH_ACTIVITY_TYPES.has(a.type))
-    : activity;
+
+  const [suggested, setSuggested] = useState([]);
+  const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
+  const [needsYouCount, setNeedsYouCount] = useState(0);
+  const [activity, setActivity] = useState([]);
+
+  useEffect(() => {
+    if (pending) return;
+    fetchBusinesses()
+      .then((all) => setSuggested(all.filter((b) => isVouchable(b, business.id)).slice(0, 3)))
+      .catch(() => {});
+    fetchVouchesGiven()
+      // Published only. This used to count the raw list, so declined
+      // vouches inflated the "Vouches given" stat — a number meant to
+      // measure give-first contribution was counting rejections toward it.
+      .then((vouches) => setVouchesGivenCount(vouches.filter((v) => v.status === "published").length))
+      .catch(() => {});
+    fetchVouchRequests()
+      .then((vouches) => setNeedsYouCount(vouches.filter((v) => v.waitingOn === "you").length))
+      .catch(() => {});
+    fetchMyActivity()
+      .then(setActivity)
+      .catch(() => {});
+  }, [pending, business.id]);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -73,6 +94,30 @@ function Dashboard() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* A prompt, not a stat — the dashboard previously surfaced pending
+          vouch work only as past-tense lines in the activity feed further
+          down the page, which told you something had happened but not that
+          it was still waiting on you, and didn't link anywhere. */}
+      {!pending && needsYouCount > 0 && (
+        <Link
+          to="/app/vouches"
+          className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
+        >
+          <div className="flex items-start gap-3">
+            <Handshake className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+            <div>
+              <div className="text-sm font-semibold text-foreground">
+                {needsYouCount} {needsYouCount === 1 ? "vouch needs" : "vouches need"} your response
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Review, revise, or reply — they're waiting on you.
+              </p>
+            </div>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
       )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -152,33 +197,27 @@ function Dashboard() {
             What's happening
           </h2>
           <ul className="mt-5 divide-y divide-border">
-            {visibleActivity.map((a) => {
-              const actor = a.actorId ? getBusiness(a.actorId) : null;
-              return (
+            {activity.length === 0 ? (
+              <li className="py-4 text-sm text-muted-foreground">Nothing yet — activity shows up here as your network engages with you.</li>
+            ) : (
+              activity.map((a) => (
                 <li key={a.id} className="flex items-start gap-3 py-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-semibold text-foreground">
-                    {actor ? actor.name.charAt(0) : "•"}
+                    {a.actorName ? a.actorName.charAt(0) : "•"}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-foreground">
-                      {actor && (
-                        <span className="font-medium">{actor.name} </span>
-                      )}
-                      <span
-                        className={
-                          actor ? "text-muted-foreground" : "text-foreground"
-                        }
-                      >
-                        {a.message}
-                      </span>
-                    </div>
+                    {/* a.message already reads as a full sentence with the
+                        actor's name baked in server-side (see
+                        backend/src/lib/activityEvents.js) — no separate
+                        actor-name prefix needed here. */}
+                    <div className="text-sm text-foreground">{a.message}</div>
                     <div className="text-xs text-muted-foreground">
-                      {a.date}
+                      {new Date(a.date).toLocaleString()}
                     </div>
                   </div>
                 </li>
-              );
-            })}
+              ))
+            )}
           </ul>
         </div>
       </div>

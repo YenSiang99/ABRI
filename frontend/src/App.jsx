@@ -21,6 +21,7 @@ import { Verify } from "@/pages/app/Verify";
 import { Introductions } from "@/pages/app/Introductions";
 import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
+import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
 
 function PublicLayout() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <Route path="introductions" element={<Introductions />} />
             <Route path="card" element={<Card />} />
             <Route path="admin" element={<AdminReview />} />
+            <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />
           </Route>
         </Route>
         <Route path="/admin" element={<Navigate to="/app/admin" replace />} />

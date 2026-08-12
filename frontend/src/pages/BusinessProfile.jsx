@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
-import { isVouchable } from "@/lib/store/businesses";
+import { isVouchable, VOUCHABLE_TIERS } from "@/lib/vouchRules";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
 import { Button } from "@/components/ui/button";
@@ -77,8 +77,18 @@ function BusinessProfile({ inApp = false }) {
 
   const status = loadedId !== id ? "loading" : (error ?? "ready");
 
+  // Submitting a vouch no longer changes anything visible immediately —
+  // it's pending until the receiver accepts (see the Vouch review state
+  // machine) — but refetching keeps this page consistent with the
+  // backend rather than silently going stale.
+  function refetchBusiness() {
+    fetchBusiness(id)
+      .then(setBusiness)
+      .catch(() => {});
+  }
+
   const canVouch =
-    inApp && actingBusiness?.tier !== "T1" && isVouchable(business, actingBusiness?.id);
+    inApp && VOUCHABLE_TIERS.has(actingBusiness?.tier) && isVouchable(business, actingBusiness?.id);
   const canConnect =
     inApp &&
     actingBusiness &&
@@ -202,8 +212,8 @@ function BusinessProfile({ inApp = false }) {
               <div className="mt-1 text-sm text-ink dark:text-foreground">
                 {isPendingVerification
                   ? "Unlocks after SSM verification"
-                  : business.vouchCount > 0
-                    ? `${business.vouchCount} peers`
+                  : vouchesReceived.length > 0
+                    ? `${vouchesReceived.length} peers`
                     : "No vouches yet"}
               </div>
             </div>
@@ -337,7 +347,7 @@ function BusinessProfile({ inApp = false }) {
       )}
 
       {canVouch && (
-        <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} />
+        <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} onSuccess={refetchBusiness} />
       )}
     </div>
   );

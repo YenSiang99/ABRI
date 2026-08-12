@@ -299,7 +299,6 @@ function AdminReview() {
         separate step after that. Removing a claim reverts the listing to unclaimed and revokes
         the claimant's login.
       </p>
-
       {claims.length === 0 ? (
         <p className="mt-10 text-sm text-muted-foreground">No claims to review yet.</p>
       ) : (

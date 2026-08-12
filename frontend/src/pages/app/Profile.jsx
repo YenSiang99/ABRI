@@ -105,7 +105,7 @@ function EditProfileDialog({ business }) {
 }
 
 function Profile() {
-  const { account, business } = useAuth();
+  const { account, business, refreshAccount } = useAuth();
   const locked = business.tier === "T1";
 
   return (
@@ -195,7 +195,11 @@ function Profile() {
               />
             </div>
           ) : business.vouches.length > 0 ? (
-            business.vouches.map((v) => <VouchListItem key={v.id} vouch={v} mode="received" />)
+            // onChanged was missing here, so "Vouch back" from this page
+            // submitted fine but left the UI showing pre-submit state.
+            business.vouches.map((v) => (
+              <VouchListItem key={v.id} vouch={v} mode="received" onChanged={refreshAccount} />
+            ))
           ) : (
             <p className="text-sm text-muted-foreground md:col-span-2">No vouches yet.</p>
           )}
