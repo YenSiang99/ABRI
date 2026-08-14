@@ -9,6 +9,10 @@ function BusinessCard({
   basePath = "/business",
   connectable = false,
   alreadyConnected = false,
+  // Connecting is a round trip to the server, so the button has to say so —
+  // otherwise a card sits looking untouched until the response lands, and
+  // an impatient second click fires a second request.
+  connecting = false,
   onConnect,
   showActions = false,
 }) {
@@ -53,13 +57,16 @@ function BusinessCard({
             ) : (
               <Button
                 size="sm"
+                disabled={connecting}
                 onClick={(e) => {
+                  // The whole card is a <Link>; without these a connect also
+                  // navigates to the profile.
                   e.preventDefault();
                   e.stopPropagation();
                   onConnect(business);
                 }}
               >
-                Connect
+                {connecting ? "Connecting…" : "Connect"}
               </Button>
             ))}
         </div>

@@ -339,7 +339,8 @@ model VouchFlag {
 // actorBusinessId is the other party. type values (see
 // lib/activityEvents.js for the message-text map): "vouch_submitted"
 // (-> receiver), "vouch_published" / "vouch_cancelled" / "vouch_reverted" /
-// "vouch_flagged" (-> giver), "vouch_revised" (-> receiver).
+// "vouch_flagged" (-> giver), "vouch_revised" (-> receiver),
+// "connection_added" (-> the side that didn't press the button).
 model ActivityEvent {
   id         String  @id @default(cuid())
   businessId String
@@ -374,19 +375,36 @@ model Connection {
   businessB   Business @relation("ConnectionB", fields: [businessBId], references: [id])
 
   @@unique([businessAId, businessBId])
+  // The only read this table gets is "every edge touching me", i.e.
+  // `OR: [{ businessAId }, { businessBId }]`. The unique above already
+  // indexes the businessAId side; without this one Postgres can't turn the
+  // other half into an index scan and has to fall back to a seq scan for
+  // the whole OR rather than a BitmapOr of two.
+  @@index([businessBId])
 }
 
 // Bridges "scanned a card while logged out" and "account actually exists
 // with a session" — a manual-review claim can take days to approve, so the
 // intent to connect is queued here and consumed the moment that account's
-// first session starts. See pendingConnections.js in the frontend for the
-// original reasoning.
+// first session starts (see startSession in lib/session.js, which is the
+// only consumer).
+//
+// A row here is a transient to-do, never a record worth keeping: it exists
+// only until the connection it describes is made. That's why accountId
+// cascades rather than restricting. Several paths delete an Account —
+// losing a contested claim (approveClaimAndRejectRivals), being rejected
+// by an admin (routes/admin.js), having an approved claim revoked — and
+// under RESTRICT every one of them would have to remember to clear this
+// table first or the delete fails with a foreign-key error that surfaces
+// as a generic 500. There is no case where a queued connect intent should
+// outlive the account that queued it, so the database enforces that rather
+// than each call site remembering to.
 model PendingConnection {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
   accountId String
-  account   Account @relation(fields: [accountId], references: [id])
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   businessId String
   business   Business @relation(fields: [businessId], references: [id])

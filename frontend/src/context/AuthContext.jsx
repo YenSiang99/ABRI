@@ -76,6 +76,10 @@ function AuthProvider({ children }) {
     repPhone,
     repRole,
     password,
+    // Set when the claim started from a card tap while logged out
+    // (/register?connect=<id>). The backend parks it and connects the two
+    // once this account's first session begins, which may be days later.
+    connectTarget,
   }) {
     try {
       const result = await submitBusinessClaim({
@@ -89,6 +93,7 @@ function AuthProvider({ children }) {
         repPhone,
         repRole,
         password,
+        connectTargetId: connectTarget,
       });
       return result.requiresEmailVerification
         ? { ok: true, requiresEmailVerification: true, token: result.token }

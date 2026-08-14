@@ -5,13 +5,18 @@ import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
+import { ConnectionsProvider } from './context/ConnectionsContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          {/* Inside AuthProvider (it reads the session), and wrapping all of
+              App rather than just /app — CardTap is a public route. */}
+          <ConnectionsProvider>
+            <App />
+          </ConnectionsProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

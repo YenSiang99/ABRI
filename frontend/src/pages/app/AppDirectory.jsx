@@ -4,18 +4,22 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { fetchBusinesses } from "@/lib/api/businesses";
-import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
+import { useConnections } from "@/context/ConnectionsContext";
+import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { TIER_FILTERS } from "@/lib/directoryFilter";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { toast } from "@/lib/toast";
 
 function AppDirectory() {
   const { business } = useAuth();
-  useConnectionsFor(business.id); // subscribe so alreadyConnected re-renders after a connect
+  const { isConnected, connect } = useConnections();
   const [query, setQuery] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
+  // Which row's Connect button is mid-flight, so it can show progress and
+  // refuse a second click.
+  const [connectingId, setConnectingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,9 +41,15 @@ function AppDirectory() {
     };
   }, [query, tierFilter, business.id]);
 
-  function handleConnect(target) {
-    addConnection(business.id, target.id, SOURCE_DIRECTORY);
-    toast.success(`Connected with ${target.name}`);
+  async function handleConnect(target) {
+    setConnectingId(target.id);
+    const result = await connect(target.id, SOURCE_DIRECTORY);
+    setConnectingId(null);
+    if (result.ok) {
+      toast.success(`Connected with ${target.name}`);
+    } else {
+      toast.error(result.error);
+    }
   }
 
   return (
@@ -104,7 +114,8 @@ function AppDirectory() {
               basePath="/app/business"
               showActions
               connectable={b.tier !== "T0"}
-              alreadyConnected={areConnected(business.id, b.id)}
+              alreadyConnected={isConnected(b.id)}
+              connecting={connectingId === b.id}
               onConnect={handleConnect}
             />
           ))}

@@ -8,6 +8,7 @@ import { authRouter } from "./routes/auth.js";
 import { businessRouter } from "./routes/businesses.js";
 import { adminRouter } from "./routes/admin.js";
 import { vouchRouter } from "./routes/vouches.js";
+import { connectionRouter } from "./routes/connections.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/auth", authRouter);
 app.use("/businesses", businessRouter);
 app.use("/admin", adminRouter);
 app.use("/vouches", vouchRouter);
+app.use("/connections", connectionRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

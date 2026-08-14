@@ -4,7 +4,8 @@ import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
 import { isVouchable, VOUCHABLE_TIERS } from "@/lib/vouchRules";
 import { fetchBusiness } from "@/lib/api/businesses";
-import { useConnectionsFor, addConnection, areConnected, SOURCE_DIRECTORY } from "@/lib/store/connections";
+import { useConnections } from "@/context/ConnectionsContext";
+import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
@@ -50,11 +51,12 @@ function BusinessProfile({ inApp = false }) {
   const { id } = useParams();
   const backLink = useBackLink(inApp);
   const { business: actingBusiness } = useAuth();
-  useConnectionsFor(actingBusiness?.id); // subscribe so alreadyConnected re-renders after a connect
+  const { isConnected, connect } = useConnections();
   const [vouchOpen, setVouchOpen] = useState(false);
   const [business, setBusiness] = useState(null);
   const [error, setError] = useState(null);
   const [loadedId, setLoadedId] = useState(null);
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,11 +97,17 @@ function BusinessProfile({ inApp = false }) {
     business &&
     actingBusiness.id !== business.id &&
     business.tier !== "T0";
-  const alreadyConnected = canConnect && areConnected(actingBusiness.id, business.id);
+  const alreadyConnected = canConnect && isConnected(business.id);
 
-  function handleConnect() {
-    addConnection(actingBusiness.id, business.id, SOURCE_DIRECTORY);
-    toast.success(`Connected with ${business.name}`);
+  async function handleConnect() {
+    setConnecting(true);
+    const result = await connect(business.id, SOURCE_DIRECTORY);
+    setConnecting(false);
+    if (result.ok) {
+      toast.success(`Connected with ${business.name}`);
+    } else {
+      toast.error(result.error);
+    }
   }
 
   if (status === "loading") {
@@ -172,8 +180,8 @@ function BusinessProfile({ inApp = false }) {
                       Connected
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={handleConnect}>
-                      Connect
+                    <Button size="sm" onClick={handleConnect} disabled={connecting}>
+                      {connecting ? "Connecting…" : "Connect"}
                     </Button>
                   ))}
                 {canVouch && (

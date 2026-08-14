@@ -12,6 +12,11 @@ const ACTIVITY_MESSAGES = {
   vouch_flagged: (actorName) => `${actorName} flagged your vouch for admin review.`,
   vouch_revised: (actorName) => `${actorName} updated their vouch for you — ready for review.`,
 
+  // Goes only to the side that didn't press the button — see
+  // createConnection in lib/connections.js. There's no removal counterpart
+  // on purpose.
+  connection_added: (actorName) => `${actorName} connected with you.`,
+
   // Admin decisions on a flagged vouch. These take no actorName — an admin
   // isn't a business, so the event carries actorBusinessId null and there is
   // no name to interpolate. Both parties get one each time, worded from

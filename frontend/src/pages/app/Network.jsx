@@ -5,23 +5,33 @@ import { ArrowUpRight, MapPin, Radio, Link2, Search, Users } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
-import { useConnectionsFor, removeConnection } from "@/lib/store/connections";
-import { useAuth } from "@/context/AuthContext";
+import { useConnections } from "@/context/ConnectionsContext";
+import { SOURCE_NFC_SCAN, SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { toast } from "@/lib/toast";
 
 const SOURCE_FILTERS = [
   { value: "all", label: "All" },
-  { value: "nfc_scan", label: "Card tap" },
-  { value: "directory", label: "Connected in app" },
+  { value: SOURCE_NFC_SCAN, label: "Card tap" },
+  { value: SOURCE_DIRECTORY, label: "Connected in app" },
 ];
 
 function ConnectionCard({ connection }) {
-  const { business, connectionId, source } = connection;
+  const { counterparty: business, id, source } = connection;
+  const { disconnect } = useConnections();
+  const [removing, setRemoving] = useState(false);
   const initial = business.name.charAt(0);
 
-  function handleRemove() {
-    removeConnection(connectionId);
-    toast(`Removed ${business.name} from your network`);
+  async function handleRemove() {
+    setRemoving(true);
+    const result = await disconnect(id);
+    if (result.ok) {
+      toast(`Removed ${business.name} from your network`);
+      return;
+    }
+    // Only reached on a real failure — the card is still on screen, so the
+    // button has to become usable again.
+    setRemoving(false);
+    toast.error(result.error);
   }
 
   return (
@@ -40,7 +50,7 @@ function ConnectionCard({ connection }) {
 
       <div className="mt-4 flex flex-wrap gap-1.5">
         <AppTierBadge tier={business.tier} />
-        {source === "nfc_scan" ? (
+        {source === SOURCE_NFC_SCAN ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
             <Radio className="h-3 w-3" /> Card tap
           </span>
@@ -62,8 +72,8 @@ function ConnectionCard({ connection }) {
           >
             Profile <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="secondary" onClick={handleRemove}>
-            Remove
+          <Button size="sm" variant="secondary" onClick={handleRemove} disabled={removing}>
+            {removing ? "Removing…" : "Remove"}
           </Button>
         </div>
       </div>
@@ -72,8 +82,7 @@ function ConnectionCard({ connection }) {
 }
 
 function Network() {
-  const { business } = useAuth();
-  const connections = useConnectionsFor(business?.id);
+  const { connections, status } = useConnections();
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
 
@@ -81,9 +90,16 @@ function Network() {
   const filtered = connections.filter((c) => {
     const matchesSource = sourceFilter === "all" || c.source === sourceFilter;
     const matchesQuery =
-      !q || c.business.name.toLowerCase().includes(q) || c.business.category.toLowerCase().includes(q);
+      !q ||
+      c.counterparty.name.toLowerCase().includes(q) ||
+      c.counterparty.category.toLowerCase().includes(q);
     return matchesSource && matchesQuery;
   });
+
+  // The list arrives over the network now, so "none yet" and "not back yet"
+  // are different states — without this the empty-state copy below flashes
+  // on every visit before the fetch lands.
+  const pending = status === "loading" || status === "idle";
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -130,17 +146,27 @@ function Network() {
         </>
       )}
 
-      <div className="mt-4 text-sm text-muted-foreground">
-        {filtered.length} {filtered.length === 1 ? "connection" : "connections"}
-      </div>
+      {!pending && (
+        <div className="mt-4 text-sm text-muted-foreground">
+          {filtered.length} {filtered.length === 1 ? "connection" : "connections"}
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((c) => (
-          <ConnectionCard key={c.connectionId} connection={c} />
+          <ConnectionCard key={c.id} connection={c} />
         ))}
       </div>
 
-      {connections.length === 0 ? (
+      {pending ? (
+        <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+          Loading your network…
+        </div>
+      ) : status === "error" ? (
+        <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+          Couldn't load your network. Refresh to try again.
+        </div>
+      ) : connections.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center">
           <Users className="mx-auto h-8 w-8 text-muted-foreground" />
           <div className="mt-3 text-sm text-muted-foreground">

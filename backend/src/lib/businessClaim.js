@@ -87,18 +87,17 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
 // making the claim is being deleted outright, so there's no intermediate
 // claim state left to fall back to.
 //
-// Deletes any queued PendingConnection rows for this account first —
-// PendingConnection.accountId is ON DELETE RESTRICT, so a bare
-// account.delete() would otherwise fail with an FK violation if the
-// account was approved but never logged in to consume them (same
-// defensive pattern as the account.deleteMany rival-cleanup above).
+// Any PendingConnection rows this account still had queued go with it —
+// PendingConnection.accountId is ON DELETE CASCADE, so the database drops
+// them rather than every account-delete in the codebase having to remember
+// to (see the model's comment in schema.prisma for why that's the right
+// place for the rule).
 //
 // Assumes exactly one approved account per business at a time (true today
 // — see approveClaimAndRejectRivals). If a future team-members feature
 // allows multiple approved accounts per business, this needs to stop
 // dropping the whole business's tier unconditionally.
 async function revokeApprovedClaim({ accountId, businessId }) {
-  await prisma.pendingConnection.deleteMany({ where: { accountId } });
   await prisma.account.delete({ where: { id: accountId } });
 
   const business = await prisma.business.update({

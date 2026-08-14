@@ -2,10 +2,10 @@ import { Router } from "express";
 
 import { prisma } from "../prisma.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
-import { signSessionToken } from "../lib/jwt.js";
-import { setSessionCookie, clearSessionCookie } from "../lib/cookies.js";
+import { clearSessionCookie } from "../lib/cookies.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { loadAccountView } from "../lib/accountView.js";
+import { startSession } from "../lib/session.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
@@ -91,8 +91,7 @@ router.post("/login", asyncHandler(async (req, res) => {
     return res.status(403).json({ error: "Please verify your email before logging in.", requiresEmailVerification: true });
   }
 
-  setSessionCookie(res, signSessionToken(account.id));
-  res.json(await loadAccountView(account.id));
+  res.json(await startSession(res, account.id));
 }));
 
 router.post("/logout", (req, res) => {
@@ -133,7 +132,7 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
   });
 
   if (record.claimPayload) {
-    const { businessId, businessName, category, location, ssm, repName, repEmail, repPhone, repRole, passwordHash } =
+    const { businessId, businessName, category, location, ssm, repName, repEmail, repPhone, repRole, passwordHash, connectTargetId } =
       record.claimPayload;
 
     const targetBusiness = await findOrCreateClaimTarget({ businessId, businessName, category, location, ssm });
@@ -161,8 +160,18 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
       verificationMethod: "domain-auto",
     });
 
-    setSessionCookie(res, signSessionToken(account.id));
-    return res.json(await loadAccountView(account.id));
+    // Queued rather than connected directly, even though the session starts
+    // three lines below and could just as well do it here: this way the
+    // domain-match path and the days-later manual-review path both connect
+    // through the same code in consumePendingConnections, instead of one
+    // rehearsed constantly and the other only in production.
+    if (connectTargetId) {
+      await prisma.pendingConnection
+        .create({ data: { accountId: account.id, businessId: connectTargetId } })
+        .catch((err) => console.error("Failed to queue connect intent", err));
+    }
+
+    return res.json(await startSession(res, account.id));
   }
 
   const account = await prisma.account.findUnique({ where: { id: record.accountId } });
@@ -175,8 +184,7 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
     data: { emailVerified: true },
   });
 
-  setSessionCookie(res, signSessionToken(verified.id));
-  res.json(await loadAccountView(verified.id));
+  res.json(await startSession(res, verified.id));
 }));
 
 export { router as authRouter };

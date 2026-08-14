@@ -16,6 +16,19 @@ const router = Router();
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const CLAIM_TOKEN_TTL_MS = 15 * 60 * 1000;
 
+// Validates the "connect me to this business once I'm in" hint that rides
+// along with a claim submitted off a card tap. Returns the id if it's still
+// worth acting on, or null — never throws, because every way this can fail
+// is somebody else's stale link, not a problem with the claim being made.
+async function resolveConnectTarget(connectTargetId, claimedBusinessId) {
+  if (!connectTargetId || connectTargetId === claimedBusinessId) return null;
+  const target = await prisma.business.findUnique({ where: { id: connectTargetId } });
+  // T0 means unclaimed, and POST /connections refuses those too — no point
+  // queueing an intent that would be dropped on the way out.
+  if (!target || target.tier === "T0") return null;
+  return target.id;
+}
+
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -145,6 +158,7 @@ router.post(
       repPhone,
       repRole,
       password,
+      connectTargetId,
     } = req.body ?? {};
 
     if (!businessName?.trim() || !category?.trim() || !location?.trim()) {
@@ -185,6 +199,17 @@ router.post(
       knownDomain = existingBusiness.domain;
     }
 
+    // Someone who tapped a card while logged out arrives here with the
+    // tapped business in tow (/register?connect=<id>), and expects to be
+    // connected to it once they're in. That can't happen now — neither the
+    // account nor the approval exists yet — so the intent is parked and
+    // consumed at their first session (see lib/session.js).
+    //
+    // Resolved best-effort and dropped silently if it doesn't hold up: a
+    // stale or hand-edited query param is not a reason to block somebody
+    // from registering their business.
+    const connectTarget = await resolveConnectTarget(connectTargetId, businessId);
+
     const passwordHash = await hashPassword(password);
     const claimPayload = {
       businessId,
@@ -197,6 +222,10 @@ router.post(
       repPhone,
       repRole,
       passwordHash,
+      // Carried through the token rather than a PendingConnection row: on
+      // this path there is no account to hang one off yet. verify-claim
+      // turns it into a row moments before startSession consumes it.
+      connectTargetId: connectTarget,
     };
 
     if (matchesBusinessDomain(repEmail, knownDomain)) {
@@ -241,6 +270,16 @@ router.post(
         phoneVerified: false,
       },
     });
+
+    // The account exists from here on, so the connect intent gets a real
+    // row to hang off — unlike the domain-match branch above, this claim
+    // can sit in an admin queue for days before its first session.
+    // Guarded: a queued nicety must never sink the claim it rode in on.
+    if (connectTarget) {
+      await prisma.pendingConnection
+        .create({ data: { accountId: account.id, businessId: connectTarget } })
+        .catch((err) => console.error("Failed to queue connect intent", err));
+    }
 
     res.status(201).json({ requiresAdminApproval: true, account: serializeAccount(account), business });
   }),

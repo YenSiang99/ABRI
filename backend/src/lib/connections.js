@@ -1,0 +1,144 @@
+import { prisma } from "../prisma.js";
+import { createActivityEvent } from "./activityEvents.js";
+
+// Everything about connections that has to behave identically outside an
+// HTTP request lives here rather than in routes/connections.js, because
+// three non-route callers create them: both verify-claim branches in
+// routes/auth.js (via consumePendingConnections below) and the claim
+// endpoint in routes/businesses.js. If orderedPair lived in the router,
+// those would each have to re-derive the ordering invariant, and the first
+// one to get it backwards would write a duplicate edge the unique
+// constraint can't catch.
+
+// The valid Connection.source values. Free text at the DB level (see
+// schema.prisma), so this is what actually constrains it — same role as
+// RECEIVER_FLAG_REASONS in routes/vouches.js. "nfc_scan" is a physical card
+// tap; "directory" is the in-app connect button.
+const CONNECTION_SOURCES = new Set(["nfc_scan", "directory"]);
+
+// Wider than vouchTurn.js's BUSINESS_SELECT by one field: Network.jsx
+// renders the counterparty's location on every card. Kept separate rather
+// than widening that one, which would silently add a field to every vouch
+// payload for the sake of an unrelated consumer.
+const CONNECTION_BUSINESS_SELECT = {
+  id: true,
+  name: true,
+  category: true,
+  location: true,
+  tier: true,
+};
+
+// One include for every connection read. Lives next to serializeConnection
+// below, which can't work without it (same reasoning as VOUCH_INCLUDE).
+const CONNECTION_INCLUDE = {
+  businessA: { select: CONNECTION_BUSINESS_SELECT },
+  businessB: { select: CONNECTION_BUSINESS_SELECT },
+};
+
+// The ordering invariant from schema.prisma, in the one place that owns it:
+// the lexicographically smaller id is always businessAId. A connection is a
+// mutual edge stored once, so without a canonical order A-scans-B and
+// B-scans-A would write two rows that @@unique([businessAId, businessBId])
+// has no way to recognise as the same pair.
+function orderedPair(idA, idB) {
+  return idA < idB
+    ? { businessAId: idA, businessBId: idB }
+    : { businessAId: idB, businessBId: idA };
+}
+
+// Expects a row loaded with CONNECTION_INCLUDE. `counterparty` is resolved
+// server-side — the client never has to work out which end of the pair it
+// is, which is the whole awkwardness of storing a mutual edge once.
+function serializeConnection(connection, viewerBusinessId) {
+  const counterparty =
+    connection.businessAId === viewerBusinessId ? connection.businessB : connection.businessA;
+
+  return {
+    id: connection.id,
+    source: connection.source,
+    createdAt: connection.createdAt,
+    counterparty: counterparty ?? null,
+  };
+}
+
+// Creates the edge and notifies the other side, as one unit — they're
+// bundled here so a future caller can't add a connection that nobody hears
+// about. Takes the client as its first arg (like createActivityEvent) so
+// callers can pass a `tx` and get both writes in one transaction.
+//
+// Only the counterparty is notified: the actor pressed the button, so
+// telling them what they just did is noise. There's deliberately no
+// equivalent on removal — "X removed you from their network" is a hostile
+// notification the reader can do nothing about.
+async function createConnection(client, { actorBusinessId, counterpartyId, source }) {
+  const connection = await client.connection.create({
+    data: { ...orderedPair(actorBusinessId, counterpartyId), source },
+  });
+
+  await createActivityEvent(client, {
+    businessId: counterpartyId,
+    actorBusinessId,
+    type: "connection_added",
+  });
+
+  return connection;
+}
+
+// Turns the connect-intents queued against an account into real edges, then
+// clears the queue. Called from startSession (lib/session.js) and nowhere
+// else — see the PendingConnection comment in schema.prisma for why the
+// intent has to survive between requests at all.
+//
+// Every failure mode here is "nothing to do", not "error": the account may
+// have no business, the target may have been revoked back to T0 while the
+// claim sat in review, or the edge may already exist. None of those should
+// surface to someone who is just logging in.
+async function consumePendingConnections(accountId) {
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account?.businessId) return;
+
+  const queued = await prisma.pendingConnection.findMany({
+    where: { accountId },
+    include: { business: { select: { id: true, tier: true } } },
+  });
+  if (queued.length === 0) return;
+
+  // Filtered out here rather than inside the transaction so the write stays
+  // as short as possible.
+  const targets = queued.filter(
+    (row) => row.businessId !== account.businessId && row.business.tier !== "T0",
+  );
+
+  await prisma.$transaction(async (tx) => {
+    for (const row of targets) {
+      const pair = orderedPair(account.businessId, row.businessId);
+      const existing = await tx.connection.findUnique({
+        where: { businessAId_businessBId: pair },
+      });
+      if (existing) continue;
+
+      await createConnection(tx, {
+        actorBusinessId: account.businessId,
+        counterpartyId: row.businessId,
+        // The only way a row lands in PendingConnection is a card tap while
+        // logged out — the in-app directory button requires a session and
+        // connects immediately.
+        source: "nfc_scan",
+      });
+    }
+
+    // Clears ALL queued rows, including the ones skipped above. A stale
+    // target is nothing to do, not something to retry on the next login.
+    await tx.pendingConnection.deleteMany({ where: { accountId } });
+  });
+}
+
+export {
+  CONNECTION_SOURCES,
+  CONNECTION_BUSINESS_SELECT,
+  CONNECTION_INCLUDE,
+  orderedPair,
+  serializeConnection,
+  createConnection,
+  consumePendingConnections,
+};

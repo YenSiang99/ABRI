@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight, Building2, MapPin, Radio, Users } from "lucide-react";
 
-import { getBusiness, refreshBusinesses } from "@/lib/store/businesses";
-import { refreshAccounts } from "@/lib/store/accounts";
-import { addConnection, areConnected, refreshConnections } from "@/lib/store/connections";
+import { fetchBusiness } from "@/lib/api/businesses";
+import { useConnections } from "@/context/ConnectionsContext";
+import { SOURCE_NFC_SCAN } from "@/lib/connectionSources";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
@@ -68,42 +68,116 @@ function CardPanel({ business, children }) {
 function CardTap() {
   const { businessId } = useParams();
   const location = useLocation();
-  const { isAuthenticated, business: myBusiness } = useAuth();
-  const connectedRef = useRef(false);
-  const [justConnected, setJustConnected] = useState(false);
+  const { isAuthenticated, business: myBusiness, loading: authLoading } = useAuth();
+  const { isConnected, connect } = useConnections();
+  // Holds the businessId this page has already fired a POST for, so a
+  // re-render doesn't fire a second one but navigating to a different card
+  // does. A boolean would stick across that navigation.
+  const attemptedRef = useRef(null);
+  const [business, setBusiness] = useState(null);
+  const [error, setError] = useState(null);
+  const [loadedId, setLoadedId] = useState(null);
+  // The connect attempt's own state, kept apart from `error` above (which is
+  // about resolving the card itself): a tap that found the business but
+  // couldn't connect is a different thing to say, and the page still has a
+  // real business to render. Phases: idle → connecting → connected | already
+  // | error. Every path out of "connecting" lands on one of the last three,
+  // which is what stops the page from sitting on the spinner forever.
+  //
+  // Carries the card it belongs to, and is read back through `connectPhase`
+  // below, so navigating from one card to another drops the previous card's
+  // result without an effect that resets it — the same shape as `loadedId`
+  // above.
+  const [connectState, setConnectState] = useState({ id: null, phase: "idle", error: null });
 
   useEffect(() => {
-    // A scan may arrive right after the other side registered or claimed in
-    // a different tab/session, which only wrote to localStorage — always
-    // read fresh rather than trusting whatever was cached before landing here.
-    refreshBusinesses();
-    refreshAccounts();
-    refreshConnections();
-  }, []);
+    let cancelled = false;
+    fetchBusiness(businessId)
+      .then((result) => {
+        if (cancelled) return;
+        setBusiness(result);
+        setError(null);
+        setLoadedId(businessId);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.status === 404 ? "notfound" : "error");
+        setLoadedId(businessId);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
 
-  const business = getBusiness(businessId);
+  const status = loadedId !== businessId || authLoading ? "loading" : (error ?? "ready");
+  const isThisCard = connectState.id === businessId;
+  const connectPhase = isThisCard ? connectState.phase : "idle";
+  const connectError = isThisCard ? connectState.error : null;
+
   const isSelf = isAuthenticated && myBusiness?.id === businessId;
-  const alreadyConnected = Boolean(
-    isAuthenticated && myBusiness && business && areConnected(myBusiness.id, businessId),
-  );
+  const alreadyConnected = Boolean(myBusiness && isConnected(businessId));
+  // Deliberately does NOT wait on the connections list to load. The POST is
+  // idempotent and tells us in its response whether it created the edge, so
+  // it's the authority on both questions this page asks — am I connected,
+  // and did that just happen. Gating on the list instead meant any failure
+  // to load it (a 404 from a stale server, an offline moment) left the tap
+  // with nothing to do and no way to say so.
+  // `alreadyConnected` is here only to skip a pointless request when we
+  // happen to know the answer — not as a precondition. False because the
+  // list hasn't loaded is indistinguishable from false because they aren't
+  // connected, and the POST resolves both.
   const canConnect =
-    isAuthenticated && myBusiness && business && !isSelf && business.tier !== "T0" && !alreadyConnected;
+    isAuthenticated &&
+    myBusiness &&
+    business &&
+    !isSelf &&
+    business.tier !== "T0" &&
+    !alreadyConnected;
+
+  async function attemptConnect(target) {
+    setConnectState({ id: target, phase: "connecting", error: null });
+    const result = await connect(target, SOURCE_NFC_SCAN);
+    setConnectState(
+      result.ok
+        ? { id: target, phase: result.created ? "connected" : "already", error: null }
+        : { id: target, phase: "error", error: result.error },
+    );
+  }
 
   useEffect(() => {
-    if (!canConnect || connectedRef.current) return;
-    connectedRef.current = true;
-    addConnection(myBusiness.id, business.id, "nfc_scan");
-    setJustConnected(true);
+    if (!canConnect || attemptedRef.current === businessId) return;
+    // Set before the await, not after: past the first suspension point a
+    // second invocation has already read the old value. The real guarantee
+    // against a double POST is that the endpoint is idempotent; this just
+    // keeps the common case to one request.
+    attemptedRef.current = businessId;
+    attemptConnect(businessId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canConnect]);
+  }, [canConnect, businessId]);
 
+  if (status === "loading") {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-16">
+        <BackLink />
+        <div className="mt-6 rounded-lg border border-grey-200 bg-white p-8 text-center dark:border-border dark:bg-card">
+          <p className="text-sm text-grey-600 dark:text-muted-foreground">Reading this card…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only a genuine 404 means the card is bad. A network or server failure
+  // gets its own message — telling someone their card isn't a real business
+  // when the request merely failed is a bad thing to be wrong about.
   if (!business) {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
         <div className="mt-6 rounded-lg border border-grey-200 bg-white p-8 text-center dark:border-border dark:bg-card">
           <p className="text-sm text-grey-600 dark:text-muted-foreground">
-            This card doesn't match a business on ABRI.
+            {error === "notfound"
+              ? "This card doesn't match a business on ABRI."
+              : "Couldn't reach ABRI to read this card. Check your connection and try again."}
           </p>
         </div>
       </div>
@@ -149,7 +223,57 @@ function CardTap() {
     );
   }
 
-  if (isAuthenticated && (alreadyConnected || justConnected)) {
+  // Logged in, but the account has no business to connect from — an admin,
+  // or a claimant whose claim is still in review. They'd otherwise fall
+  // through to the logged-out pitch below and be told to log in.
+  if (isAuthenticated && !myBusiness) {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-16">
+        <BackLink />
+        <CardPanel business={business}>
+          <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
+            <p className="text-sm font-bold text-ink dark:text-foreground">
+              Nothing to connect from yet
+            </p>
+            <p className="mt-1 text-[13.5px] text-grey-600 dark:text-muted-foreground">
+              Connections are between businesses, and your account doesn't have a claimed one
+              yet. Once your claim is approved, tap this card again.
+            </p>
+          </div>
+        </CardPanel>
+      </div>
+    );
+  }
+
+  if (isAuthenticated && connectPhase === "error") {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-16">
+        <BackLink />
+        <CardPanel business={business}>
+          <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
+            <p className="text-sm font-bold text-ink dark:text-foreground">
+              Couldn't connect with {business.name}
+            </p>
+            <p className="mt-1 text-[13.5px] text-grey-600 dark:text-muted-foreground">
+              {connectError}
+            </p>
+            {/* The tap itself can't be repeated — they've already put the
+                card down — so the retry has to live on the page. */}
+            <Button className="mt-4" onClick={() => attemptConnect(businessId)}>
+              Try again
+            </Button>
+          </div>
+        </CardPanel>
+      </div>
+    );
+  }
+
+  const connectSettled = connectPhase === "connected" || connectPhase === "already";
+
+  if (isAuthenticated && (alreadyConnected || connectSettled)) {
+    // Only the server's answer can call it new: `alreadyConnected` becoming
+    // true is just the list arriving, which says nothing about who added it.
+    const isNew = connectPhase === "connected";
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
@@ -157,14 +281,35 @@ function CardTap() {
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="inline-flex items-center gap-2 text-sm font-bold text-ink dark:text-foreground">
               <Users className="h-4 w-4" />
-              {justConnected ? "You're now connected" : "You're already connected"}
+              {isNew ? "You're now connected" : "You're already connected"}
             </p>
             <p className="mt-1 text-[13.5px] text-grey-600 dark:text-muted-foreground">
-              {business.name} has been added to your network, and you to theirs.
+              {isNew
+                ? `${business.name} has been added to your network, and you to theirs.`
+                : `${business.name} is already in your network, and you in theirs.`}
             </p>
             <Button className="mt-4" render={<Link to="/app/network" />} nativeButton={false}>
               View your network
             </Button>
+          </div>
+        </CardPanel>
+      </div>
+    );
+  }
+
+  // The request is in flight (or about to be — the effect fires on the
+  // render right after this one). Every path out of it sets a terminal
+  // phase above, so this state always resolves.
+  if (isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-16">
+        <BackLink />
+        <CardPanel business={business}>
+          <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
+            <p className="inline-flex items-center gap-2 text-sm font-bold text-ink dark:text-foreground">
+              <Users className="h-4 w-4" />
+              Adding {business.name} to your network…
+            </p>
           </div>
         </CardPanel>
       </div>

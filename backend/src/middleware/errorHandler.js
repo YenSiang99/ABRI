@@ -12,6 +12,15 @@ function errorHandler(err, req, res, next) {
   if (err.code === "P2002") {
     return res.status(409).json({ error: "That value is already in use." });
   }
+  // Foreign-key violation — a delete blocked by rows still pointing at the
+  // target, or a write naming a row that doesn't exist. This is a backstop,
+  // not a fix: every one of these is a route that should have cleaned up or
+  // validated first, and a 409 on (say) "reject this claim" is still a
+  // broken admin flow. It's here so the next one names itself in the
+  // response instead of rendering as an indistinguishable 500.
+  if (err.code === "P2003") {
+    return res.status(409).json({ error: "That record is still referenced by something else." });
+  }
   if (err.status) {
     return res.status(err.status).json({ error: err.message });
   }
