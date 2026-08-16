@@ -16,11 +16,14 @@ import { AppBusinessCard } from "@/components/app/AppBusinessCard";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { tierLabel, ladderLabel } from "@/lib/store/businesses";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyActivity } from "@/lib/api/activity";
 import { isVouchable } from "@/lib/vouchRules";
+import { activityLink } from "@/lib/activityLinks";
+import { cn } from "@/lib/utils";
 
 const NEXT_TIER_STEPS = [
   { label: "SSM cross-check confirmed", done: true },
@@ -29,14 +32,111 @@ const NEXT_TIER_STEPS = [
   { label: "Verify representative identity", done: false },
 ];
 
+// One line of the activity feed. Clickable whenever the event names somewhere
+// to go — every message is about something that happened on another page, so
+// reading one and then having to hunt for it in the nav is the gap this
+// closes. Types with no destination (see lib/activityLinks.js) still render,
+// just as plain text.
+//
+// Opening it is what marks it read. Rendering the feed deliberately doesn't:
+// glancing at the dashboard on the way somewhere else isn't the same as
+// dealing with what's in it, and marking on render would clear the badge for
+// requests the member never opened.
+function ActivityRow({ event, onOpen }) {
+  const to = activityLink(event);
+
+  const body = (
+    <>
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-semibold text-foreground">
+        {event.actorName ? event.actorName.charAt(0) : "•"}
+      </div>
+      <div className="min-w-0 flex-1">
+        {/* event.message already reads as a full sentence with the actor's
+            name baked in server-side (see backend/src/lib/activityEvents.js)
+            — no separate actor-name prefix needed here. */}
+        <div className={cn("text-sm text-foreground", !event.read && "font-medium")}>
+          {event.message}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {new Date(event.date).toLocaleString()}
+        </div>
+      </div>
+      {/* Kept alongside the tint rather than replaced by it. The wash is the
+          thing you notice scanning the list; the dot is what still says
+          "unread" to someone who can't distinguish it from the card behind
+          it, and colour on its own would leave them with no signal at all. */}
+      {!event.read && (
+        <span
+          aria-label="Unread"
+          className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent-foreground"
+        />
+      )}
+      {to && <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+    </>
+  );
+
+  // The unread wash, ABRI's equivalent of LinkedIn's blue: --accent is the
+  // brand yellow and is deliberately constant across light and dark (see
+  // index.css), so one opacity works in both without a second definition.
+  // Read rows carry no fill at all, which is what makes the tint mean
+  // something — a list where every row is tinted says nothing.
+  const unreadFill = !event.read && "bg-accent/10";
+
+  return (
+    <li>
+      {to ? (
+        // Negative margin against matching padding so the fill reaches past
+        // the text without widening the row's place in the divided list.
+        <Link
+          to={to}
+          onClick={() => !event.read && onOpen(event.id)}
+          className={cn(
+            "-mx-2 flex items-start gap-3 rounded-lg px-2 py-4 transition-colors",
+            unreadFill,
+            // Unread hovers deeper into the same hue rather than swapping to
+            // the neutral fill, so hovering never looks like the row was read.
+            event.read ? "hover:bg-secondary" : "hover:bg-accent/20",
+          )}
+        >
+          {body}
+        </Link>
+      ) : (
+        <div className={cn("-mx-2 flex items-start gap-3 rounded-lg px-2 py-4", unreadFill)}>
+          {body}
+        </div>
+      )}
+    </li>
+  );
+}
+
 function Dashboard() {
   const { business } = useAuth();
+  const { markOneRead, markAllRead } = useNotifications();
   const pending = business.tier === "T1";
 
   const [suggested, setSuggested] = useState([]);
   const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
   const [needsYouCount, setNeedsYouCount] = useState(0);
   const [activity, setActivity] = useState([]);
+
+  // Derived from the feed rather than the context's unreadCount, which
+  // markAllRead has already zeroed by the time this renders. It also counts
+  // only what's on screen — the context counts every unread row, including
+  // any beyond the 20 this panel fetches.
+  const newCount = activity.filter((a) => !a.read).length;
+
+  // Both handlers flip the local rows too, so the dots clear without a
+  // refetch. Opening one is usually a navigation away, but the row has to be
+  // right for the back-button case; "mark all" never navigates at all.
+  function handleOpen(id) {
+    markOneRead(id);
+    setActivity((current) => current.map((a) => (a.id === id ? { ...a, read: true } : a)));
+  }
+
+  function handleMarkAllRead() {
+    markAllRead();
+    setActivity((current) => current.map((a) => (a.read ? a : { ...a, read: true })));
+  }
 
   useEffect(() => {
     if (pending) return;
@@ -195,8 +295,28 @@ function Dashboard() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Recent activity
+          <div className="flex items-center gap-2">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Recent activity
+            </div>
+            {newCount > 0 && (
+              <>
+                <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">
+                  {newCount} new
+                </span>
+                {/* For the lines with nothing to open — a cancelled vouch, a
+                    connection you already knew about. Without it those sit
+                    unread forever, since opening is the only other way to
+                    clear one. */}
+                <button
+                  type="button"
+                  onClick={handleMarkAllRead}
+                  className="ml-auto text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Mark all read
+                </button>
+              </>
+            )}
           </div>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
             What's happening
@@ -205,23 +325,7 @@ function Dashboard() {
             {activity.length === 0 ? (
               <li className="py-4 text-sm text-muted-foreground">Nothing yet — activity shows up here as your network engages with you.</li>
             ) : (
-              activity.map((a) => (
-                <li key={a.id} className="flex items-start gap-3 py-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-xs font-semibold text-foreground">
-                    {a.actorName ? a.actorName.charAt(0) : "•"}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {/* a.message already reads as a full sentence with the
-                        actor's name baked in server-side (see
-                        backend/src/lib/activityEvents.js) — no separate
-                        actor-name prefix needed here. */}
-                    <div className="text-sm text-foreground">{a.message}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(a.date).toLocaleString()}
-                    </div>
-                  </div>
-                </li>
-              ))
+              activity.map((a) => <ActivityRow key={a.id} event={a} onOpen={handleOpen} />)
             )}
           </ul>
         </div>

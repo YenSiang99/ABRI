@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { VouchRequestCard } from "@/components/app/VouchRequestCard";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { fetchVouchesGiven, fetchVouchesReceived, fetchVouchRequests } from "@/lib/api/vouches";
 import { toast } from "@/lib/toast";
@@ -32,9 +34,27 @@ function Section({ title, count, hint, children }) {
   );
 }
 
+const TABS = ["requests", "received", "given"];
+
 function Vouches() {
   const { business, refreshAccount } = useAuth();
+  const { refreshVouchActions } = useNotifications();
   const locked = business.tier === "T1";
+
+  // The open tab lives in the URL so the dashboard's activity feed can link
+  // straight to it — "X accepted your vouch" belongs on Given, and landing on
+  // Requests (which only lists in-flight vouches) would show an empty list for
+  // an event that just told you something happened. Unrecognised values fall
+  // back rather than rendering no tab at all.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("tab");
+  const tab = TABS.includes(requested) ? requested : "requests";
+
+  function handleTabChange(next) {
+    // replace: switching tabs isn't a navigation step worth a back-button
+    // press, but arriving from a notification link is — that one stays.
+    setSearchParams(next === "requests" ? {} : { tab: next }, { replace: true });
+  }
 
   const [open, setOpen] = useState(false);
   const [allBusinesses, setAllBusinesses] = useState([]);
@@ -84,6 +104,10 @@ function Vouches() {
     if (locked) return;
     setLoading(true);
     refreshAccount();
+    // Keeps the sidebar's Vouches badge honest — accepting or declining here
+    // changes whose turn it is, and the badge is rendered outside this page's
+    // subtree so nothing else would tell it.
+    refreshVouchActions();
     Promise.all([fetchBusinesses(), fetchVouchesGiven(), fetchVouchesReceived(), fetchVouchRequests()])
       .then(([biz, giv, rec, reqs]) => {
         setAllBusinesses(biz);
@@ -134,7 +158,7 @@ function Vouches() {
         )}
       </div>
 
-      <Tabs defaultValue="requests" className="mt-8">
+      <Tabs value={tab} onValueChange={handleTabChange} className="mt-8">
         <TabsList>
           <TabsTrigger value="requests">
             Requests

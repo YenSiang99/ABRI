@@ -125,6 +125,11 @@ router.get(
         actorName: e.actorBusiness?.name ?? null,
         message: messageFor(e.type, e.actorBusiness?.name),
         date: e.createdAt,
+        // Sent so the feed can mark which lines are new. Deliberately not
+        // consumed here: reading the feed doesn't clear it, POST
+        // /me/activity/read does. Otherwise the response that renders the
+        // "new" highlights would be the same one that erases them.
+        read: e.readAt !== null,
       })),
     });
 
@@ -135,6 +140,70 @@ router.get(
     // the vouch write transactions; the tradeoff is that a business nobody
     // ever logs into never gets pruned (see PRUNING note in BACKEND_STATUS.md).
     pruneActivityEvents(prisma, req.account.businessId).catch(() => {});
+  }),
+);
+
+// The sidebar badge. Split from GET /me/activity because the sidebar renders
+// on every /app/* page and only needs the number — pulling 20 rows and their
+// actor joins to derive it would make the count the most expensive thing on
+// pages that don't show the feed at all.
+router.get(
+  "/me/activity/unread-count",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) return res.json({ unread: 0 });
+
+    const unread = await prisma.activityEvent.count({
+      where: { businessId: req.account.businessId, readAt: null },
+    });
+
+    res.json({ unread });
+  }),
+);
+
+// Marks everything currently unread as seen — the "Mark all read" escape
+// hatch for events the member has no reason to open (a vouch that was
+// cancelled, a connection they already know about). Opening a notification
+// is what normally clears it; see POST /me/activity/:id/read below.
+//
+// `readAt: null` in the filter rather than blanket-updating the business's
+// rows keeps this idempotent and cheap — a second call matches nothing and
+// preserves the original timestamps.
+router.post(
+  "/me/activity/read",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) return res.json({ marked: 0 });
+
+    const { count } = await prisma.activityEvent.updateMany({
+      where: { businessId: req.account.businessId, readAt: null },
+      data: { readAt: new Date() },
+    });
+
+    res.json({ marked: count });
+  }),
+);
+
+// Marks one event read, which is what opening a notification does. Kept
+// separate from the bulk route above because they answer different questions:
+// this one means "I dealt with this", the other means "stop showing me these".
+//
+// updateMany rather than update-by-id so the businessId filter is part of the
+// write itself — a member passing someone else's event id matches zero rows
+// and gets `{ marked: 0 }`, rather than a 404 that would confirm the id
+// exists, or worse a successful write on a feed that isn't theirs.
+router.post(
+  "/me/activity/:id/read",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) return res.json({ marked: 0 });
+
+    const { count } = await prisma.activityEvent.updateMany({
+      where: { id: req.params.id, businessId: req.account.businessId, readAt: null },
+      data: { readAt: new Date() },
+    });
+
+    res.json({ marked: count });
   }),
 );
 

@@ -352,8 +352,18 @@ model ActivityEvent {
   type      String
   createdAt DateTime @default(now())
 
+  // Null until the owner has seen the feed. Nullable rather than a boolean
+  // so "when did they see it" is answerable later (a digest needs to know
+  // what's still unseen since the last send) without a second migration.
+  readAt DateTime?
+
   // Matches the dashboard feed's `where businessId ... orderBy createdAt desc`.
   @@index([businessId, createdAt])
+  // Serves the unread count, which the sidebar asks for on every /app page
+  // load — `where businessId ... AND readAt IS NULL`. Separate from the feed
+  // index above because that one leads with createdAt as its second column
+  // and can't answer a readAt predicate without scanning the business's rows.
+  @@index([businessId, readAt])
 }
 
 // A mutual edge — connecting via a tap (or in-app connect) links both

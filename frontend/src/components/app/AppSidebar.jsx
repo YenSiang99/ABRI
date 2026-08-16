@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { tierLabel } from "@/lib/store/businesses";
 import { introductions } from "@/data/appMockData";
 
@@ -44,7 +45,30 @@ const TRUST_ITEMS = [
 
 const pendingIntros = introductions.filter((i) => i.direction === "incoming" && i.status === "pending").length;
 
-function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut }) {
+// Counts capped at 9+ so a member who's been away for a month doesn't get a
+// three-digit pill wide enough to push the nav label out of the row.
+function NavBadge({ count, label }) {
+  if (!count) return null;
+  return (
+    <span
+      aria-label={`${count} ${label}`}
+      className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground"
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
+function SidebarNav({
+  pathname,
+  onNavigate,
+  business,
+  isAdmin,
+  locked,
+  unreadCount,
+  vouchActionCount,
+  onSignOut,
+}) {
   // Prefix match, except for the two urls that are prefixes of their own
   // children — /app is under everything, and /app/admin is under
   // /app/admin/vouch-reviews. Those need an exact match or they'd light up
@@ -109,6 +133,17 @@ function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut
                   {item.lockWhenPending && locked && (
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
+                  {/* The feed lives on the dashboard, so that's where the
+                      unread count belongs — a badge on any other item would
+                      point at a page that can't clear it. */}
+                  {item.url === "/app" && <NavBadge count={unreadCount} label="unread" />}
+                  {/* Counts only vouches whose turn is yours, matching the
+                      Requests tab badge. Hidden while locked, where the page
+                      itself is a LockedFeature and the count would point at
+                      work the member can't reach. */}
+                  {item.url === "/app/vouches" && !locked && (
+                    <NavBadge count={vouchActionCount} label="waiting on you" />
+                  )}
                 </Link>
               ))}
             </div>
@@ -134,10 +169,8 @@ function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut
                   {item.lockWhenPending && locked && (
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
-                  {item.url === "/app/introductions" && pendingIntros > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-foreground">
-                      {pendingIntros}
-                    </span>
+                  {item.url === "/app/introductions" && (
+                    <NavBadge count={pendingIntros} label="pending" />
                   )}
                 </Link>
               ))}
@@ -177,6 +210,7 @@ function SidebarNav({ pathname, onNavigate, business, isAdmin, locked, onSignOut
 function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const { business, isAdmin, logout } = useAuth();
+  const { unreadCount, vouchActionCount } = useNotifications();
 
   if (!business && !isAdmin) return null;
 
@@ -197,6 +231,8 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           business={business}
           isAdmin={isAdmin}
           locked={locked}
+          unreadCount={unreadCount}
+          vouchActionCount={vouchActionCount}
           onSignOut={handleSignOut}
         />
       </aside>
@@ -219,6 +255,8 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               business={business}
               isAdmin={isAdmin}
               locked={locked}
+              unreadCount={unreadCount}
+              vouchActionCount={vouchActionCount}
               onSignOut={handleSignOut}
             />
           </aside>
