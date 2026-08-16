@@ -5,6 +5,18 @@ const ACTIVITY_MESSAGES = {
   vouch_submitted: (actorName) => `${actorName} sent you a vouch to review.`,
   vouch_published: (actorName) => `${actorName} accepted your vouch.`,
   vouch_cancelled: (actorName) => `${actorName} cancelled your vouch.`,
+  // Distinct from vouch_cancelled because the two are different facts about
+  // a relationship: one is a decision the counterparty made, the other is
+  // nobody getting round to it. Both land the vouch on "cancelled", so
+  // without a separate type the giver is told they were declined by a
+  // business that never actually did anything.
+  //
+  // Worded so it names no culprit — the counterparty appears as the subject
+  // of the vouch, not as someone who acted. "14 days" mirrors EXPIRY_DAYS in
+  // lib/vouchExpiry.js; it can't be imported (that module imports this one),
+  // so change both together.
+  vouch_expired: (actorName) =>
+    `Your vouch for ${actorName} expired after 14 days without a response.`,
   vouch_reverted: (actorName) => `${actorName} sent your vouch back for edits.`,
   // The one event that names no next step for the recipient — a flagged
   // vouch is an admin's to move, so telling the giver to do anything would

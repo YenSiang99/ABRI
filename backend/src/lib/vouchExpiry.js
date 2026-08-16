@@ -27,11 +27,7 @@ async function applyExpiryIfNeeded(vouch) {
       where: { id: vouch.id },
       data: { status: "cancelled", lastActionAt: new Date(), closedAt: new Date() },
     }),
-    // actorId null: nobody cancelled this, it lapsed. The receiver gets
-    // named as the actor on the ActivityEvent below because that feed is
-    // about who to chase up, but the audit log has to stay literal — an
-    // admin reading the timeline must be able to tell a real cancel from
-    // a timeout.
+    // actorId null: nobody cancelled this, it lapsed.
     prisma.vouchAction.create({
       data: {
         vouchId: vouch.id,
@@ -43,10 +39,19 @@ async function applyExpiryIfNeeded(vouch) {
         toStatus: "cancelled",
       },
     }),
+    // vouch_expired, not vouch_cancelled: the status lands on "cancelled"
+    // either way, but telling the giver their counterparty cancelled — when
+    // that business simply never replied — puts a rejection that never
+    // happened into a permanent, member-visible feed.
+    //
+    // The receiver is still carried as actorBusinessId so the feed can name
+    // which vouch lapsed and show their avatar; the message (see
+    // ACTIVITY_MESSAGES in lib/activityEvents.js) is worded to make them its
+    // subject rather than its culprit.
     createActivityEvent(prisma, {
       businessId: vouch.fromBusinessId,
       actorBusinessId: vouch.toBusinessId,
-      type: "vouch_cancelled",
+      type: "vouch_expired",
     }),
   ]);
   // Merge rather than replace — `vouch` may carry joined relations (e.g. a
