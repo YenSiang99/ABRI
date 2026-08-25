@@ -37,17 +37,22 @@ const FEATURE_MIN_PLAN = {
   contactDetails: "plus",
 
 
-  // DECLARED HERE, ENFORCED ONLY IN THE UI — for now. Neither feature has a
-  // server endpoint: both screens read frontend/src/data/appMockData.js,
-  // which ships inside the bundle, so nothing on this side can withhold
-  // anything yet. They live here regardless so there is ONE registry of what
-  // a plan includes rather than a short server list and a longer client one,
-  // and so the gate is already written down when the real routes arrive —
-  // at which point those routes call can() and these become real.
+  // DECLARED HERE, ENFORCED ONLY IN THE UI — for now. There is no server
+  // endpoint: the card screen reads frontend/src/data/appMockData.js, which
+  // ships inside the bundle, so nothing on this side can withhold anything
+  // yet. It lives here regardless so there is ONE registry of what a plan
+  // includes rather than a short server list and a longer client one, and so
+  // the gate is already written down when the real route arrives — at which
+  // point that route calls can() and this becomes real.
   //
-  // Don't cite either as a server-enforced gate until that happens.
+  // Don't cite it as a server-enforced gate until that happens.
+  //
+  // `introductions: "pro"` sat here too until Aug 2026, when the screen it
+  // gated was deleted for being mock data end to end. A gate is not a
+  // feature: keeping the entry would have left the registry describing a
+  // plan that included something the product didn't have. If a replacement
+  // Pro feature arrives, it gets its own entry under its own name.
   nfcCard: "plus",
-  introductions: "pro",
 };
 
 function can(business, feature) {

@@ -18,7 +18,6 @@ import { Vouches } from "@/pages/app/Vouches";
 import { Network } from "@/pages/app/Network";
 import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Verify } from "@/pages/app/Verify";
-import { Introductions } from "@/pages/app/Introductions";
 import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
@@ -56,7 +55,6 @@ function App() {
             <Route path="directory" element={<AppDirectory />} />
             <Route path="business/:id" element={<BusinessProfile inApp />} />
             <Route path="verify" element={<Verify />} />
-            <Route path="introductions" element={<Introductions />} />
             <Route path="card" element={<Card />} />
             <Route path="admin" element={<AdminReview />} />
             <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />

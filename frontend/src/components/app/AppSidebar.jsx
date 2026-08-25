@@ -8,7 +8,6 @@ import {
   LogOut,
   X,
   ShieldCheck,
-  Mailbox,
   CreditCard,
   Lock,
   ClipboardCheck,
@@ -19,7 +18,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { tierLabel } from "@/lib/trustLabels";
 import { planLabel, canUpgradeFrom, planAllows } from "@/lib/plans";
-import { introductions } from "@/data/appMockData";
 
 const WORKSPACE_ITEMS = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
@@ -42,13 +40,15 @@ const ADMIN_ITEMS = [
 // one: lockWhenPending is verification (tier T1), lockFeature is the plan.
 // The NFC card is behind both, and the page itself decides which message
 // to show when they overlap.
+//
+// Both fields are kept even though only one item uses each right now. They
+// outlived Introductions, which was removed in Aug 2026 for being a screen
+// backed entirely by mock data, and whatever Pro gets in its place will
+// almost certainly want the same pair.
 const TRUST_ITEMS = [
   { title: "Verification", url: "/app/verify", icon: ShieldCheck },
-  { title: "Introductions", url: "/app/introductions", icon: Mailbox, lockFeature: "introductions" },
   { title: "NFC Card", url: "/app/card", icon: CreditCard, lockWhenPending: true, lockFeature: "nfcCard" },
 ];
-
-const pendingIntros = introductions.filter((i) => i.direction === "incoming" && i.status === "pending").length;
 
 // Counts capped at 9+ so a member who's been away for a month doesn't get a
 // three-digit pill wide enough to push the nav label out of the row.
@@ -145,7 +145,19 @@ function SidebarNav({
                   {/* Counts only vouches whose turn is yours, matching the
                       Requests tab badge. Hidden while locked, where the page
                       itself is a LockedFeature and the count would point at
-                      work the member can't reach. */}
+                      work the member can't reach.
+
+                      NOT hidden for a Free member, though — a plan lock and
+                      a verification lock call this differently, on purpose.
+                      A Free member's vouch requests are real, addressed to
+                      them, and readable in full; only publishing one is
+                      priced. The badge points at something genuinely
+                      waiting, and the nag is the pitch.
+
+                      The rule, for whatever badge comes next: count it when
+                      the member can at least OPEN what it refers to. Hide it
+                      when the page behind it is a LockedFeature, where the
+                      count would be advertising work that isn't there. */}
                   {item.url === "/app/vouches" && !locked && (
                     <NavBadge count={vouchActionCount} label="waiting on you" />
                   )}
@@ -176,12 +188,6 @@ function SidebarNav({
                     <span className="flex-1">{item.title}</span>
                     {((item.lockWhenPending && locked) || planLocked) && (
                       <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                    {/* Hidden while locked for the same reason as the vouch
-                        badge above: a count pointing at work the member
-                        can't open. */}
-                    {item.url === "/app/introductions" && !planLocked && (
-                      <NavBadge count={pendingIntros} label="pending" />
                     )}
                   </Link>
                 );

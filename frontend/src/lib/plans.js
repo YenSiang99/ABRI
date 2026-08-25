@@ -64,10 +64,9 @@ const PLAN_FEATURES = [
   // GET /businesses/:id withholds the text itself, not just the UI.
   //
   // Vouch caps, this row and the contact-details row below are the only
-  // three the SERVER enforces. The NFC card and introductions rows are shut
-  // in the UI but not on the wire
-  // (they have no endpoint yet). Every other row is still a promise, and
-  // the comment saying so is what keeps this table from quietly becoming
+  // ones the SERVER enforces. The NFC card row is shut in the UI but not on
+  // the wire (it has no endpoint yet). Every other row is still a promise,
+  // and the comment saying so is what keeps this table from quietly becoming
   // fiction — move a row up as it starts being enforced.
   { label: "Testimonials shown on your page", free: false, plus: true, pro: true, enterprise: true },
   // ENFORCED. GET /businesses/:id withholds phone/whatsapp/email outright —
@@ -87,9 +86,13 @@ const PLAN_FEATURES = [
   { label: "Profile view alerts + weekly summary", free: false, plus: true, pro: true, enterprise: true },
   { label: "Search ranking", free: "Standard", plus: "Higher", pro: "Top", enterprise: "Top" },
   { label: "Requests board", free: "Read only", plus: "Read only", pro: "Post + reply", enterprise: "Private" },
-  // The introductions half is GATED in the UI (/app/introductions); the
-  // referral tracker doesn't exist yet.
-  { label: "Referral tracker + introductions", free: false, plus: false, pro: true, enterprise: true },
+  // Nothing behind this yet — no route, no screen, no data. It used to read
+  // "Referral tracker + introductions"; the introductions half was removed
+  // in Aug 2026 (the screen was mock data end to end) and the referral
+  // tracker has never been built, so this row is Pro's headline promise and
+  // is entirely a promise. It's the first thing to make real, or the first
+  // thing to replace, before Pro is sold to anyone.
+  { label: "Referral tracker", free: false, plus: false, pro: true, enterprise: true },
   { label: "Business card scanner", free: false, plus: false, pro: true, enterprise: true },
   { label: "Team accounts", free: false, plus: false, pro: false, enterprise: true },
 ];
@@ -100,10 +103,10 @@ const PLAN_FEATURES = [
 // For `testimonials` the server strips the data and this copy exists only
 // so the UI can explain the gate before the payload arrives (e.g. telling
 // an owner what visitors can't see on their own profile). For `nfcCard`
-// and `introductions` there is no endpoint yet, so this copy is currently
-// the ONLY thing shutting those screens — which is a real limit, not a
-// safeguard: anyone can edit it in a browser. Never put anything behind
-// this that would matter if it were read.
+// there is no endpoint yet, so this copy is currently the ONLY thing
+// shutting that screen — which is a real limit, not a safeguard: anyone can
+// edit it in a browser. Never put anything behind this that would matter if
+// it were read.
 const FEATURE_MIN_PLAN = {
   testimonials: "plus",
   // Like `testimonials` and unlike the two below it: the server strips the
@@ -115,7 +118,6 @@ const FEATURE_MIN_PLAN = {
   // this feature deliberately doesn't have.
   contactDetails: "plus",
   nfcCard: "plus",
-  introductions: "pro",
 };
 
 // True when `plan` reaches the minimum tier for `feature`. Unknown plan or
