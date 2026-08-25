@@ -7,9 +7,14 @@ import { findOrCreateClaimTarget } from "../lib/businessClaim.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { messageFor, pruneActivityEvents } from "../lib/activityEvents.js";
 import { ladderFor } from "../lib/vouchLadder.js";
+import { publicBusinessView } from "../lib/accountView.js";
+import { can } from "../lib/entitlements.js";
+import { contactVisibility } from "../lib/contactVisibility.js";
+import { normalizeBusinessEdit } from "../lib/contactFields.js";
+import { loadAccountView } from "../lib/accountView.js";
 
 const router = Router();
 
@@ -53,8 +58,24 @@ router.get(
       // every business object carries both (see
       // components/badge/VouchBadge.jsx, which indexes an icon map by
       // ladder with no undefined fallback).
+      // Contact details are stripped UNCONDITIONALLY here, which is why this
+      // route needs no optionalAuth and no contactLocked flag: it has no
+      // viewer-dependent behaviour at all, and identical output for everyone
+      // is the assertion that keeps it that way.
+      //
+      // Two reasons. BusinessCard.jsx renders name/category/location/tier/
+      // vouchCount and has nowhere to put a phone number, so nothing here
+      // would read them. And shipping every listing's phone number to every
+      // session would be the best scraping surface in the app, built to serve
+      // a card that doesn't display it — which is the precise thing the
+      // logged-in half of the gate exists to prevent.
+      //
+      // The trade-off, stated so it can be revisited deliberately: a future
+      // "call" button on directory cards is a change to THIS route, and that
+      // is the right moment to decide whether the gated surface should grow
+      // past the single profile route it occupies today.
       businesses: businesses.map(({ _count, ...business }) => ({
-        ...business,
+        ...publicBusinessView(business),
         vouchCount: _count.vouchesReceived,
         ladder: ladderFor(_count.vouchesReceived),
       })),
@@ -62,8 +83,14 @@ router.get(
   }),
 );
 
+// optionalAuth, not requireAuth: this is a public route — it serves both the
+// profile page and the NFC tap page (/m/:businessId resolves through it) — but
+// it withholds contact details from anonymous visitors, so it has to be able
+// to tell an anonymous visitor from a logged-in member. req.account is null
+// rather than undefined here, and must be read as req.account?.something.
 router.get(
   "/:id",
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const business = await prisma.business.findUnique({
       where: { id: req.params.id },
@@ -84,17 +111,59 @@ router.get(
     });
     if (!business) return res.status(404).json({ error: "Business not found." });
 
+    // Read the plan off the RAW row: publicBusinessView strips
+    // membershipPlan, so asking can() about its output denies everything.
+    const showTestimonials = can(business, "testimonials");
+
+    // Deliberately adjacent to the line above, and for the same reason: this
+    // reads the plan off the RAW row too. publicBusinessView strips
+    // membershipPlan, so a gate computed after it would see every business as
+    // free and withhold from everyone.
+    const contact = contactVisibility(business, req.account);
+
+    // Sent explicitly rather than left for the client to infer from
+    // vouchesReceived.length, which is what it used to do in three places.
+    // The moment the array can be withheld, its length stops meaning "how
+    // many vouches" — and the count is the half of this that every plan
+    // keeps, so it must not travel inside the half that gets taken away.
+    const vouchCount = business.vouchesReceived.length;
+
     // Flatten the live revision's text onto each vouch as `testimonial`.
     // The column of that name is gone (schema.prisma) — it was the copy a
     // revise overwrote — but the public shape is unchanged, so nothing
     // downstream needs to know a join happened.
+    //
+    // Withheld as an empty array rather than rows with `testimonial: null`:
+    // the free tier shows a number and nothing else, and keeping the rows
+    // would still publish who vouched and when.
     res.json({
       business: {
-        ...business,
-        vouchesReceived: business.vouchesReceived.map(({ currentRevision, ...v }) => ({
-          ...v,
-          testimonial: currentRevision?.comment ?? null,
-        })),
+        ...publicBusinessView(business, { showContact: contact.visible }),
+        vouchCount,
+        testimonialsLocked: !showTestimonials,
+        // Withheld the same way testimonials are — the keys are absent, not
+        // null, so there is no masked value on the wire to un-mask.
+        //
+        // Both a boolean AND a reason. The boolean keeps the client's check
+        // as `if (contactLocked)`, the same idiom as testimonialsLocked right
+        // above it. The reason exists because the two locked states are
+        // different messages: "owner_plan" is something the viewer can do
+        // nothing about, while "viewer_anonymous" names a free action they
+        // can take. With only a boolean the client's sole inference would be
+        // "am I logged in?", which would render "log in to see this" on a
+        // free owner's page too — promising something logging in does not
+        // deliver.
+        //
+        // Note contactLocked false with all three fields null means the owner
+        // hasn't added any. Withheld and empty must not render the same.
+        contactLocked: !contact.visible,
+        contactLockedReason: contact.reason,
+        vouchesReceived: showTestimonials
+          ? business.vouchesReceived.map(({ currentRevision, ...v }) => ({
+              ...v,
+              testimonial: currentRevision?.comment ?? null,
+            }))
+          : [],
       },
     });
   }),
@@ -204,6 +273,62 @@ router.post(
     });
 
     res.json({ marked: count });
+  }),
+);
+
+// The owner edits their own business. Everything the profile page can change
+// goes through here.
+//
+// "/me" rather than "/:id" so that "you can only edit your own business" is
+// structural instead of a check that can be got wrong: the target comes from
+// the session, so there is no id to compare against and no way to pass someone
+// else's. Same reasoning as the /me/activity routes above. No collision with
+// GET /:id — different verb — but if a PATCH /:id is ever added it has to be
+// declared AFTER this one.
+//
+// Replaces a write that never reached the server: the Edit-profile dialog used
+// to call updateBusinessProfile() from frontend/src/lib/store/businesses.js,
+// which put description and services into localStorage that nothing read back.
+// It toasted "Profile updated" and changed nothing.
+router.patch(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) {
+      return res.status(403).json({ error: "Your account isn't attached to a business yet." });
+    }
+
+    // LOAD-BEARING, and it will look redundant — read this before deleting it.
+    //
+    // Account.businessId is set for PENDING claimants too: POST /claim's
+    // manual-review branch (below) creates the account with businessId already
+    // populated and claimStatus "pending". So "has a businessId" is NOT "owns
+    // this business".
+    //
+    // Today nothing can reach this line with a pending claim, because that
+    // same branch sets emailVerified false and POST /auth/login refuses to
+    // start a session for an unverified account. That invariant lives in a
+    // different file, which is exactly why this check is here and not assumed:
+    // if login ever loosens by a line — say, to let a claimant in to watch
+    // their own claim — its absence is a stranger publishing contact details
+    // on a business they merely applied for.
+    if (req.account.claimStatus !== "approved") {
+      return res.status(403).json({ error: "Your claim on this business hasn't been approved yet." });
+    }
+
+    const { data, error } = normalizeBusinessEdit(req.body);
+    if (error) return res.status(400).json({ error });
+
+    await prisma.business.update({
+      where: { id: req.account.businessId },
+      data,
+    });
+
+    // Same shape as GET /auth/me, so the client re-uses refreshAccount() and
+    // there is no second response shape to keep in step. loadAccountView is
+    // already described as the single source of truth for what a logged-in
+    // account gets back.
+    res.json(await loadAccountView(req.account.id));
   }),
 );
 
@@ -350,7 +475,21 @@ router.post(
         .catch((err) => console.error("Failed to queue connect intent", err));
     }
 
-    res.status(201).json({ requiresAdminApproval: true, account: serializeAccount(account), business });
+    // publicBusinessView, not the raw row. This response goes to whoever
+    // POSTed the claim, BEFORE any approval — so before this, any stranger
+    // could claim an existing listing and read back that business's four
+    // billing columns. With contact columns on the same row it would have
+    // handed over the phone, WhatsApp and email too.
+    //
+    // On the brand-new-business path the columns are all null anyway; the leak
+    // was only ever real on the claim-an-existing-listing path, and fixing it
+    // at the response covers both. Safe to narrow: AuthContext.claimOrRegister
+    // reads only requiresEmailVerification and token off this payload.
+    res.status(201).json({
+      requiresAdminApproval: true,
+      account: serializeAccount(account),
+      business: publicBusinessView(business),
+    });
   }),
 );
 

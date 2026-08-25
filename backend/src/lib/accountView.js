@@ -25,6 +25,12 @@ import { ladderFor } from "./vouchLadder.js";
 // PUBLIC column should appear on profiles automatically, while a new
 // BILLING column is the kind you have to opt into exposing. Adding one
 // means adding it here.
+//
+// That reasoning held up when the contact columns arrived: website, address
+// and openingHours are public and needed no edit here at all, which is
+// exactly the case this shape was chosen for. There are now TWO private
+// groups, though — see omitContactFields below, and read publicBusinessView
+// before adding a third.
 function omitBillingFields(business) {
   const {
     membershipPlan: _membershipPlan,
@@ -35,6 +41,56 @@ function omitBillingFields(business) {
   } = business;
   return publicFields;
 }
+
+// Sibling of omitBillingFields — same shape, different reason. Billing is
+// private because it's ours; contact is private because it's the thing
+// members pay to publish and scrapers pay nothing to harvest.
+//
+// Unlike billing, this omit is CONDITIONAL: whether it applies depends on the
+// viewer, so it is never called directly by a route. Call publicBusinessView.
+//
+// Adding a PRIVATE column means adding it here, or it leaks by default.
+// Adding a PUBLIC one still means doing nothing. If a THIRD private group
+// ever appears, stop and switch this file to an explicit public allowlist
+// rather than adding a third omit — at three groups the "do nothing" default
+// stops being a convenience and starts being the reason something leaked.
+function omitContactFields(business) {
+  const {
+    phone: _phone,
+    whatsapp: _whatsapp,
+    email: _email,
+    ...rest
+  } = business;
+  return rest;
+}
+
+// The one serializer for a Business row leaving the server to somebody who is
+// NOT that business and NOT an admin. Every public route should call this and
+// nothing else — grep for omitBillingFields( and omitContactFields( and
+// expect zero hits outside this file.
+//
+// It exists because the two omits must never be applied one-and-not-the-
+// other. Before it, omitBillingFields was spread by hand at each call site;
+// adding a second, conditional omit would have doubled the number of ways
+// that goes wrong — silently, and in the leaking direction both times.
+// Composing them here turns "did you remember both omits?" into "did you use
+// the public serializer?", which a reviewer can actually check.
+//
+// showContact comes from contactVisibility(business, viewer) and MUST be
+// computed on the RAW row, before this function runs: omitBillingFields
+// strips membershipPlan, so can() asked about this function's output would
+// deny everything and every business would silently look free. Same trap the
+// testimonials gate in routes/businesses.js already warns about.
+function publicBusinessView(business, { showContact = false } = {}) {
+  const stripped = omitBillingFields(business);
+  return showContact ? stripped : omitContactFields(stripped);
+}
+
+// The OWNER's own view. Deliberately does NOT go through publicBusinessView:
+// billing columns belong to the business itself, and the contact columns are
+// what makes "the owner always sees their own contact details" true without a
+// special case anywhere else. Reached only via loadAccountView, i.e. /login,
+// /auth/me and /verify-claim.
 function serializeBusiness(business) {
   const { vouchesReceived, vouchesGiven, ...rest } = business;
   const published = vouchesReceived.filter((v) => v.status === "published");
@@ -101,4 +157,10 @@ async function loadAccountView(accountId) {
   };
 }
 
-export { loadAccountView, serializeBusiness, omitBillingFields };
+export {
+  loadAccountView,
+  serializeBusiness,
+  omitBillingFields,
+  omitContactFields,
+  publicBusinessView,
+};

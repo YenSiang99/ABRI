@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { LockedFeature } from "@/components/app/LockedFeature";
+import { ContactDetails } from "@/components/business/ContactDetails";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
@@ -28,9 +29,14 @@ function VouchCard({ vouch }) {
           </div>
         </div>
       </div>
-      <blockquote className="mt-4 border-l-2 border-yellow pl-4 text-sm italic text-grey-700 dark:text-foreground">
-        "{vouch.testimonial}"
-      </blockquote>
+      {/* Guarded because the field is nullable in principle — an unguarded
+          interpolation renders a bordered blockquote containing two bare
+          quote marks, which reads as a bug rather than as absence. */}
+      {vouch.testimonial && (
+        <blockquote className="mt-4 border-l-2 border-yellow pl-4 text-sm italic text-grey-700 dark:text-foreground">
+          "{vouch.testimonial}"
+        </blockquote>
+      )}
     </div>
   );
 }
@@ -139,7 +145,12 @@ function BusinessProfile({ inApp = false }) {
 
   const isUnclaimed = business.tier === "T0";
   const isPendingVerification = business.tier === "T1";
-  const { services, vouchesReceived, ssm } = business;
+  // vouchCount comes from the server rather than vouchesReceived.length:
+  // on a free business the array is withheld but the count is not, and
+  // conflating them is what would silently show "0 vouches" for a business
+  // that has twelve.
+  const { services, vouchesReceived, ssm, vouchCount, testimonialsLocked } = business;
+  const { contactLocked, contactLockedReason } = business;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -220,8 +231,8 @@ function BusinessProfile({ inApp = false }) {
               <div className="mt-1 text-sm text-ink dark:text-foreground">
                 {isPendingVerification
                   ? "Unlocks after SSM verification"
-                  : vouchesReceived.length > 0
-                    ? `${vouchesReceived.length} peers`
+                  : vouchCount > 0
+                    ? `${vouchCount} peers`
                     : "No vouches yet"}
               </div>
             </div>
@@ -263,7 +274,7 @@ function BusinessProfile({ inApp = false }) {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="vouches">
-              Vouches ({isPendingVerification ? 0 : vouchesReceived.length})
+              Vouches ({isPendingVerification ? 0 : vouchCount})
             </TabsTrigger>
             <TabsTrigger value="card">NFC Card</TabsTrigger>
           </TabsList>
@@ -275,6 +286,17 @@ function BusinessProfile({ inApp = false }) {
                 {business.description}
               </p>
             </div>
+            {/* No tier lock of its own here. On T0 this whole tab isn't
+                rendered (the unclaimed panel replaces it), and on T1 the
+                plan gate already covers it via reason "owner_plan". The
+                verification-beats-plan rule used on the vouches and card
+                tabs applies to features verification actually UNLOCKS —
+                contact details aren't one of those. */}
+            <ContactDetails
+              business={business}
+              contactLocked={contactLocked}
+              contactLockedReason={contactLockedReason}
+            />
             {services.length > 0 && (
               <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
                 <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">Services</h2>
@@ -293,11 +315,26 @@ function BusinessProfile({ inApp = false }) {
           </TabsContent>
 
           <TabsContent value="vouches" className="mt-6 grid gap-4 md:grid-cols-2">
+            {/* Tier lock wins when both apply: a T1 business can't have
+                published vouches at all, so "get verified" is the more
+                useful thing to say than "this is on a paid plan". */}
             {isPendingVerification ? (
               <div className="md:col-span-2">
                 <LockedFeature
                   title="Vouches locked"
                   description="Vouches unlock once this business is SSM-verified."
+                />
+              </div>
+            ) : testimonialsLocked && vouchCount > 0 ? (
+              // Deliberately not an upgrade pitch. A visitor reading
+              // someone else's profile is the wrong person to sell to —
+              // the pressure belongs on the owner, who sees it on their
+              // own /app/profile. The "N peers" count above is what
+              // actually does the work here.
+              <div className="md:col-span-2">
+                <LockedFeature
+                  title="Written vouches not shown"
+                  description={`${vouchCount} ${vouchCount === 1 ? "business has" : "businesses have"} vouched for this company. Their written vouches aren't displayed on this profile.`}
                 />
               </div>
             ) : vouchesReceived.length > 0 ? (

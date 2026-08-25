@@ -8,6 +8,7 @@ import { SOURCE_NFC_SCAN } from "@/lib/connectionSources";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
+import { ContactDetails } from "@/components/business/ContactDetails";
 
 function BackLink() {
   return (
@@ -60,6 +61,23 @@ function CardPanel({ business, children }) {
           View business profile <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
+      {/* Inside CardPanel rather than in each of the six branches below, so
+          the product rule — verification status renders BEFORE contact
+          details on every tap — is structural instead of a convention
+          repeated six times and broken on the seventh.
+
+          T0 is suppressed rather than locked: an unclaimed listing has no
+          owner, and the "isn't on ABRI yet" panel below already says so.
+          A lock there would imply there is something to unlock. */}
+      {business.tier !== "T0" && (
+        <div className="mt-6">
+          <ContactDetails
+            business={business}
+            contactLocked={business.contactLocked}
+            contactLockedReason={business.contactLockedReason}
+          />
+        </div>
+      )}
       {children}
     </div>
   );
@@ -328,7 +346,7 @@ function CardTap() {
       <CardPanel business={business}>
         <p className="mt-6 text-[14px] text-grey-600 dark:text-muted-foreground">
           Log in or register on ABRI to add {business.name} to your network — and be added to
-          theirs.
+          theirs — and to see their contact details.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Button render={<Link to="/login" state={{ from: location }} />} nativeButton={false}>

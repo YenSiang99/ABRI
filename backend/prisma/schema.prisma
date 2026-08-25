@@ -33,6 +33,41 @@ model Business {
   // a claim when the claimant's email matches it. Never claimant-editable.
   domain      String?
 
+  // Contact fields. Which of the two groups a column is in IS what it means,
+  // and the split is enforced in exactly one place — omitContactFields in
+  // lib/accountView.js, reached only through publicBusinessView:
+  //
+  //   GATED  — phone/whatsapp/email. Never cross the wire to a third party
+  //            unless the OWNER is on plus or above AND the viewer is logged
+  //            in. The rule lives in lib/contactVisibility.js; the plan half
+  //            of it is `contactDetails` in lib/entitlements.js.
+  //   PUBLIC — website/address/openingHours. Shown on every plan to
+  //            everyone, anonymous visitors included. These are the half of
+  //            "full business page" not worth withholding: a business nobody
+  //            can find the door of doesn't upgrade, it leaves.
+  //
+  // Adding a PRIVATE column here means adding it to omitContactFields too,
+  // or it leaks by default. Adding a PUBLIC one means doing nothing — that
+  // asymmetry is the deliberate trade omitBillingFields already makes, and
+  // its comment explains why.
+  //
+  // `email` is a PUBLISHED "contact us" address and nothing else. It is not
+  // Account.email (the login credential — unique, proves identity) and it is
+  // not `domain` above (claim verification, never claimant-editable, feeds
+  // matchesBusinessDomain). This one is free text the owner types: not
+  // unique, not verified, and it must never be read by anything that
+  // authenticates or auto-approves a claim.
+  phone        String?
+  whatsapp     String?
+  email        String?
+  website      String?
+  address      String?
+  // One free-text string, deliberately not Json and not String[] — nothing
+  // queries or computes on opening hours (no "open now", no filter, no
+  // booking), and the real answers include "By appointment only", which a
+  // day-map can't hold without a free-text escape hatch anyway.
+  openingHours String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -48,8 +83,9 @@ model Business {
   // migrations/20260817120000_rename_membership_plans. Any change to this
   // union has to move VOUCH_CAP_BY_PLAN in lib/vouchCap.js in the same
   // commit — a value here with no entry there silently removes the cap —
-  // and PLAN_RANK in lib/entitlements.js, which ranks the plans for every
-  // yes/no feature gate.
+  // and PLAN_RANK in lib/entitlements.js, which is where the plan half of
+  // the contact gate (`contactDetails`) is ranked. lib/contactVisibility.js
+  // consumes that; it is the other reader of this column.
   membershipPlan String @default("free")
 
   // Null until the business first lands on a plan (set at claim approval).

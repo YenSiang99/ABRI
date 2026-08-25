@@ -18,7 +18,9 @@ import { VouchBadge } from "@/components/badge/VouchBadge";
 import { VouchListItem } from "@/components/app/VouchListItem";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
-import { updateBusinessProfile } from "@/lib/store/businesses";
+import { updateMyBusiness } from "@/lib/api/businesses";
+import { ContactDetails } from "@/components/business/ContactDetails";
+import { planAllows } from "@/lib/plans";
 import { toast } from "@/lib/toast";
 
 function Stat({ label, value }) {
@@ -35,29 +37,65 @@ function formatMemberSince(iso) {
   return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(iso));
 }
 
-function EditProfileDialog({ business }) {
+// Every field this dialog edits, and the empty-string default each one resets
+// to. All six contact columns are nullable, so "" is what an unset field looks
+// like in an input — and "" is also what the server reads as "clear it", which
+// makes the round trip symmetrical.
+const FIELDS = ["description", "phone", "whatsapp", "email", "website", "address", "openingHours"];
+
+function EditProfileDialog({ business, onSaved }) {
   const [open, setOpen] = useState(false);
-  const [description, setDescription] = useState(business.description);
-  const [services, setServices] = useState(business.services.join(", "));
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  function seed() {
+    const next = Object.fromEntries(FIELDS.map((f) => [f, business[f] ?? ""]));
+    next.services = business.services.join(", ");
+    return next;
+  }
 
   function onOpenChange(next) {
     setOpen(next);
     if (next) {
-      setDescription(business.description);
-      setServices(business.services.join(", "));
+      setForm(seed());
+      setError(null);
     }
   }
 
-  function save() {
-    updateBusinessProfile(business.id, {
-      description: description.trim(),
-      services: services
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    });
-    toast.success("Profile updated");
-    setOpen(false);
+  function set(field, value) {
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  // Async, and that is the fix rather than a detail. This used to be a
+  // synchronous call into a localStorage store that no screen read back — it
+  // toasted "Profile updated" and changed nothing, on every device. Now it
+  // awaits the PATCH, awaits refreshAccount() so the page reflects what the
+  // server actually stored (the server normalises: a WhatsApp number comes
+  // back as bare digits, a website gains its scheme), and only then closes.
+  //
+  // On failure the dialog STAYS OPEN with the server's message. Never toast
+  // success on a write that was rejected — that is the exact bug this
+  // replaces.
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await updateMyBusiness({
+        ...Object.fromEntries(FIELDS.map((f) => [f, form[f] ?? ""])),
+        services: (form.services ?? "")
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean),
+      });
+      await onSaved();
+      toast.success("Profile updated");
+      setOpen(false);
+    } catch (err) {
+      setError(err.message ?? "Couldn't save your profile.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -75,29 +113,109 @@ function EditProfileDialog({ business }) {
           <DialogDescription>This is what other members see on your public profile.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
           <div>
             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">About</label>
             <Textarea
               className="mt-2"
               rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={form.description ?? ""}
+              onChange={(e) => set("description", e.target.value)}
             />
           </div>
           <div>
             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Services (comma-separated)
             </label>
-            <Input className="mt-2" value={services} onChange={(e) => setServices(e.target.value)} />
+            <Input
+              className="mt-2"
+              value={form.services ?? ""}
+              onChange={(e) => set("services", e.target.value)}
+            />
           </div>
+
+          <div className="border-t border-border pt-4">
+            <div className="text-sm font-semibold text-foreground">Contact details</div>
+            {/* The honest statement of the gate, next to the inputs it
+                governs — not only in the pricing table. An owner filling
+                these in deserves to know who will actually see them. */}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Phone, WhatsApp and email are shown to logged-in members, on Plus and above.
+              Website, address and opening hours are public on every plan.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Phone</label>
+              <Input
+                className="mt-2"
+                placeholder="03-7955 1234"
+                value={form.phone ?? ""}
+                onChange={(e) => set("phone", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">WhatsApp</label>
+              <Input
+                className="mt-2"
+                placeholder="012-345 6789"
+                value={form.whatsapp ?? ""}
+                onChange={(e) => set("whatsapp", e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Contact email
+            </label>
+            <Input
+              className="mt-2"
+              placeholder="hello@yourcompany.my"
+              value={form.email ?? ""}
+              onChange={(e) => set("email", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Website</label>
+            <Input
+              className="mt-2"
+              placeholder="yourcompany.my"
+              value={form.website ?? ""}
+              onChange={(e) => set("website", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Address</label>
+            <Input
+              className="mt-2"
+              value={form.address ?? ""}
+              onChange={(e) => set("address", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Opening hours
+            </label>
+            <Textarea
+              className="mt-2"
+              rows={3}
+              placeholder={"Mon–Fri 9am–6pm\nSat 9am–1pm"}
+              value={form.openingHours ?? ""}
+              onChange={(e) => set("openingHours", e.target.value)}
+            />
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={save}>Save changes</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -107,6 +225,16 @@ function EditProfileDialog({ business }) {
 function Profile() {
   const { account, business, refreshAccount } = useAuth();
   const locked = business.tier === "T1";
+  // The owner always sees their own testimonials here (/auth/me is
+  // ungated) — this is only about what VISITORS get on the public profile.
+  const testimonialsHidden =
+    business.vouchCount > 0 && !planAllows(business.membershipPlan, "testimonials");
+  // Same shape as the line above, and the same reason: /auth/me is ungated, so
+  // the owner always sees their own contact details here. These two flags are
+  // only about what VISITORS get on the public profile.
+  const hasAnyContact = Boolean(business.phone || business.whatsapp || business.email);
+  const contactHidden = hasAnyContact && !planAllows(business.membershipPlan, "contactDetails");
+  const contactEmpty = !hasAnyContact && planAllows(business.membershipPlan, "contactDetails");
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -141,7 +269,7 @@ function Profile() {
               </div>
             </div>
           </div>
-          <EditProfileDialog business={business} />
+          <EditProfileDialog business={business} onSaved={refreshAccount} />
         </div>
 
         <div className="mt-6 grid gap-4 border-t border-border pt-6 sm:grid-cols-3">
@@ -152,7 +280,7 @@ function Profile() {
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Vouches Received</div>
             <div className="mt-1 text-sm text-foreground">
-              {locked ? "Unlocks after SSM verification" : `${business.vouches.length} peers`}
+              {locked ? "Unlocks after SSM verification" : `${business.vouchCount} peers`}
             </div>
           </div>
           <div>
@@ -165,7 +293,7 @@ function Profile() {
       <Tabs defaultValue="overview" className="mt-8">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="vouches">Vouches ({locked ? 0 : business.vouches.length})</TabsTrigger>
+          <TabsTrigger value="vouches">Vouches ({locked ? 0 : business.vouchCount})</TabsTrigger>
           <TabsTrigger value="card">NFC Card</TabsTrigger>
         </TabsList>
 
@@ -174,6 +302,31 @@ function Profile() {
             <h2 className="text-lg font-semibold tracking-tight text-foreground">About</h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{business.description}</p>
           </div>
+          {/* contactLocked false: this is the owner's own view, which is
+              never gated. The upsell below is what tells them the public
+              profile looks different. */}
+          <ContactDetails business={business} contactLocked={false} ownerView />
+
+          {/* The owner's side of the gate, and the one place selling it is
+              right — they're looking at the exact details visitors can't
+              see, so the gap is concrete rather than abstract. */}
+          {contactHidden && (
+            <LockedFeature
+              requiredPlan="plus"
+              title="Your contact details aren't shown to anyone"
+              description="You've added them, but nobody visiting your profile or tapping your card can see them."
+            />
+          )}
+          {/* The inverse nudge. On a paid plan an empty contact block is the
+              feature being wasted, and this is the only screen that can say
+              so — a visitor would just see a profile with no phone number. */}
+          {contactEmpty && (
+            <p className="text-sm text-muted-foreground">
+              Your plan shows your contact details to members — but you haven't added any yet. Use
+              Edit profile to add a phone number, WhatsApp or email.
+            </p>
+          )}
+
           <div className="rounded-2xl border border-border bg-card p-6">
             <h2 className="text-lg font-semibold tracking-tight text-foreground">Services</h2>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -187,6 +340,25 @@ function Profile() {
         </TabsContent>
 
         <TabsContent value="vouches" className="mt-6 grid gap-4 md:grid-cols-2">
+          {/* The upgrade pitch lives here and nowhere else. The owner is
+              the only person who should be sold this, and this is the one
+              screen where they're looking at the exact text that visitors
+              can't see — so the gap is concrete rather than abstract. */}
+          {/* The owner's side of the same gate a visitor meets on the public
+              profile — and the one place in the app where selling the
+              upgrade is the right thing to do, since it's their own page
+              that's being held back. */}
+          {!locked && testimonialsHidden && (
+            <div className="md:col-span-2">
+              <LockedFeature
+                requiredPlan="plus"
+                title="Your written vouches aren't shown"
+                description={`Visitors can see that you have ${business.vouchCount} ${
+                  business.vouchCount === 1 ? "vouch" : "vouches"
+                } — but not what any of them say.`}
+              />
+            </div>
+          )}
           {locked ? (
             <div className="md:col-span-2">
               <LockedFeature
@@ -194,7 +366,7 @@ function Profile() {
                 description="Vouches you receive will appear here once your SSM verification is complete."
               />
             </div>
-          ) : business.vouches.length > 0 ? (
+          ) : business.vouchCount > 0 ? (
             // onChanged was missing here, so "Vouch back" from this page
             // submitted fine but left the UI showing pre-submit state.
             business.vouches.map((v) => (

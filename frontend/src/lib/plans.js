@@ -47,7 +47,12 @@ const planPriceNote = {
 const PLAN_FEATURES = [
   { label: "Listed in the directory", free: true, plus: true, pro: true, enterprise: true },
   { label: "SSM-verified badge", free: false, plus: true, pro: true, enterprise: true },
-  { label: "Full editable profile", free: false, plus: true, pro: true, enterprise: true },
+  // Free, and nothing anywhere gates it: PATCH /businesses/me asks only for
+  // an approved claim. This row said `false` until Aug 2026, which made the
+  // table the only thing in the product claiming otherwise. Editing your own
+  // page is table stakes for being listed at all — what Plus buys is the
+  // contact block on it being VISIBLE (see the row below), not writable.
+  { label: "Full editable profile", free: true, plus: true, pro: true, enterprise: true },
   // GATED, in the UI only — see FEATURE_MIN_PLAN below and its counterpart
   // in backend/src/lib/entitlements.js. /app/card is shut to Free.
   { label: "NFC card", free: false, plus: "1 card", pro: "1 card", enterprise: "Per person" },
