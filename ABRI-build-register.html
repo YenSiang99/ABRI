@@ -1,0 +1,1125 @@
+<meta charset="utf-8">
+<title>ABRI Build Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style id="css">
+/* ─── Tokens: light is the base set, both dark states redefine only tokens ─── */
+:root {
+  --paper:      #F1F3F0;
+  --surface:    #FFFFFF;
+  --surface-2:  #E9EDEA;
+  --ink:        #10201C;
+  --ink-soft:   #3E514B;
+  --muted:      #66766F;
+  --rule:       #D8DFDB;
+  --rule-soft:  #E4E9E6;
+  --jade:       #0B6E52;
+  --jade-soft:  #DCEDE6;
+  --amber:      #9A6206;
+  --amber-soft: #F4E9D5;
+  --shadow:     0 1px 2px rgba(16,32,28,.05), 0 8px 24px -16px rgba(16,32,28,.22);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0D1513;
+    --surface:    #141F1C;
+    --surface-2:  #1B2825;
+    --ink:        #E7EDEA;
+    --ink-soft:   #B3C2BC;
+    --muted:      #7E8F88;
+    --rule:       #26332F;
+    --rule-soft:  #1E2B27;
+    --jade:       #45C39B;
+    --jade-soft:  #12332A;
+    --amber:      #E0A33C;
+    --amber-soft: #33270F;
+    --shadow:     0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:      #0D1513;
+  --surface:    #141F1C;
+  --surface-2:  #1B2825;
+  --ink:        #E7EDEA;
+  --ink-soft:   #B3C2BC;
+  --muted:      #7E8F88;
+  --rule:       #26332F;
+  --rule-soft:  #1E2B27;
+  --jade:       #45C39B;
+  --jade-soft:  #12332A;
+  --amber:      #E0A33C;
+  --amber-soft: #33270F;
+  --shadow:     0 1px 2px rgba(0,0,0,.3), 0 8px 24px -16px rgba(0,0,0,.7);
+}
+
+/* Own reset: after its first save this page ships as a complete document,
+   so it cannot rely on the host's reset still being there. */
+*, *::before, *::after { box-sizing: border-box; }
+body, h1, h2, h3, p, ul, ol, figure { margin: 0; }
+img, svg { max-width: 100%; }
+button { font: inherit; color: inherit; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: Archivo, ui-sans-serif, system-ui, sans-serif;
+  text-wrap: balance;
+  margin: 0;
+}
+
+a { color: var(--jade); }
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.wrap {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 2.5rem);
+}
+
+/* ─── Masthead ─── */
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+  padding: clamp(2.25rem, 6vw, 3.75rem) 0 clamp(1.75rem, 4vw, 2.5rem);
+}
+.eyebrow {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--jade);
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+}
+.eyebrow { margin: 0; }
+.eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+.masthead h1 {
+  font-size: clamp(2.25rem, 7vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -.035em;
+  line-height: 1.02;
+  margin: 1rem 0 .75rem;
+}
+.standfirst {
+  max-width: 44ch;
+  color: var(--ink-soft);
+  font-size: 1.0625rem;
+  margin: 0;
+}
+.stamp-meta {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.5rem;
+  font-size: .75rem;
+  color: var(--muted);
+}
+.stamp-meta b { color: var(--ink-soft); font-weight: 500; }
+
+/* ─── Overall tally ─── */
+.tally {
+  margin-top: 2rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--paper);
+  padding: 1.25rem 1.375rem 1.375rem;
+}
+.tally-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .5rem 1rem;
+  margin-bottom: .875rem;
+}
+.tally-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tally-figure {
+  font-family: Archivo, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.tally-figure small {
+  font-size: .8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.bar {
+  display: flex;
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+  gap: 2px;
+}
+.bar span { display: block; }
+.bar .seg-built   { background: var(--jade); }
+.bar .seg-partial { background: var(--amber); }
+.bar .seg-todo    { background: var(--rule); }
+
+.legend {
+  margin-top: .875rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1.375rem;
+  font-size: .8125rem;
+  color: var(--ink-soft);
+}
+.legend > span { display: inline-flex; align-items: center; gap: .5rem; }
+.legend b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Status glyphs — shape carries the state, not just hue */
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+.dot-built   { background: var(--jade); }
+.dot-partial { background: linear-gradient(90deg, var(--amber) 0 50%, transparent 50% 100%); box-shadow: inset 0 0 0 1.5px var(--amber); }
+.dot-todo    { box-shadow: inset 0 0 0 1.5px var(--muted); }
+
+/* ─── Sticky rail ─── */
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.rail-inner {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: .5rem 0;
+}
+.rail-inner::-webkit-scrollbar { display: none; }
+.rail a {
+  flex: none;
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-size: .8125rem;
+  font-weight: 500;
+  padding: .4rem .7rem;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.rail a:hover { background: var(--surface-2); color: var(--ink); }
+.filter {
+  flex: none;
+  margin-left: auto;
+  padding-left: .75rem;
+  display: flex;
+  gap: .25rem;
+  align-items: center;
+}
+.filter button {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: .35rem .6rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filter button:hover { color: var(--ink); border-color: var(--muted); }
+.filter button[aria-pressed="true"] {
+  background: var(--jade);
+  border-color: var(--jade);
+  color: var(--paper);
+}
+
+/* ─── Sections ─── */
+.tier { padding-top: clamp(2.5rem, 6vw, 4rem); }
+.tier-head {
+  border-top: 2px solid var(--ink);
+  padding-top: 1.125rem;
+  display: grid;
+  gap: 1.125rem;
+}
+.tier-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem .875rem;
+}
+.tier-head h2 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -.03em;
+}
+.price {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .8125rem;
+  color: var(--jade);
+  background: var(--jade-soft);
+  padding: .2rem .5rem;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.pitch { color: var(--muted); font-size: .9375rem; }
+.tier-note {
+  max-width: 60ch;
+  color: var(--ink-soft);
+  margin: 0;
+  font-size: .9375rem;
+}
+.tier-progress { display: grid; gap: .5rem; max-width: 34rem; }
+.tier-counts {
+  display: flex;
+  gap: 1rem;
+  font-size: .75rem;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.group-label {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 2rem 0 .25rem;
+}
+
+/* ─── Ledger rows ─── */
+.ledger { list-style: none; margin: 1.25rem 0 0; padding: 0; }
+.item {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  gap: 0 .875rem;
+  align-items: start;
+  padding: .875rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.item:first-child { border-top: 1px solid var(--rule-soft); }
+.item > .dot-btn { grid-column: 1; grid-row: 1; }
+.dot-btn {
+  appearance: none; -webkit-appearance: none;
+  background: none; border: 0; line-height: 0;
+  padding: .375rem; margin: .0625rem 0 0 -.375rem;
+  border-radius: 50%; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform .12s ease;
+}
+.dot-btn:hover:not(:disabled) { transform: scale(1.35); }
+.dot-btn:disabled { cursor: default; }
+
+.hint {
+  margin-top: .875rem;
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .8125rem; color: var(--muted);
+}
+.hint[hidden] { display: none; }
+.hint .dot { flex: none; }
+
+.ro-chip {
+  flex: none;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .625rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: .25rem .5rem; white-space: nowrap;
+}
+
+/* Save bar — built by script, never part of the saved source */
+.savebar {
+  position: fixed; z-index: 60; left: 50%; bottom: 1.25rem;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: .875rem;
+  max-width: calc(100vw - 2rem);
+  background: var(--ink); color: var(--paper);
+  border-radius: 999px;
+  padding: .4375rem .4375rem .4375rem 1.125rem;
+  box-shadow: 0 10px 34px -10px rgba(0,0,0,.5);
+  font-size: .875rem;
+  animation: rise .18s ease-out;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.savebar-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.savebar-msg { opacity: .75; }
+.savebar button {
+  appearance: none; border: 0; cursor: pointer;
+  border-radius: 999px; padding: .4rem .9rem;
+  font-size: .8125rem; font-weight: 600; white-space: nowrap;
+}
+.savebar .btn-save { background: var(--jade); color: var(--ink); }
+.savebar .btn-save:disabled { opacity: .55; cursor: default; }
+.savebar .btn-undo { background: transparent; color: var(--paper); opacity: .65; padding-inline: .5rem; }
+.savebar .btn-undo:hover { opacity: 1; }
+
+/* Fixed lists */
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+.chip {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .75rem;
+  background: var(--surface-2); color: var(--ink-soft);
+  border-radius: 3px; padding: .25rem .55rem;
+}
+.digest { margin-top: 1.5rem; border-left: 2px solid var(--jade); padding-left: 1.125rem; }
+.digest-title { font-weight: 600; margin-bottom: .5rem; }
+.digest ul { padding-left: 1.1rem; display: grid; gap: .25rem; color: var(--ink-soft); font-size: .9375rem; }
+.item-name {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  color: var(--ink);
+}
+.item-desc {
+  margin: .2rem 0 0;
+  color: var(--ink-soft);
+  font-size: .9375rem;
+  max-width: 66ch;
+}
+.item-desc code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .8125em;
+  background: var(--surface-2);
+  padding: .1em .35em;
+  border-radius: 3px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.item-desc em { color: var(--muted); }
+.item-desc b { color: var(--ink); font-weight: 600; }
+.tag {
+  grid-column: 3;
+  grid-row: 1;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .05em;
+  padding: .2rem .5rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  margin-top: .15rem;
+}
+.is-built   .tag { background: var(--jade-soft);  color: var(--jade); }
+.is-partial .tag { background: var(--amber-soft); color: var(--amber); }
+.is-todo    .tag { background: var(--surface-2);  color: var(--muted); }
+.is-built .item-name { color: var(--muted); }
+.is-built .item-name .marker { text-decoration: line-through; text-decoration-color: var(--rule); }
+
+.flag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .625rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 0 .3rem;
+  margin-left: .4rem;
+  vertical-align: 1px;
+}
+
+body.only-open .item.is-built { display: none; }
+
+.aside {
+  margin: 1.75rem 0 0;
+  border-left: 2px solid var(--rule);
+  padding: .125rem 0 .125rem 1rem;
+  color: var(--muted);
+  font-size: .9375rem;
+  max-width: 62ch;
+}
+
+/* ─── Build order ─── */
+.order { list-style: none; counter-reset: step; margin: 1.5rem 0 0; padding: 0; display: grid; gap: 0; }
+.step {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0 1rem;
+  padding: 1rem 0 1.125rem;
+  border-bottom: 1px solid var(--rule-soft);
+  position: relative;
+}
+.step:first-child { border-top: 1px solid var(--rule-soft); }
+.step::before {
+  content: counter(step, decimal-leading-zero);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-top: .1rem;
+}
+.step h3 { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
+.step p { margin: .25rem 0 0; color: var(--ink-soft); font-size: .9375rem; max-width: 62ch; }
+.step-now { background: var(--jade-soft); border-radius: 3px; padding-inline: .875rem; margin-inline: -.875rem; }
+.step-now::before { color: var(--jade); }
+.step-done h3 { color: var(--muted); }
+.step-done h3 .now-tag { color: var(--muted); }
+.now-tag {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .625rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--jade);
+  margin-left: .5rem;
+  vertical-align: 2px;
+}
+
+/* ─── Rules ─── */
+.cols { display: grid; gap: 1.5rem; grid-template-columns: 1fr; margin-top: 1.5rem; }
+@media (min-width: 46rem) { .cols { grid-template-columns: 1fr 1fr; gap: 2rem; } }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 1.25rem 1.375rem 1.5rem;
+  box-shadow: var(--shadow);
+}
+.card h3 {
+  font-size: .8125rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: .875rem;
+}
+.card ul { margin: 0; padding-left: 1.1rem; display: grid; gap: .5rem; }
+.card li { color: var(--ink-soft); font-size: .9375rem; }
+.card li b { color: var(--ink); font-weight: 600; }
+.card.warn { border-left: 2px solid var(--amber); }
+
+.table-scroll { overflow-x: auto; margin-top: 1.5rem; border: 1px solid var(--rule); border-radius: 3px; }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; background: var(--surface); }
+th, td { text-align: left; padding: .7rem .875rem; border-bottom: 1px solid var(--rule-soft); font-size: .875rem; }
+th {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: .6875rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  background: var(--surface-2);
+}
+tr:last-child td { border-bottom: 0; }
+td:nth-child(2), td:nth-child(3) { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+
+footer {
+  margin-top: 4rem;
+  border-top: 1px solid var(--rule);
+  padding: 1.75rem 0 3.5rem;
+  color: var(--muted);
+  font-size: .8125rem;
+}
+footer code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--ink-soft);
+}
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--jade);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+html { scroll-behavior: smooth; }
+[id] { scroll-margin-top: 4rem; }
+</style>
+
+<div id="page">
+<header class="masthead">
+  <div class="wrap">
+    <p class="eyebrow">ABRI · Build register</p>
+    <h1>What to build,<br>and what's already there.</h1>
+    <p class="standfirst">Every feature in plain words, in the order it should be built. Status checked against the repository, not against the plan.</p>
+
+    <div class="stamp-meta mono">
+      <span>Checked <b>19 Aug 2026</b></span>
+      <span>Source <b>ABRI-feature-checklist.md</b></span>
+      <span>Plans <b>Free → Plus → Pro → Enterprise</b></span>
+    </div>
+
+    <div class="tally">
+      <div class="tally-top">
+        <span class="tally-label">Overall</span>
+        <span class="tally-figure"><span id="pct">—</span>% <small>of 65 features built</small></span>
+      </div>
+      <div class="bar" id="bar-all" role="img" aria-label="Overall build progress">
+        <span class="seg-built"></span><span class="seg-partial"></span><span class="seg-todo"></span>
+      </div>
+      <div class="legend">
+        <span><i class="dot dot-built"></i> <b id="n-built">—</b> Built</span>
+        <span><i class="dot dot-partial"></i> <b id="n-partial">—</b> Partial</span>
+        <span><i class="dot dot-todo"></i> <b id="n-todo">—</b> To build</span>
+      </div>
+      <p class="hint" id="hint" hidden><i class="dot dot-partial"></i> Click any status dot to change it — To build → Partial → Built. Your changes save to this page for everyone with the link.</p>
+    </div>
+  </div>
+</header>
+
+<nav class="rail" aria-label="Sections">
+  <div class="wrap rail-inner">
+    <a href="#core">Core</a>
+    <a href="#plus">Plus</a>
+    <a href="#pro">Pro</a>
+    <a href="#enterprise">Enterprise</a>
+    <a href="#order">Build order</a>
+    <a href="#lists">Fixed lists</a>
+    <a href="#rules">Rules</a>
+    <span class="filter">
+      <button type="button" id="f-all" aria-pressed="true">All</button>
+      <button type="button" id="f-open" aria-pressed="false">Unfinished</button>
+    </span>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- ══ CORE ══ -->
+  <section class="tier" id="core" data-tier>
+    <div class="tier-head">
+      <div class="tier-title-row">
+        <h2>Core — the platform</h2>
+        <span class="price">Everyone</span>
+      </div>
+      <p class="tier-note">Works the same for every business. <b>Free is Core with limits</b>, so there's no separate Free list — where Free is capped, the cap is on the line.</p>
+      <div class="tier-progress">
+        <div class="bar" data-bar><span class="seg-built"></span><span class="seg-partial"></span><span class="seg-todo"></span></div>
+        <div class="tier-counts" data-counts></div>
+      </div>
+    </div>
+
+    <p class="group-label">Done</p>
+    <ul class="ledger">
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Sign up and log in</span></p><p class="item-desc">Email and password, stay logged in.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Claim your business</span></p><p class="item-desc">Find your listing, prove it by email, an admin approves. Rival claims get dropped.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Listings already there</span></p><p class="item-desc">22 businesses seeded as &ldquo;Unclaimed&rdquo; (T0) in <code>backend/prisma/seed.js</code>, so they exist before anyone signs up. Sample rows ported from the old frontend fixture, <b>not</b> a real registry import &mdash; the SSM data pull is still to do.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Public business page</span></p><p class="item-desc">Name, category, location, description, services, badges. Anyone can view it.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Edit your own page</span></p><p class="item-desc">The owner changes their own details, via <code>PATCH /businesses/me</code> (description, services and all six contact fields). Until Aug 2026 this was ticked but false: the dialog wrote to a localStorage store nothing read back, so it toasted &ldquo;Profile updated&rdquo; and changed nothing.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Browse and search</span></p><p class="item-desc">Every business, searchable by name and category, filterable by verification level. <b>Location is shown but not searched</b> &mdash; <code>GET /businesses</code> matches <code>name</code> and <code>category</code> only.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Verification badge</span></p><p class="item-desc">One badge, five levels: Listed, Claimed, SSM-Verified, and two for later.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Vouching</span></p><p class="item-desc">Write, send back for changes, accept, cancel, expire. Every version kept. Caps: <b>Free 3 &middot; Plus 20 &middot; Pro 40 &middot; Enterprise 100</b> per rolling 30 days (<code>backend/src/lib/vouchCap.js</code>). Receiving is unlimited on every plan. There is no &ldquo;ask for a vouch&rdquo; yet.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Report a bad vouch</span></p><p class="item-desc">Either side reports, the vouch freezes until an admin rules.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Admin review screens</span></p><p class="item-desc">Approve claims, rule on reported vouches.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Connections</span></p><p class="item-desc">Two businesses become linked, from a card tap or the directory.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Activity feed and unread count</span></p><p class="item-desc">"Someone vouched for you", "someone connected with you".</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">NFC tap page</span></p><p class="item-desc">Tapping a card opens that business&rsquo;s page. No account needed. An anonymous tapper sees the verification badge and is asked to log in or register &mdash; contact details sit behind the same door as the connection. The member&rsquo;s own card screen still renders tap counts and history from mock data; <b>no tap is recorded anywhere</b>.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">The plan field</span></p><p class="item-desc">Each business stores <code>free / plus / pro / enterprise</code>, when it started, when it runs out.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Founding-100 flag</span></p><p class="item-desc">Its own field (<code>isFoundingMember</code>), so a later upgrade or expiry can't erase it.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">One permission function</span></p><p class="item-desc"><code>can(business, feature)</code> in <code>backend/src/lib/entitlements.js</code>. Every locked feature asks this first; each new gate adds a line there. <code>testimonials</code> is enforced on the server. <code>nfcCard</code> and <code>introductions</code> are registered but shut in the UI only — neither has an endpoint yet.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Public pricing table</span></p><p class="item-desc">The four plans and what's in them, on the landing page.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Locked-feature screen</span></p><p class="item-desc">Says what the feature does, which plan includes it, and links to pricing. Introductions sit behind Pro and the NFC card behind Plus; the sidebar locks both. Where a business is behind on verification <em>and</em> plan, the verification message wins.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Change a business's plan</span></p><p class="item-desc">An admin sets the plan and an optional expiry from the claims screen (<code>POST /admin/businesses/:id/plan</code>). Founding status can't be stripped by it, and correcting only the expiry doesn't restart the membership. The expiry is <b>recorded, not enforced</b> — nothing downgrades on its own yet.</p></div><span class="tag">Built</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Contact details</span> <span class="flag">Biggest upgrade reason</span></p><p class="item-desc">Phone, WhatsApp and email are withheld unless the <em>owner</em> is on Plus or above <em>and</em> the viewer is logged in; website, address and opening hours are public on every plan. Stripped on the server by <code>publicBusinessView</code> in <code>backend/src/lib/accountView.js</code>; the rule lives in <code>backend/src/lib/contactVisibility.js</code>. A free account is enough to see a paying member&rsquo;s details — the viewer&rsquo;s plan is deliberately not part of the gate.</p></div><span class="tag">Built</span></li>
+    </ul>
+
+    <p class="group-label">Left to do</p>
+    <ul class="ledger">
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Ask for a vouch</p><p class="item-desc">A member requests a vouch instead of waiting to receive one. No endpoint, no UI &mdash; the &ldquo;Requests&rdquo; tab is inbound in-flight vouches, not asks.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Delete the last of the mock data</p><p class="item-desc"><code>frontend/src/data/appMockData.js</code> (introduction lists, the sidebar introductions badge, NFC tap stats), the dashboard&rsquo;s hardcoded &ldquo;47 profile views&rdquo; and pre-ticked verification steps, and <code>frontend/src/lib/store/*</code> with <code>data/businesses.js</code>. Each one currently looks like a working feature.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Search ranking by plan</p><p class="item-desc">Paid members above free ones.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Connection cap for Free</p><p class="item-desc">Sending is uncapped today; it shouldn't be.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Follow a business</p><p class="item-desc">Watch a business without connecting. One-way, no approval.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">"Get verified" prompt</p><p class="item-desc">A permanent banner on a free member's own dashboard.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Sending WhatsApp messages</p><p class="item-desc">One shared pipe. Every alert, digest and reminder below uses it, so build it once and well.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Payment and renewal</p><p class="item-desc">Take the money, set the expiry, remind before it runs out, drop to Free if unpaid.</p></div><span class="tag">To build</span></li>
+    </ul>
+  </section>
+
+  <!-- ══ PLUS ══ -->
+  <section class="tier" id="plus" data-tier>
+    <div class="tier-head">
+      <div class="tier-title-row">
+        <h2>Plus</h2>
+        <span class="price">RM490 / year</span>
+        <span class="pitch">"People can trust me."</span>
+      </div>
+      <p class="tier-note">Proof the business is real, and a reason to open the app each week. This is the volume tier — most paying members should sit here.</p>
+      <div class="tier-progress">
+        <div class="bar" data-bar><span class="seg-built"></span><span class="seg-partial"></span><span class="seg-todo"></span></div>
+        <div class="tier-counts" data-counts></div>
+      </div>
+    </div>
+
+    <ul class="ledger">
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Testimonials shown</span></p><p class="item-desc">The written vouches appear on the page. Free sees the count ("12 vouches"), not the words. Server-enforced.</p></div><span class="tag">Built</span></li>
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">SSM verification</p><p class="item-desc">Member submits their registration number, ABRI checks it and matches a director's name, badge goes up a level. The status screen exists (<code>frontend/src/pages/app/Verify.jsx</code>); there's no way to submit and no admin queue.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">Full business page</p><p class="item-desc">Logo, longer description, website, opening hours. Basic fields exist, the richer ones don't.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">NFC card ×1</p><p class="item-desc">The physical card. The tap page is built; ordering, printing and posting are not.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">Search filters</p><p class="item-desc">Narrow by category, location, industry, verification level.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-built"><button type="button" class="dot-btn"><i class="dot dot-built"></i></button><div><p class="item-name"><span class="marker">Your contact details visible</span></p><p class="item-desc">Be seen: a Plus member&rsquo;s phone, WhatsApp and email are shown to logged-in members; on Free they are withheld from everyone. Seeing <em>other</em> members&rsquo; details needs no plan — the viewer-side half of the old wording was deliberately not built.</p></div><span class="tag">Built</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Milestone badges</p><p class="item-desc">First Vouch, 5 Vouches, Trusted Business at 10. Counted from vouches they already have.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Shareable milestone image</p><p class="item-desc">Sized for LinkedIn and WhatsApp status. Cheap, and every share is free advertising.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Who viewed my page</p><p class="item-desc">A list of businesses that opened their profile, newest first.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">View alert on WhatsApp</p><p class="item-desc">A message when someone views them. Needs a daily cap or it becomes noise.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Weekly summary on WhatsApp</p><p class="item-desc">Views, new vouches, new connections. Built from activity already recorded.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Save a business</p><p class="item-desc">A bookmark list.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Save a search</p><p class="item-desc">Re-run a common search with one tap.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Ranked above Free in search</p><p class="item-desc">The other half of Core's ranking work.</p></div><span class="tag">To build</span></li>
+    </ul>
+  </section>
+
+  <!-- ══ PRO ══ -->
+  <section class="tier" id="pro" data-tier>
+    <div class="tier-head">
+      <div class="tier-title-row">
+        <h2>Pro</h2>
+        <span class="price">RM1,490 / year</span>
+        <span class="pitch">"The network brings me business."</span>
+      </div>
+      <p class="tier-note">The tools that turn a directory into leads. This tier has to survive <em>"what did I get for my money?"</em> — which is why the referral tracker comes first.</p>
+      <div class="tier-progress">
+        <div class="bar" data-bar><span class="seg-built"></span><span class="seg-partial"></span><span class="seg-todo"></span></div>
+        <div class="tier-counts" data-counts></div>
+      </div>
+    </div>
+
+    <ul class="ledger">
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Referral tracker <span class="flag">Build first</span></p><p class="item-desc">A table the member fills in: who I sent, to whom, when, and whether it became work (Pending / Won / Not pursued). Four buttons: add, edit, mark won, mark not pursued. <b>Two features below are only ways of reading it.</b></p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Referral summary</p><p class="item-desc">The same table read back as numbers: sent, received, how many became work, who your best partner is. A screen over the tracker, not a second product.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">"Looking for" and "Can offer" tags</p><p class="item-desc">Pick from a fixed list: looking for customers, suppliers, distributors, investors, partners; offering accounting, legal, IT, logistics. Fixed list, not free text, or matching won't work.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Requests board</p><p class="item-desc">Post "Looking for a corporate secretary in KL"; other members reply. Free and Plus can read it and not reply.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Suggested matches</p><p class="item-desc">Businesses whose "can offer" lines up with your "looking for", in your area and industry, best overlap first. Tag overlap, no AI. <em>This one screen is everything the old docs called opportunity matching, smart introductions, referral matching, the recommendation engine and priority matching.</em></p></div><span class="tag">To build</span></li>
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">Real introductions</p><p class="item-desc">Pick two businesses, write one line on why they should talk, both get a WhatsApp. The screen is built but runs on fake data (<code>frontend/src/data/appMockData.js</code>); it needs a real table and real messages.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Introduction count on your page</p><p class="item-desc">"Made 12 introductions". A public number that rewards being useful.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Enquiry inbox</p><p class="item-desc">One screen holding every reply to your requests and every introduction sent to you.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Follow-up reminder</p><p class="item-desc">Put a date on a referral or enquiry, get a WhatsApp that day.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Business card scanner <span class="flag">Daily habit</span></p><p class="item-desc">Photograph a paper card, we read the company name and say whether they're on ABRI and verified, with a button to connect or invite. Every scan saved. This is what gets the app opened on an ordinary Tuesday.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Full page statistics</p><p class="item-desc">Views over time, which industries looked, card taps, vouches over time.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Badge for their website</p><p class="item-desc">A "Verified on ABRI" image with a live vouch count. Every member's site becomes a link back.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Written weekly summary</p><p class="item-desc">Monday WhatsApp in plain language: <em>"You sent 4 referrals and received 3. Two turned into work. You're 3 vouches from Trusted Business."</em></p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Introduction writer</p><p class="item-desc">Three boxes (who, who, why), out comes a polished message. Cheapest thing on this list.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Top of search results</p><p class="item-desc">Above Plus, above Free.</p></div><span class="tag">To build</span></li>
+    </ul>
+
+    <p class="aside"><b>Not on this list on purpose: CRM-lite.</b> What people want from those words is the referral tracker, the follow-up reminder and the enquiry inbox — all three are already here. A real CRM competes with tools your members already pay for.</p>
+  </section>
+
+  <!-- ══ ENTERPRISE ══ -->
+  <section class="tier" id="enterprise" data-tier>
+    <div class="tier-head">
+      <div class="tier-title-row">
+        <h2>Enterprise</h2>
+        <span class="price">from RM3,500 / year</span>
+        <span class="pitch">"One account for my whole organisation."</span>
+      </div>
+      <p class="tier-note">Everything in Pro, for many people at once. Sold to firms with staff, and to associations and chambers who want a private verified member list.</p>
+      <div class="tier-progress">
+        <div class="bar" data-bar><span class="seg-built"></span><span class="seg-partial"></span><span class="seg-todo"></span></div>
+        <div class="tier-counts" data-counts></div>
+      </div>
+    </div>
+
+    <p class="aside"><b>Build nothing here until someone has signed.</b> Every item is a week or more, and none of it helps a single-person member. It's on this list so it can be quoted in a sales conversation.</p>
+
+    <ul class="ledger">
+      <li class="item is-partial"><button type="button" class="dot-btn"><i class="dot dot-partial"></i></button><div><p class="item-name">Several people under one business</p><p class="item-desc">The database already allows it (<code>Account.businessId</code>); the app assumes one person per business.</p></div><span class="tag">Partial</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Roles</p><p class="item-desc">Owner, Admin, Member. Who edits the page, who vouches on its behalf, who pays.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Invite a colleague</p><p class="item-desc">An email invite that joins the existing company instead of creating a new one.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Team dashboard</p><p class="item-desc">Every staff member's vouches, connections and referrals in one screen.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Team statistics</p><p class="item-desc">Which staff member actually generates business relationships.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">One NFC card per staff member</p><p class="item-desc">Bulk ordering against one account.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Bulk verification</p><p class="item-desc">An association uploads its member list as a spreadsheet, verified as a batch.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">White-label</p><p class="item-desc">Sold as one word, built as five: private directory · private requests board · their logo and colours · their own web address · ABRI branding removed.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">Fast-track verification</p><p class="item-desc">Their members jump the SSM queue. Mostly an admin setting.</p></div><span class="tag">To build</span></li>
+      <li class="item is-todo"><button type="button" class="dot-btn"><i class="dot dot-todo"></i></button><div><p class="item-name">API access</p><p class="item-desc">Another system reads the verified member list. Only build it when a partner has asked in writing.</p></div><span class="tag">To build</span></li>
+    </ul>
+
+    <p class="aside">A named contact and guided setup are also part of Enterprise, but they're people, not software.</p>
+  </section>
+
+  <!-- ══ BUILD ORDER ══ -->
+  <section class="tier" id="order">
+    <div class="tier-head">
+      <div class="tier-title-row"><h2>Build order</h2></div>
+      <p class="tier-note">Each block is worth shipping on its own. Don't start one before the block above it is done — later features read data earlier ones create.</p>
+    </div>
+
+    <ol class="order">
+      <li class="step step-done">
+        <div>
+          <h3>Make plans real <span class="now-tag">Done</span></h3>
+          <p>Plan field, permission function, vouch caps, the locked-feature screen and admin plan changes. A plan can now be sold and fulfilled by hand.</p>
+        </div>
+      </li>
+      <li class="step step-now"><div><h3>Make Plus worth RM490 <span class="now-tag">You are here</span></h3><p>SSM verification flow, contact details hidden/shown, milestone badges, search ranking. Testimonials and the NFC card gate are done — <b>contact details is the one left that a member actually feels</b>, and it's the biggest single reason to upgrade.</p></div></li>
+      <li class="step"><div><h3>Turn on messages</h3><p>WhatsApp sending, then view alerts and the weekly summary on top of it. One pipe, several uses — it's what makes membership felt between logins.</p></div></li>
+      <li class="step"><div><h3>Referral tracker</h3><p>The first Pro feature and the highest-leverage item on the whole list; the referral summary and the written weekly summary are both just readings of this table.</p></div></li>
+      <li class="step"><div><h3>Tags and the requests board</h3><p>Looking for / can offer, post, reply, tag matching. This is the part that generates actual leads.</p></div></li>
+      <li class="step"><div><h3>Real introductions</h3><p>Replace the fake data, send the WhatsApp to both sides, show the count on the profile.</p></div></li>
+      <li class="step"><div><h3>Card scanner</h3><p>The daily-habit feature. Build it once Pro is already worth buying.</p></div></li>
+      <li class="step"><div><h3>Statistics and the written features</h3><p>Page statistics, website badge, Monday summary, introduction writer.</p></div></li>
+      <li class="step"><div><h3>Enterprise</h3><p>Only with a signed customer, and only the parts that customer asked for.</p></div></li>
+    </ol>
+  </section>
+
+  <!-- ══ FIXED LISTS ══ -->
+  <section class="tier" id="lists">
+    <div class="tier-head">
+      <div class="tier-title-row"><h2>Fixed lists</h2></div>
+      <p class="tier-note">Build input, not strategy. Matching is tag overlap, so both sides have to pick from a closed list — free text breaks it. This is the only copy of these lists.</p>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>I am looking for</h3>
+        <div class="chips">
+          <span class="chip">Customers</span><span class="chip">Suppliers</span><span class="chip">Distributors</span><span class="chip">Investors</span><span class="chip">Partners</span><span class="chip">Employees</span><span class="chip">Service providers</span><span class="chip">Export partners</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>I can offer</h3>
+        <div class="chips">
+          <span class="chip">Accounting</span><span class="chip">Legal</span><span class="chip">Manufacturing</span><span class="chip">IT</span><span class="chip">Marketing</span><span class="chip">Logistics</span><span class="chip">Financing</span><span class="chip">Consulting</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>A request can be posted under</h3>
+        <div class="chips">
+          <span class="chip">Customer requirement</span><span class="chip">Supplier requirement</span><span class="chip">Partnership</span><span class="chip">Distribution</span><span class="chip">Export</span><span class="chip">Service requirement</span><span class="chip">Collaboration</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>The weekly summary, in shape</h3>
+        <div class="digest">
+          <p class="digest-title">Your ABRI Weekly</p>
+          <ul>
+            <li>5 businesses you should know</li>
+            <li>3 potential customers</li>
+            <li>2 suppliers matching your needs</li>
+            <li>4 new businesses in your industry</li>
+            <li>1 introduction opportunity</li>
+          </ul>
+        </div>
+        <p class="tier-note" style="margin-top:1rem">Rule-based, not written by a model. The Pro version is the same data put into sentences.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ RULES ══ -->
+  <section class="tier" id="rules">
+    <div class="tier-head">
+      <div class="tier-title-row"><h2>Rules</h2></div>
+      <p class="tier-note">The boundaries that keep the product from drifting. These aren't features and they aren't up for negotiation per-release.</p>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>Never build</h3>
+        <ul>
+          <li><b>Accounting software</b> — competes with QuickBooks, Wave, SQL, AutoCount. Outside core value.</li>
+          <li><b>Full CRM</b> — members already have one.</li>
+          <li><b>Payment processing</b> — needs BNM licensing. Only via a licensed partner, much later.</li>
+          <li><b>A marketplace, escrow, or procurement platform</b> — needs transaction volume that won't exist for years.</li>
+          <li><b>AI matching</b> — needs data density the directory won't have for a long time. Tag overlap until then.</li>
+          <li><b>Paid "featured" placement</b> — you're selling "verified businesses rank higher"; selling the top slot separately contradicts that on the same screen.</li>
+          <li><b>More than four tiers</b> — too many value propositions to sell at once.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Non-negotiable, every tier</h3>
+        <ul>
+          <li><b>No advertising, ever</b> — not in any tier, at any price. It contradicts the trust brand.</li>
+          <li><b>Member data is never sold</b> — the badge's credibility is worth more than any data revenue.</li>
+          <li><b>Vouch integrity</b> — only verified members can vouch. Fake vouching means termination.</li>
+          <li><b>Verification cannot be bought</b> — SSM verification is the gate to Plus and Pro. You cannot pay your way to a verified badge.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th scope="col">Feature</th><th scope="col">Effort</th><th scope="col">Third-party cost</th></tr></thead>
+        <tbody>
+          <tr><td>Business card scanner</td><td>2–3 weeks, 1 dev</td><td>~USD 0.0015 / scan (OCR)</td></tr>
+          <tr><td>Referral tracker + summary</td><td>3–4 weeks</td><td>none</td></tr>
+          <tr><td>Written weekly summary</td><td>~1 week on top of the tracker</td><td>~USD 0.01 / member / week</td></tr>
+          <tr><td>Introduction writer</td><td>~1 week</td><td>~USD 0.005 / introduction</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cols">
+      <div class="card warn">
+        <h3>Two calls worth revisiting</h3>
+        <ul>
+          <li><b>Free can give 3 vouches a month.</b> An earlier draft said Free can't vouch at all. A small allowance is better — vouches are what make the directory worth reading. One number in <code>vouchCap.js</code> to reverse.</li>
+          <li><b>No AI in matching.</b> Tag overlap only. The two AI features are the written weekly summary and the introduction writer; neither holds up the price alone, so if they slip nothing breaks.</li>
+        </ul>
+      </div>
+      <div class="card warn">
+        <h3>One live risk</h3>
+        <ul>
+          <li>The public pricing table (<code>frontend/src/lib/plans.js</code>) still promises rows that <b>aren't enforced</b> — search ranking, requests board, view alerts. Vouch caps and testimonials are enforced on the server; the NFC card and introductions are shut in the UI only, since neither has an endpoint. Everything else on that table becomes a promise the moment you take payment.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Companion to <code>ABRI-feature-checklist.md</code> in the repo. Strategy, positioning, the financial model and stage gates live in <code>ABRI-master-blueprint.md</code>.
+  </footer>
+</main>
+</div>
+
+<script id="app">
+(function () {
+  "use strict";
+
+  var STATES = ["todo", "partial", "built"];
+  var LABEL  = { todo: "To build", partial: "Partial", built: "Built" };
+
+  var page  = document.getElementById("page");
+  var items = Array.prototype.slice.call(page.querySelectorAll(".item"));
+
+  // ── state lives in the DOM ────────────────────────────────────────────
+  // The row's class IS the record. Nothing is mirrored into a JS object,
+  // so serialising the page for a save can never disagree with what the
+  // reader is looking at.
+  function stateOf(el) {
+    if (el.classList.contains("is-built"))   return "built";
+    if (el.classList.contains("is-partial")) return "partial";
+    return "todo";
+  }
+
+  function setState(el, next) {
+    el.classList.remove("is-built", "is-partial", "is-todo");
+    el.classList.add("is-" + next);
+    el.querySelector(".dot").className = "dot dot-" + next;
+    el.querySelector(".tag").textContent = LABEL[next];
+    var btn = el.querySelector(".dot-btn");
+    if (btn) {
+      var name = el.querySelector(".item-name").textContent.trim();
+      btn.setAttribute("aria-label", name + " — " + LABEL[next] + ". Change status.");
+      btn.title = LABEL[next];
+    }
+  }
+
+  var baseline = items.map(stateOf);
+  function changed() {
+    return items.filter(function (el, i) { return stateOf(el) !== baseline[i]; });
+  }
+
+  // ── counts, read off the DOM so they cannot drift from the rows ───────
+  function tally(root) {
+    return {
+      built:   root.querySelectorAll(".item.is-built").length,
+      partial: root.querySelectorAll(".item.is-partial").length,
+      todo:    root.querySelectorAll(".item.is-todo").length
+    };
+  }
+  function paint(bar, t) {
+    var total = t.built + t.partial + t.todo || 1;
+    bar.children[0].style.flexBasis = (t.built   / total * 100) + "%";
+    bar.children[1].style.flexBasis = (t.partial / total * 100) + "%";
+    bar.children[2].style.flexBasis = (t.todo    / total * 100) + "%";
+  }
+  function refresh() {
+    var all = tally(page);
+    var total = all.built + all.partial + all.todo;
+    document.getElementById("n-built").textContent   = all.built;
+    document.getElementById("n-partial").textContent = all.partial;
+    document.getElementById("n-todo").textContent    = all.todo;
+    document.getElementById("pct").textContent = Math.round(all.built / total * 100);
+    document.querySelector(".tally-figure small").textContent = "of " + total + " features built";
+    paint(document.getElementById("bar-all"), all);
+
+    page.querySelectorAll("[data-tier]").forEach(function (section) {
+      var t = tally(section);
+      paint(section.querySelector("[data-bar]"), t);
+      section.querySelector("[data-counts]").innerHTML =
+        "<span>" + t.built + " built</span><span>" + t.partial +
+        " partial</span><span>" + t.todo + " to build</span>";
+    });
+  }
+
+  // ── filter (view-only, never saved) ───────────────────────────────────
+  var fAll  = document.getElementById("f-all");
+  var fOpen = document.getElementById("f-open");
+  function setFilter(openOnly) {
+    document.body.classList.toggle("only-open", openOnly);
+    fAll.setAttribute("aria-pressed", String(!openOnly));
+    fOpen.setAttribute("aria-pressed", String(openOnly));
+  }
+  fAll.addEventListener("click", function () { setFilter(false); });
+  fOpen.addEventListener("click", function () { setFilter(true); });
+
+  // ── serialising the page back into a complete document ────────────────
+  // Never document.documentElement.outerHTML: that carries the viewer's
+  // session state and the runtime scripts the shell injected. #page, #css
+  // and #app are the authored source, and they are all still in the DOM.
+  var HEAD = [
+    '<meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>ABRI Build Register</title>',
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">'
+  ].join("\n");
+
+  function fullDocument() {
+    var clone = page.cloneNode(true);
+    // Strip this viewer's session-only state so a save records the
+    // checklist and nothing about who happened to save it.
+    clone.querySelectorAll(".dot-btn").forEach(function (b) { b.removeAttribute("disabled"); });
+    var a = clone.querySelector("#f-all"), o = clone.querySelector("#f-open");
+    if (a) a.setAttribute("aria-pressed", "true");
+    if (o) o.setAttribute("aria-pressed", "false");
+    var h = clone.querySelector("#hint");
+    if (h) h.setAttribute("hidden", "");
+
+    return '<!doctype html>\n<html lang="en">\n<head>\n' + HEAD +
+      '\n<style id="css">' + document.getElementById("css").textContent + '</style>\n</head>\n<body>\n' +
+      clone.outerHTML +
+      '\n<script id="app">' + document.getElementById("app").textContent + '<\/script>\n</body>\n</html>';
+  }
+
+  // ── save bar, built here so it is never part of the saved source ──────
+  var bar, countEl, saveBtn, undoBtn, msgEl;
+  function buildBar() {
+    bar = document.createElement("div");
+    bar.className = "savebar";
+    bar.hidden = true;
+    countEl = document.createElement("span"); countEl.className = "savebar-count";
+    msgEl   = document.createElement("span"); msgEl.className = "savebar-msg";
+    undoBtn = document.createElement("button"); undoBtn.type = "button";
+    undoBtn.className = "btn-undo"; undoBtn.textContent = "Undo all";
+    saveBtn = document.createElement("button"); saveBtn.type = "button";
+    saveBtn.className = "btn-save"; saveBtn.textContent = "Save";
+    bar.append(countEl, msgEl, undoBtn, saveBtn);
+    document.body.appendChild(bar);
+
+    undoBtn.addEventListener("click", function () {
+      items.forEach(function (el, i) { setState(el, baseline[i]); });
+      refresh(); syncBar();
+    });
+    saveBtn.addEventListener("click", save);
+  }
+  function syncBar() {
+    var n = changed().length;
+    bar.hidden = n === 0;
+    countEl.textContent = n === 1 ? "1 change" : n + " changes";
+    msgEl.textContent = "";
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save";
+  }
+  function say(text) { if (msgEl) msgEl.textContent = text; }
+
+  // ── permission ────────────────────────────────────────────────────────
+  var api = null;
+
+  function goEditable(a) {
+    api = a;
+    items.forEach(function (el) {
+      var btn = el.querySelector(".dot-btn");
+      if (!btn) return;
+      btn.disabled = false;
+      setState(el, stateOf(el));            // fills in aria-label / title
+      btn.addEventListener("click", function () {
+        setState(el, STATES[(STATES.indexOf(stateOf(el)) + 1) % STATES.length]);
+        refresh(); syncBar();
+      });
+    });
+    document.getElementById("hint").hidden = false;
+    buildBar();
+  }
+
+  function goReadOnly() {
+    items.forEach(function (el) {
+      var btn = el.querySelector(".dot-btn");
+      if (btn) btn.disabled = true;
+    });
+    document.getElementById("hint").hidden = true;
+    if (bar) bar.hidden = true;
+    if (!document.querySelector(".ro-chip")) {
+      var chip = document.createElement("span");
+      chip.className = "ro-chip";
+      chip.textContent = "Read only";
+      document.querySelector(".filter").prepend(chip);
+    }
+  }
+
+  function save() {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+    say("");
+    api.publish(fullDocument()).then(function () {
+      // The shell reloads every open view to the new version, this one
+      // included — the reloaded page already carries the saved state.
+      say("Saved.");
+    }, function (err) {
+      var code = err && err.code;
+      if (code === "conflict") {
+        say("Someone saved first — reloading to their version.");
+      } else if (code === "not_writer" || code === "not_granted" ||
+                 code === "not_declared" || code === "consent_required" ||
+                 code === "capability_disabled" || code === "capability_removed") {
+        goReadOnly();
+      } else if (code === "rate_limited") {
+        say("Saving too often — wait a moment.");
+        saveBtn.disabled = false; saveBtn.textContent = "Save";
+      } else if (code === "too_large") {
+        say("Page too large to save.");
+      } else {
+        say("Couldn't save.");
+        saveBtn.disabled = false; saveBtn.textContent = "Try again";
+      }
+    });
+  }
+
+  refresh();
+
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("artifact").then(function (a) {
+      if (a && typeof a.publish === "function") { goEditable(a); } else { goReadOnly(); }
+    }, goReadOnly);
+  } else {
+    goReadOnly();
+  }
+})();
+</script>
