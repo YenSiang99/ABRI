@@ -13,6 +13,7 @@ import {
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
+import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { existingVouchTo } from "@/lib/vouchRules";
 import { flagUnfairCancel } from "@/lib/api/vouches";
@@ -92,6 +93,12 @@ function VouchListItem({ vouch, mode, onChanged }) {
   const [vouchBackOpen, setVouchBackOpen] = useState(false);
   const [vouchAgainOpen, setVouchAgainOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
+  // Both remaining ways into a fresh vouch from this screen: "Vouch back" on
+  // one you received, "Vouch again" on one that was cancelled. Same gate as
+  // the directory's Vouch button and the Vouches page's — a Free member can
+  // reach the pitch from wherever the thought occurs to them, and hears the
+  // same sentence each time (components/app/UpgradePrompt.jsx owns the copy).
+  const vouchGate = useUpgradeGate("giveVouch");
 
   const other =
     vouch.counterparty ??
@@ -169,7 +176,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
                     : "Your vouch for them is in progress"}
               </span>
             ) : (
-              <Button size="sm" onClick={() => setVouchBackOpen(true)}>
+              <Button size="sm" onClick={vouchGate.guard(() => setVouchBackOpen(true))}>
                 Vouch back
               </Button>
             )}
@@ -177,7 +184,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
         )}
         {closed && (
           <>
-            <Button size="sm" onClick={() => setVouchAgainOpen(true)}>
+            <Button size="sm" onClick={vouchGate.guard(() => setVouchAgainOpen(true))}>
               Vouch again
             </Button>
             {/* Only for an actual cancellation — there's nobody to hold
@@ -194,6 +201,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
       {mode === "received" && !reciprocal && (
         <VouchDialog open={vouchBackOpen} onOpenChange={setVouchBackOpen} targetBusiness={other} onSuccess={onChanged} />
       )}
+      <UpgradePrompt gate={vouchGate} />
       {closed && (
         <>
           <VouchDialog

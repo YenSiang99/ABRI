@@ -22,7 +22,15 @@ function errorHandler(err, req, res, next) {
     return res.status(409).json({ error: "That record is still referenced by something else." });
   }
   if (err.status) {
-    return res.status(err.status).json({ error: err.message });
+    return res.status(err.status).json({
+      error: err.message,
+      // Only set by a paywall throw (failUpgrade in routes/vouches.js), and
+      // the reason those are 402s rather than 403s: the client shows an
+      // upgrade prompt naming this plan instead of toasting the message.
+      // Keyed off the field rather than off the status so a future 402 that
+      // isn't a plan gate can't accidentally open a pricing dialog.
+      ...(err.upgradeRequired ? { upgradeRequired: err.upgradeRequired } : {}),
+    });
   }
 
   res.status(500).json({ error: "Something went wrong." });

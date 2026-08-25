@@ -30,6 +30,13 @@ async function apiFetch(path, { method = "GET", body } = {}) {
   if (!res.ok) {
     throw Object.assign(new Error(data?.error ?? "Something went wrong. Please try again."), {
       status: res.status,
+      // Present only on a plan gate (a 402 from backend's failUpgrade), and
+      // carried through so a caller can open an upgrade prompt instead of
+      // toasting. Most call sites don't need it: components/app/UpgradePrompt
+      // catches these before the request is made. It's here for the ones that
+      // can't — a plan that lapsed mid-session, or a gate the client hasn't
+      // mirrored — where the alternative is a toast that reads like a fault.
+      upgradeRequired: data?.upgradeRequired,
     });
   }
   return data;

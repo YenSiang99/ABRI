@@ -23,6 +23,17 @@ const FEATURE_MIN_PLAN = {
   // Third parties see the vouch COUNT on every plan; only paid plans show
   // the words. See ABRI-feature-checklist.md's Free tier: "'12 vouches' is
   // visible, the written words are not."
+  //
+  // Looks dead now that `acceptVouch` stops a Free business ever publishing
+  // a vouch — a Free profile has nothing for this to hide. It isn't. This is
+  // the DOWNGRADE path, and it's the only thing that makes a downgrade mean
+  // anything: a business that published 12 vouches on Plus and then lapses
+  // to Free keeps the count on its page and loses the words. Without this
+  // gate, cancelling Plus would cost them nothing they could see.
+  //
+  // That path is one admin click away today (POST /admin/businesses/:id/plan)
+  // and becomes automatic the moment planExpiresAt starts being enforced.
+  // Don't remove this as unreachable — it's the thing that will be reached.
   testimonials: "plus",
 
   // The OWNER's plan half of the contact gate — the second server-enforced
@@ -36,6 +47,25 @@ const FEATURE_MIN_PLAN = {
   // about which business it was asking about.
   contactDetails: "plus",
 
+  // The two halves of the vouch paywall, and the shape of the Free tier.
+  // A Free business may RECEIVE a vouch request in full — the row is
+  // created, the activity event fires, the card appears in their queue —
+  // and may not move it. That is deliberate: the request sitting there
+  // unanswerable is the pitch, and a gate that hid it would throw the pitch
+  // away to save the member a disappointment.
+  //
+  // Two features rather than one `vouching`, because they are enforced at
+  // opposite ends of the state machine (POST /vouches vs POST
+  // /vouches/:id/accept) and each reads at its own call site as the
+  // question actually being asked.
+  //
+  // NOT gated, on purpose: cancel and flag. A member must always be able to
+  // get rid of a vouch they don't want and to report an abusive one —
+  // paywalling either would make "pay us" the only way out of content
+  // somebody else put in front of you. `acceptVouch` covers revert too,
+  // since reverting is a step towards publishing and nothing else.
+  giveVouch: "plus",
+  acceptVouch: "plus",
 
   // DECLARED HERE, ENFORCED ONLY IN THE UI — for now. There is no server
   // endpoint: the card screen reads frontend/src/data/appMockData.js, which

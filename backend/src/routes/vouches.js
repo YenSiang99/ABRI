@@ -7,6 +7,7 @@ import { vouchCapFor, vouchCapWindowStart } from "../lib/vouchCap.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
 import { applyExpiryIfNeeded } from "../lib/vouchExpiry.js";
 import { hasTurn, roleFor, serializeVouch, VOUCH_INCLUDE } from "../lib/vouchTurn.js";
+import { can } from "../lib/entitlements.js";
 
 const router = Router();
 
@@ -46,6 +47,20 @@ function fail(status, message) {
   throw Object.assign(new Error(message), { status });
 }
 
+// The paywall's throw, and deliberately not just a fail(403). 403 is "you
+// may never" — what an unverified tier gets — and this is a door with a
+// price on it. The 402 plus `upgradeRequired` is what lets the client open
+// an upgrade prompt naming the plan rather than toasting the message; see
+// middleware/errorHandler.js, which is the only thing that reads the field.
+//
+// Every gate below runs AFTER the tier check on the same route. Verification
+// beats plan everywhere in this product: an unverified Free member should
+// hear "get SSM-verified", which is free and is the actual next step, not
+// "pay us" for a door that would still be shut afterwards.
+function failUpgrade(plan, message) {
+  throw Object.assign(new Error(message), { status: 402, upgradeRequired: plan });
+}
+
 async function loadOwnBusiness(req) {
   if (!req.account.businessId) fail(400, "You need a claimed business to do this.");
   const business = await prisma.business.findUnique({ where: { id: req.account.businessId } });
@@ -80,6 +95,18 @@ router.post(
 
     if (!VOUCHABLE_TIERS.has(fromBusiness.tier)) {
       fail(403, "Your business must be SSM-verified before you can vouch.");
+    }
+
+    // Before the cap, not folded into it. Free's cap is 0, so the count
+    // below would stop them anyway — but with the wrong words: "you've
+    // reached your plan's vouch limit (0 per 30 days)" describes using up an
+    // allowance that never existed. This is the only place a Free member is
+    // told what giving a vouch actually costs.
+    if (!can(fromBusiness, "giveVouch")) {
+      failUpgrade(
+        "plus",
+        "Giving vouches is part of Plus. Upgrade to vouch for the businesses you work with.",
+      );
     }
 
     // Counts submissions, not Vouch rows. Vouch.createdAt never moves when
@@ -272,6 +299,16 @@ router.post(
     if (!hasTurn(vouch, business.id, "receiver")) {
       fail(400, "This vouch isn't awaiting your review.");
     }
+    // Last of the three checks, and the order is the point: role, then turn,
+    // then price. A member who isn't the receiver, or whose turn it isn't,
+    // has nothing to buy here — pitching them an upgrade for an action that
+    // would still be unavailable afterwards is how a paywall becomes a lie.
+    if (!can(business, "acceptVouch")) {
+      failUpgrade(
+        "plus",
+        "Publishing a vouch is part of Plus. Upgrade to accept this one onto your profile.",
+      );
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.vouch.update({
@@ -313,6 +350,16 @@ router.post(
     if (roleFor(vouch, business.id) !== "receiver") fail(403, "This isn't a vouch you can review.");
     if (!hasTurn(vouch, business.id, "receiver")) {
       fail(400, "This vouch isn't awaiting your review.");
+    }
+    // Same gate as accept, and on purpose the same FEATURE: reverting is a
+    // step towards publishing and nothing else, so a member who can't
+    // publish has no use for it. Letting Free negotiate wording on a vouch
+    // they can never accept would spend the giver's revisions on a dead end.
+    if (!can(business, "acceptVouch")) {
+      failUpgrade(
+        "plus",
+        "Reviewing a vouch is part of Plus. Upgrade to send this one back for edits.",
+      );
     }
     if (vouch.revisionCount >= vouch.maxRevisions) {
       fail(400, "This vouch has already been revised the maximum number of times — accept or cancel it instead.");

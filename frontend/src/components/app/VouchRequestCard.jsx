@@ -14,6 +14,7 @@ import {
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
+import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { acceptVouch, cancelVouch, flagVouch, revertVouch } from "@/lib/api/vouches";
 import {
   revisionCapFor,
@@ -251,6 +252,16 @@ function VouchRequestCard({ vouch, onChanged }) {
   const [revertOpen, setRevertOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
+  // Covers Accept and Revert, which are one decision priced together — see
+  // the `acceptVouch` note in backend/src/lib/entitlements.js. Cancel and
+  // Flag stay open to every plan on purpose: a member must always be able to
+  // refuse a vouch or report an abusive one without paying for the privilege.
+  //
+  // The card itself is never gated. A Free member sees the request, the
+  // testimonial, the timeline and whose turn it is — the whole thing, priced
+  // only at the moment they reach for it. That is the pitch, and hiding the
+  // card would be hiding the reason to upgrade.
+  const reviewGate = useUpgradeGate("acceptVouch");
 
   const other = vouch.counterparty;
   if (!other) return null;
@@ -348,12 +359,17 @@ function VouchRequestCard({ vouch, onChanged }) {
       {yourTurn ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {canAccept(vouch) && (
-            <Button size="sm" onClick={accept} disabled={busy}>
+            <Button size="sm" onClick={reviewGate.guard(accept)} disabled={busy}>
               Accept
             </Button>
           )}
           {canRevert(vouch) && (
-            <Button size="sm" variant="secondary" onClick={() => setRevertOpen(true)} disabled={busy}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={reviewGate.guard(() => setRevertOpen(true))}
+              disabled={busy}
+            >
               Revert
             </Button>
           )}
@@ -375,6 +391,7 @@ function VouchRequestCard({ vouch, onChanged }) {
       <CancelDialog vouch={vouch} open={cancelOpen} onOpenChange={setCancelOpen} onSuccess={onChanged} />
       <RevertDialog vouch={vouch} open={revertOpen} onOpenChange={setRevertOpen} onSuccess={onChanged} />
       <FlagDialog vouch={vouch} open={flagOpen} onOpenChange={setFlagOpen} onSuccess={onChanged} />
+      <UpgradePrompt gate={reviewGate} />
       <VouchDialog
         open={reviseOpen}
         onOpenChange={setReviseOpen}

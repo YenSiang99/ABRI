@@ -7,6 +7,7 @@ import { VouchListItem } from "@/components/app/VouchListItem";
 import { VouchRequestCard } from "@/components/app/VouchRequestCard";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { LockedFeature } from "@/components/app/LockedFeature";
+import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { fetchBusinesses } from "@/lib/api/businesses";
@@ -40,6 +41,11 @@ function Vouches() {
   const { business, refreshAccount } = useAuth();
   const { refreshVouchActions } = useNotifications();
   const locked = business.tier === "T1";
+  // Verification beats plan, matching the server's check order in
+  // POST /vouches: `locked` (T1, not yet SSM-verified) still wins below and
+  // shows "Vouching unlocks after SSM verification", because that is free
+  // and is genuinely the next step. Only a verified member gets pitched.
+  const vouchGate = useUpgradeGate("giveVouch");
 
   // The open tab lives in the URL so the dashboard's activity feed can link
   // straight to it — "X accepted your vouch" belongs on Given, and landing on
@@ -150,10 +156,16 @@ function Vouches() {
           <div className="text-sm text-muted-foreground">Vouching unlocks after SSM verification.</div>
         ) : (
           <>
-            <Button onClick={() => setOpen(true)}>
+            {/* The search picker lives inside VouchDialog, so gating the
+                button that opens it is what puts the prompt in front of a
+                Free member "searching for a business to vouch for" — there
+                is no earlier point to intercept. The button keeps its full
+                styling rather than looking locked: it is the pitch. */}
+            <Button onClick={vouchGate.guard(() => setOpen(true))}>
               <Plus className="mr-1.5 h-4 w-4" /> Vouch for a business
             </Button>
             <VouchDialog open={open} onOpenChange={setOpen} businesses={allBusinesses} onSuccess={refetchAll} />
+            <UpgradePrompt gate={vouchGate} />
           </>
         )}
       </div>

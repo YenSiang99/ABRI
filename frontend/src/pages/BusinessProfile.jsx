@@ -12,6 +12,7 @@ import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import { VouchDialog } from "@/components/app/VouchDialog";
+import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
 
@@ -95,6 +96,14 @@ function BusinessProfile({ inApp = false }) {
       .catch(() => {});
   }
 
+  // Deliberately NOT part of `canVouch` below. The plan gate decides what
+  // the button DOES, not whether it renders — a Free member browsing the
+  // directory is exactly who this feature is being sold to, and hiding the
+  // button from them would hide the pitch too. Every other clause in
+  // `canVouch` is a fact about the pair (wrong tier, own business, already
+  // vouched) that no amount of money changes, which is why those still hide
+  // it. See components/app/UpgradePrompt.jsx.
+  const vouchGate = useUpgradeGate("giveVouch");
   const canVouch =
     inApp && VOUCHABLE_TIERS.has(actingBusiness?.tier) && isVouchable(business, actingBusiness);
   const canConnect =
@@ -196,7 +205,7 @@ function BusinessProfile({ inApp = false }) {
                     </Button>
                   ))}
                 {canVouch && (
-                  <Button size="sm" variant="outline" onClick={() => setVouchOpen(true)}>
+                  <Button size="sm" variant="outline" onClick={vouchGate.guard(() => setVouchOpen(true))}>
                     Vouch
                   </Button>
                 )}
@@ -392,7 +401,10 @@ function BusinessProfile({ inApp = false }) {
       )}
 
       {canVouch && (
-        <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} onSuccess={refetchBusiness} />
+        <>
+          <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} onSuccess={refetchBusiness} />
+          <UpgradePrompt gate={vouchGate} />
+        </>
       )}
     </div>
   );

@@ -60,10 +60,21 @@ const PLAN_FEATURES = [
   // history. The dash in this column is right anyway — what Plus sells is
   // the physical card, and a Free member doesn't get one.
   { label: "NFC card", free: false, plus: "1 card", pro: "1 card", enterprise: "Per person" },
-  // ENFORCED. These four numbers must match VOUCH_CAP_BY_PLAN in
+  // ENFORCED. These four values must match VOUCH_CAP_BY_PLAN in
   // backend/src/lib/vouchCap.js exactly — it's a rolling 30-day window,
   // not a calendar month.
-  { label: "Vouches you can give", free: "3 / mo", plus: "20 / mo", pro: "40 / mo", enterprise: "100 / mo" },
+  //
+  // Free is a dash, not "0 / mo". Zero-of-a-quantity invites the reader to
+  // treat it as a small allowance that might be topped up; a dash says the
+  // feature starts at Plus, which is what the server enforces (`giveVouch`).
+  { label: "Vouches you can give", free: false, plus: "20 / mo", pro: "40 / mo", enterprise: "100 / mo" },
+  // ENFORCED, by `acceptVouch` — and the row that describes the Free tier
+  // most honestly, so it sits next to the giving row rather than further
+  // down. A Free business still RECEIVES vouch requests in full: the
+  // request lands, the notification fires, the card sits in their queue.
+  // What it can't do is publish one. Net effect, and the thing to say out
+  // loud rather than let a reader discover: a Free business has no vouches.
+  { label: "Accept vouches onto your profile", free: false, plus: true, pro: true, enterprise: true },
   // ENFORCED, by FEATURE_MIN_PLAN in backend/src/lib/entitlements.js —
   // GET /businesses/:id withholds the text itself, not just the UI.
   //
@@ -126,6 +137,18 @@ const FEATURE_MIN_PLAN = {
   // it as a plan question is what would recreate the viewer-side paywall
   // this feature deliberately doesn't have.
   contactDetails: "plus",
+  // Both server-enforced (POST /vouches and POST /vouches/:id/accept
+  // respectively, which answer 402 with an `upgradeRequired` plan). Unlike
+  // every other entry here, these two are read to decide whether a button
+  // OPENS ITS ACTION OR AN UPGRADE PROMPT — never whether it renders. The
+  // affordance staying visible is the whole mechanism: a Free member is
+  // meant to reach for the thing and be told what it costs, not to find an
+  // app with fewer buttons in it. See components/app/UpgradePrompt.jsx.
+  giveVouch: "plus",
+  // Covers reverting too — see the note on the same feature in
+  // backend/src/lib/entitlements.js. Cancel and flag are deliberately
+  // ungated on both sides.
+  acceptVouch: "plus",
   nfcCard: "plus",
 };
 

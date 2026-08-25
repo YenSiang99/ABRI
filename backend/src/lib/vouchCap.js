@@ -12,7 +12,19 @@
 // to the most restrictive tier instead, so the failure mode of an unknown
 // plan is "too strict" (visible, complained about) rather than "no limit
 // at all" (invisible, and exactly what the cap is there to prevent).
-const VOUCH_CAP_BY_PLAN = { free: 3, plus: 20, pro: 40, enterprise: 100 };
+//
+// Free is 0, and that is a paywall rather than a quota: a Free business
+// cannot give a vouch at all. The cap is not what enforces it — POST
+// /vouches asks lib/entitlements.js's `giveVouch` first, so a Free member
+// gets a priced door ("Giving vouches is part of Plus") instead of this
+// module's wording, which would tell them they had used up a limit of zero.
+// The 0 is here so the two can't disagree: if the entitlement check were
+// ever removed, the cap would still hold.
+const VOUCH_CAP_BY_PLAN = { free: 0, plus: 20, pro: 40, enterprise: 100 };
+// Now 0, which makes the unknown-plan fallback a total block rather than a
+// tight quota. Still the intended direction — see below — and it matches
+// what entitlements.js does with the same unknown value, which denies every
+// feature and warns. An off-union plan should fail the same way everywhere.
 const VOUCH_CAP_FALLBACK = Math.min(...Object.values(VOUCH_CAP_BY_PLAN));
 const VOUCH_CAP_WINDOW_DAYS = 30;
 
