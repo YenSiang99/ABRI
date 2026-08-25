@@ -9,12 +9,22 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 // shaping so each domain file (businesses.js, auth.js, admin.js) only has
 // to describe its own endpoints.
 async function apiFetch(path, { method = "GET", body } = {}) {
-  const res = await fetch(`${API_URL}${path}`, {
-    method,
-    credentials: "include",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      credentials: "include",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // fetch only rejects when the request never got a response at all —
+    // offline, DNS failure, backend not running. Its native message is
+    // "Failed to fetch", which callers render straight into the UI.
+    throw Object.assign(new Error("Can't reach the server. Check your connection and try again."), {
+      status: 0,
+    });
+  }
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {

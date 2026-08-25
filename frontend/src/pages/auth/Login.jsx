@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -19,19 +20,25 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (submitting) return;
     if (!email.trim() || !password.trim()) {
       setError("Enter your email and password to continue.");
       return;
     }
+    setError("");
+    setSubmitting(true);
     const result = await login(email.trim(), password);
     if (!result.ok) {
       setError(result.error);
+      setSubmitting(false);
       return;
     }
-    setError("");
+    // Deliberately leaves `submitting` set: the navigate below unmounts this
+    // form, and clearing it first flashes the idle button for a frame.
     navigate(location.state?.from?.pathname ?? (result.isAdmin ? "/app/admin" : "/app"), {
       replace: true,
     });
@@ -59,6 +66,7 @@ function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
               className={cn(fieldClass, "mt-1.5")}
+              disabled={submitting}
               autoFocus
             />
           </div>
@@ -71,6 +79,7 @@ function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className={cn(fieldClass, "mt-1.5")}
+              disabled={submitting}
             />
           </div>
 
@@ -78,9 +87,11 @@ function Login() {
 
           <button
             type="submit"
-            className="mt-2 inline-flex items-center justify-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+            disabled={submitting}
+            className="mt-2 inline-flex items-center justify-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
           >
-            Log in
+            {submitting && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            {submitting ? "Logging in…" : "Log in"}
           </button>
         </form>
 
