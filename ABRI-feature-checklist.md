@@ -12,7 +12,7 @@ Strategy, positioning, financial model and stage gates live in `ABRI-master-blue
 
 `[Built]` working · `[Partial]` half there · `[To build]` nothing yet
 
-Status checked against the repo on 19 Aug 2026 — every `[x]` in §1 audited against a real route and real persistence, not just a screen.
+Status checked against the repo on 25 Aug 2026 — every `[x]` in §1 audited against a real route and real persistence, not just a screen.
 
 ---
 
