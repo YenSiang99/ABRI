@@ -41,8 +41,9 @@ async function findOrCreateClaimTarget({ businessId, businessName, category, loc
   });
 }
 
-// How many businesses get the founding-100 program's free "premium"
-// membershipPlan (see schema.prisma's Business.membershipPlan comment).
+// How many businesses the founding-100 program admits — each gets the
+// permanent isFoundingMember flag plus a complimentary "plus" plan (see
+// schema.prisma's Business.membershipPlan / isFoundingMember comments).
 const FOUNDING_MEMBER_LIMIT = 100;
 
 // Approves one account's claim on a business and rejects every other
@@ -66,16 +67,28 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
   // flag in this codebase, e.g. Account.isAdmin, is otherwise a manual DB
   // flip). Known minor edge case, not worth engineering around at
   // N=100–600: if a founding business's claim is later revoked (which
-  // resets tier to T0 but doesn't touch membershipPlan) and re-claimed
-  // after 100 other businesses have since been approved, re-running this
-  // check on re-approval would downgrade it to "basic" — acceptable given
-  // revokeApprovedClaim is already framed as a full unwind.
+  // resets tier to T0 but doesn't touch the plan) and re-claimed after 100
+  // other businesses have since been approved, re-running this check on
+  // re-approval would put it back on "free" — acceptable given
+  // revokeApprovedClaim is already framed as a full unwind. The founding
+  // FLAG is deliberately exempt from that: see below.
   const approvedCount = await prisma.account.count({ where: { claimStatus: "approved" } });
-  const membershipPlan = approvedCount <= FOUNDING_MEMBER_LIMIT ? "premium" : "basic";
+  const isFounding = approvedCount <= FOUNDING_MEMBER_LIMIT;
 
   const business = await prisma.business.update({
     where: { id: businessId },
-    data: { tier: "T1", membershipPlan },
+    data: {
+      tier: "T1",
+      membershipPlan: isFounding ? "plus" : "free",
+      planStartedAt: new Date(),
+      // Set only on the founding branch — never written as `false`. Once a
+      // business has been recognised as founding, no later approval can
+      // take it back, which is exactly what the old plan-encoded version
+      // couldn't promise (any plan change erased it). Spreading rather than
+      // a ternary keeps the non-founding path from touching the column at
+      // all, so the column default is the only thing that ever sets false.
+      ...(isFounding ? { isFoundingMember: true } : {}),
+    },
   });
 
   return { account, business };

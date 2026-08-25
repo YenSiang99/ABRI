@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { tierLabel } from "@/lib/store/businesses";
+import { planLabel, canUpgradeFrom, planAllows } from "@/lib/plans";
 import { introductions } from "@/data/appMockData";
 
 const WORKSPACE_ITEMS = [
@@ -37,10 +38,14 @@ const ADMIN_ITEMS = [
   { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
 ];
 
+// Two independent reasons an item can be shut, so two fields rather than
+// one: lockWhenPending is verification (tier T1), lockFeature is the plan.
+// The NFC card is behind both, and the page itself decides which message
+// to show when they overlap.
 const TRUST_ITEMS = [
   { title: "Verification", url: "/app/verify", icon: ShieldCheck },
-  { title: "Introductions", url: "/app/introductions", icon: Mailbox },
-  { title: "NFC Card", url: "/app/card", icon: CreditCard, lockWhenPending: true },
+  { title: "Introductions", url: "/app/introductions", icon: Mailbox, lockFeature: "introductions" },
+  { title: "NFC Card", url: "/app/card", icon: CreditCard, lockWhenPending: true, lockFeature: "nfcCard" },
 ];
 
 const pendingIntros = introductions.filter((i) => i.direction === "incoming" && i.status === "pending").length;
@@ -152,28 +157,35 @@ function SidebarNav({
               Trust
             </div>
             <div className="mt-2 flex flex-col gap-1">
-              {TRUST_ITEMS.map((item) => (
-                <Link
-                  key={item.title}
-                  to={item.url}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive(item.url)
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span className="flex-1">{item.title}</span>
-                  {item.lockWhenPending && locked && (
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                  {item.url === "/app/introductions" && (
-                    <NavBadge count={pendingIntros} label="pending" />
-                  )}
-                </Link>
-              ))}
+              {TRUST_ITEMS.map((item) => {
+                const planLocked =
+                  item.lockFeature && !planAllows(business?.membershipPlan, item.lockFeature);
+                return (
+                  <Link
+                    key={item.title}
+                    to={item.url}
+                    onClick={onNavigate}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                      isActive(item.url)
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span className="flex-1">{item.title}</span>
+                    {((item.lockWhenPending && locked) || planLocked) && (
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                    {/* Hidden while locked for the same reason as the vouch
+                        badge above: a count pointing at work the member
+                        can't open. */}
+                    {item.url === "/app/introductions" && !planLocked && (
+                      <NavBadge count={pendingIntros} label="pending" />
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </>
         )}
@@ -181,18 +193,48 @@ function SidebarNav({
 
       <div className="border-t border-sidebar-border p-3">
         {!isAdmin && (
-          <div className="flex items-center gap-2 rounded-lg px-2 py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-semibold text-accent-foreground">
-              {business.name.charAt(0)}
+          <>
+            <div className="flex items-center gap-2 rounded-lg px-2 py-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-semibold text-accent-foreground">
+                {business.name.charAt(0)}
+              </div>
+              <div className="flex min-w-0 flex-col text-left">
+                <span className="truncate text-sm font-medium text-sidebar-foreground">{business.name}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {tierLabel[business.tier] ?? "Listed"}
+                  {business.ssm ? ` · ${business.ssm}` : ""}
+                </span>
+              </div>
             </div>
-            <div className="flex min-w-0 flex-col text-left">
-              <span className="truncate text-sm font-medium text-sidebar-foreground">{business.name}</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {tierLabel[business.tier] ?? "Listed"}
-                {business.ssm ? ` · ${business.ssm}` : ""}
-              </span>
-            </div>
-          </div>
+            {/* Billing metadata, NOT a third trust signal — see the
+                membershipPlan comment in schema.prisma. A squared mono chip
+                rather than the circular mark VerificationBadge uses or the
+                pill VouchBadge uses, so it can't be misread as a rank
+                alongside the verification tier shown directly above it.
+                Both chips stay muted for the same reason: the yellow this
+                first used is VerificationIcon's "verified" colour, which
+                one line under "SSM-Verified" read as a second trust mark. */}
+            {planLabel[business.membershipPlan] && (
+              <div className="mt-1 flex items-center gap-2 px-2 py-1.5">
+                <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+                  {planLabel[business.membershipPlan]}
+                </span>
+                {business.isFoundingMember && (
+                  <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
+                    Founding
+                  </span>
+                )}
+                {canUpgradeFrom(business.membershipPlan) && (
+                  <Link
+                    to="/#pricing"
+                    className="ml-auto text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
+                  >
+                    Upgrade
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
         )}
         <button
           type="button"

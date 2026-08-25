@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/app/StatCard";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
+import { planAllows } from "@/lib/plans";
 import { nfcTaps } from "@/data/appMockData";
 import { toast } from "@/lib/toast";
 
@@ -22,25 +23,53 @@ function landingHost() {
   return typeof window !== "undefined" ? window.location.host : "abri.my";
 }
 
+// Shown by all three states of this page — verification lock, plan lock,
+// and the real thing — so a member who can't use the card still reads what
+// the card is for rather than landing on a bare panel.
+function PageHeader() {
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        Physical trust token
+      </div>
+      <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Your NFC card</h1>
+      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+        Every tap leads with verification status, not your job title. Real proof, in someone's hand.
+      </p>
+    </div>
+  );
+}
+
 function Card() {
   const { business } = useAuth();
 
+  // Verification lock first, and it wins when both apply — same precedence
+  // as the vouches tab in BusinessProfile.jsx. "Finish getting verified" is
+  // more useful to someone who can't use the feature either way than "this
+  // is on a paid plan", which would only be true after they had.
   if (business.tier === "T1") {
     return (
       <div className="mx-auto max-w-5xl px-6 py-10">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Physical trust token
-          </div>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Your NFC card</h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Every tap leads with verification status, not your job title. Real proof, in someone's hand.
-          </p>
-        </div>
+        <PageHeader />
         <div className="mt-8">
           <LockedFeature
             title="NFC card unlocks after SSM verification"
             description="Once our team confirms your SSM registration, your founding-member card ships and taps start showing up here."
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (!planAllows(business.membershipPlan, "nfcCard")) {
+    return (
+      <div className="mx-auto max-w-5xl px-6 py-10">
+        <PageHeader />
+        <div className="mt-8">
+          <LockedFeature
+            requiredPlan="plus"
+            title="A card comes with Plus"
+            description="Plus members get one printed ABRI card. Tapping it opens your verified profile — badge and vouch count first — even for someone who has never heard of ABRI."
           />
         </div>
       </div>
@@ -53,15 +82,7 @@ function Card() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <div>
-        <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Physical trust token
-        </div>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">Your NFC card</h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Every tap leads with verification status, not your job title. Real proof, in someone's hand.
-        </p>
-      </div>
+      <PageHeader />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">

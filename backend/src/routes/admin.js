@@ -12,6 +12,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
 import { serializeVouch, VOUCH_INCLUDE, BUSINESS_SELECT } from "../lib/vouchTurn.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
+import { PLAN_RANK } from "../lib/entitlements.js";
 
 const router = Router();
 
@@ -172,6 +173,64 @@ router.post(
       where: { id: business.id },
       data: { tier: "T1" },
     });
+    res.json({ business: updated });
+  }),
+);
+
+// Moves a business onto a membership plan by hand. There is no payment page
+// yet, so this IS how a sale gets fulfilled — and it replaces having to SSH
+// in and run scripts/set-plan.js to do it.
+//
+// planExpiresAt is RECORDED, NOT ENFORCED. Nothing reads the column (see
+// schema.prisma), so a date in the past downgrades nobody; expiry belongs
+// to the payment-and-renewal work. It's writable now so an admin selling a
+// year of Plus has somewhere to put the date, and so renewal has real data
+// to act on when it lands.
+//
+// isFoundingMember is deliberately NOT writable here. The other two writers
+// (lib/businessClaim.js, scripts/set-plan.js) only ever set it true — that
+// is the entire reason it was split out of membershipPlan — so this route
+// doesn't touch the column at all, rather than offering a way to strip
+// founding status as a side effect of an unrelated downgrade.
+router.post(
+  "/businesses/:id/plan",
+  asyncHandler(async (req, res) => {
+    const { plan, expiresAt } = req.body ?? {};
+
+    // Checked against the entitlements ladder rather than a list kept here:
+    // a value this route accepted but can() didn't recognise would be sold,
+    // stored, and then quietly denied every gated feature (and capped at
+    // the strictest vouch limit — see lib/vouchCap.js).
+    if (!Object.hasOwn(PLAN_RANK, plan)) {
+      return res
+        .status(400)
+        .json({ error: `Unknown plan. Pick one of: ${Object.keys(PLAN_RANK).join(", ")}.` });
+    }
+
+    // Empty clears it — a plan that doesn't lapse, which is what every
+    // business has today.
+    let planExpiresAt = null;
+    if (expiresAt) {
+      planExpiresAt = new Date(expiresAt);
+      if (Number.isNaN(planExpiresAt.getTime())) {
+        return res.status(400).json({ error: "That expiry date isn't a real date." });
+      }
+    }
+
+    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    if (!business) return res.status(404).json({ error: "Business not found." });
+
+    const updated = await prisma.business.update({
+      where: { id: business.id },
+      data: {
+        membershipPlan: plan,
+        // Only restarted when the plan actually moves. Correcting an expiry
+        // date shouldn't rewrite when the membership began.
+        ...(business.membershipPlan === plan ? {} : { planStartedAt: new Date() }),
+        planExpiresAt,
+      },
+    });
+
     res.json({ business: updated });
   }),
 );

@@ -14,6 +14,27 @@ import { ladderFor } from "./vouchLadder.js";
 // state machine in schema.prisma); pending/reverted/under_review/cancelled
 // rows must never count toward vouchCount/ladder or appear in the public
 // `vouches` list.
+// Billing columns are for the business itself and for admins, never for
+// whoever is looking at it. They live on the same row as the public profile
+// fields, so any handler that spreads a raw Business row leaks them — which
+// is what routes/businesses.js does, deliberately, for both the directory
+// list and the public profile (see the comment on GET /:id explaining why
+// those don't go through serializeBusiness).
+//
+// Exported as an omit rather than a public allowlist on purpose: a new
+// PUBLIC column should appear on profiles automatically, while a new
+// BILLING column is the kind you have to opt into exposing. Adding one
+// means adding it here.
+function omitBillingFields(business) {
+  const {
+    membershipPlan: _membershipPlan,
+    planStartedAt: _planStartedAt,
+    planExpiresAt: _planExpiresAt,
+    isFoundingMember: _isFoundingMember,
+    ...publicFields
+  } = business;
+  return publicFields;
+}
 function serializeBusiness(business) {
   const { vouchesReceived, vouchesGiven, ...rest } = business;
   const published = vouchesReceived.filter((v) => v.status === "published");
@@ -80,4 +101,4 @@ async function loadAccountView(accountId) {
   };
 }
 
-export { loadAccountView, serializeBusiness };
+export { loadAccountView, serializeBusiness, omitBillingFields };

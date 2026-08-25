@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Check, Lock } from "lucide-react";
 
-import { fetchBusinesses } from "@/lib/api/businesses";
 import {
   fetchAdminClaims,
   approveAdminClaim,
@@ -10,12 +9,14 @@ import {
   revokeAdminClaim,
   verifySsm,
   revokeSsm,
+  setBusinessPlan,
 } from "@/lib/api/admin";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/AuthContext";
+import { PLAN_ORDER, planLabel } from "@/lib/plans";
 
 function ClaimantLine({ account }) {
   return (
@@ -96,9 +97,87 @@ function UndoAction({ children, ...props }) {
   );
 }
 
-function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
+function planStepState(account) {
+  // An unclaimed listing has nobody to bill, so the step stays shut until
+  // the claim is approved. Every claimed business has a plan (schema
+  // default "free"), which is why there is no "current" state here.
+  return account.claimStatus === "approved" ? "done" : "locked";
+}
+
+// Date inputs want YYYY-MM-DD; planExpiresAt arrives as a full ISO string.
+function dateInputValue(iso) {
+  return iso ? String(iso).slice(0, 10) : "";
+}
+
+// Remounted by its key in ReviewTimeline whenever the saved plan changes,
+// which is what resets these two fields after a save — cheaper and harder
+// to get wrong than syncing local state back to props in an effect.
+function PlanFields({ business, onSetPlan }) {
+  const [plan, setPlan] = useState(business.membershipPlan);
+  const [expiresAt, setExpiresAt] = useState(dateInputValue(business.planExpiresAt));
+  const [saving, setSaving] = useState(false);
+
+  const dirty =
+    plan !== business.membershipPlan ||
+    expiresAt !== dateInputValue(business.planExpiresAt);
+
+  async function handleSave() {
+    setSaving(true);
+    await onSetPlan(business.id, { plan, expiresAt });
+    setSaving(false);
+  }
+
+  const fieldClass =
+    "rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground";
+
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Membership plan"
+          value={plan}
+          onChange={(e) => setPlan(e.target.value)}
+          className={fieldClass}
+        >
+          {PLAN_ORDER.map((value) => (
+            <option key={value} value={value}>
+              {planLabel[value]}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          aria-label="Plan expiry date"
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+          className={fieldClass}
+        />
+        <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
+          {saving ? "Saving…" : "Save plan"}
+        </Button>
+      </div>
+      {/* Said out loud because the field looks like it does something it
+          doesn't: no code reads planExpiresAt yet, so a date that has
+          passed leaves the business on its plan. */}
+      <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+        The expiry date is recorded only — nothing downgrades automatically yet.
+      </p>
+    </div>
+  );
+}
+
+function ReviewTimeline({
+  account,
+  business,
+  onApprove,
+  onRemove,
+  onVerifySsm,
+  onRevokeSsm,
+  onSetPlan,
+}) {
   const claimStatus = claimStepState(account);
   const ssmStatus = ssmStepState(account, business);
+  const planStatus = planStepState(account);
 
   function confirmRemove(message) {
     if (window.confirm(message)) onRemove(account);
@@ -153,7 +232,6 @@ function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, o
               : "Verified"
         }
         status={ssmStatus}
-        isLast
       >
         {ssmStatus === "current" && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -168,11 +246,40 @@ function ReviewTimeline({ account, business, onApprove, onRemove, onVerifySsm, o
           </UndoAction>
         )}
       </BreadcrumbStep>
+
+      {/* Billing, not a trust step — but it belongs on this timeline
+          because this is the screen an admin is already on when they act
+          on a business, and there is no payment page to fulfil a sale
+          anywhere else. */}
+      <BreadcrumbStep
+        label="Plan"
+        sublabel={
+          planStatus === "locked"
+            ? "Waiting on claim"
+            : `${planLabel[business.membershipPlan] ?? business.membershipPlan}${
+                business.isFoundingMember ? " · founding member" : ""
+              }${
+                business.planExpiresAt
+                  ? ` · until ${dateInputValue(business.planExpiresAt)}`
+                  : ""
+              }`
+        }
+        status={planStatus}
+        isLast
+      >
+        {planStatus === "done" && (
+          <PlanFields
+            key={`${business.membershipPlan}:${business.planExpiresAt ?? ""}`}
+            business={business}
+            onSetPlan={onSetPlan}
+          />
+        )}
+      </BreadcrumbStep>
     </div>
   );
 }
 
-function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
+function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan }) {
   return (
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="font-bold text-foreground">{business.name}</div>
@@ -190,6 +297,7 @@ function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevo
           onRemove={onRemove}
           onVerifySsm={onVerifySsm}
           onRevokeSsm={onRevokeSsm}
+          onSetPlan={onSetPlan}
         />
       </div>
     </div>
@@ -204,7 +312,7 @@ function claimQueue(account, business) {
   return null;
 }
 
-function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
+function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan }) {
   if (claims.length === 0) {
     return <p className="mt-10 text-sm text-muted-foreground">Nothing in this queue right now.</p>;
   }
@@ -219,6 +327,7 @@ function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm }) {
           onRemove={onRemove}
           onVerifySsm={onVerifySsm}
           onRevokeSsm={onRevokeSsm}
+          onSetPlan={onSetPlan}
         />
       ))}
     </div>
@@ -229,14 +338,16 @@ function AdminReview() {
   const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
-  const [businesses, setBusinesses] = useState([]);
 
+  // GET /admin/claims embeds the raw Business row, billing columns and all.
+  // This page used to pair each claim with a row from GET /businesses
+  // instead, which runs every row through omitBillingFields — so
+  // membershipPlan never arrived and the plan step had nothing to show.
+  // Nothing here reads vouchCount or ladder, the only fields that endpoint
+  // added, so the second request is gone rather than merged.
   function loadData() {
-    return Promise.all([fetchAdminClaims(), fetchBusinesses({})])
-      .then(([claims, biz]) => {
-        setAccounts(claims);
-        setBusinesses(biz);
-      })
+    return fetchAdminClaims()
+      .then(setAccounts)
       .catch((err) => {
         toast.error(err.message);
         throw err;
@@ -275,11 +386,12 @@ function AdminReview() {
     );
   const onVerifySsm = (businessId) => withRefresh(() => verifySsm(businessId));
   const onRevokeSsm = (businessId) => withRefresh(() => revokeSsm(businessId));
+  const onSetPlan = (businessId, fields) =>
+    withRefresh(() => setBusinessPlan(businessId, fields));
 
-  const businessById = new Map(businesses.map((b) => [b.id, b]));
   const claims = accounts
-    .map((account) => ({ account, business: businessById.get(account.businessId) }))
-    .filter((c) => c.business);
+    .filter((account) => account.business)
+    .map((account) => ({ account, business: account.business }));
 
   const queues = {
     pendingClaim: claims.filter((c) => claimQueue(c.account, c.business) === "pendingClaim"),
@@ -287,7 +399,7 @@ function AdminReview() {
     verified: claims.filter((c) => claimQueue(c.account, c.business) === "verified"),
   };
 
-  const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm };
+  const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan };
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">

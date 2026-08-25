@@ -32,8 +32,39 @@ model Business {
   // Canonical email domain, set at seed/import time — used to auto-approve
   // a claim when the claimant's email matches it. Never claimant-editable.
   domain      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // "free" | "plus" | "pro" | "enterprise" — the billing tier, and the
+  // third axis on a business after verification tier and vouch ladder.
+  // Determines the vouch-giving cap (see lib/vouchCap.js), which is
+  // currently the only behaviour it gates. Deliberately never surfaced as
+  // a profile badge — it must not read as a third kind of TRUST signal
+  // sitting beside the other two, so the only place it appears is the
+  // member's own sidebar, styled as billing metadata.
+  //
+  // Renamed from "basic"/"premium"/"enterprise" in
+  // migrations/20260817120000_rename_membership_plans. Any change to this
+  // union has to move VOUCH_CAP_BY_PLAN in lib/vouchCap.js in the same
+  // commit — a value here with no entry there silently removes the cap —
+  // and PLAN_RANK in lib/entitlements.js, which ranks the plans for every
+  // yes/no feature gate.
+  membershipPlan String @default("free")
+
+  // Null until the business first lands on a plan (set at claim approval).
+  // planExpiresAt stays null for plans that don't lapse; nothing reads it
+  // yet, but renewal is the next thing to touch this row and a nullable
+  // column costs nothing to add now versus a second migration later.
+  planStartedAt DateTime?
+  planExpiresAt DateTime?
+
+  // The founding-100 programme, split out of membershipPlan so it survives
+  // every later plan change. It used to be encoded AS the plan (founding
+  // members were assigned "premium"), which meant the first upgrade,
+  // downgrade or expiry silently erased the fact that they were founding
+  // members at all. Earned once, never revoked — see businessClaim.js.
+  isFoundingMember Boolean @default(false)
 
   // Many, not one: while unclaimed/contested, several accounts can hold
   // competing pending claims on the same business at once (see Account
@@ -41,26 +72,18 @@ model Business {
   // steady state this is back to one — but the relation has to allow many
   // to support both that transient dispute window AND (later) multiple
   // legitimate team members under one business.
-  // "basic" | "premium" | "enterprise" — determines the vouch-giving cap
-  // (see lib/vouchCap.js). Founding-100 businesses are auto-assigned
-  // "premium" at claim-approval time (see approveClaimAndRejectRivals in
-  // lib/businessClaim.js). Deliberately never surfaced as a profile badge —
-  // it sits next to two other tier axes (verification tier, vouch ladder)
-  // and must not read as a third kind of trust signal.
-  membershipPlan String @default("basic")
-
-  accounts           Account[]
-  vouchesReceived    Vouch[]             @relation("VouchTarget")
-  vouchesGiven       Vouch[]             @relation("VouchSource")
-  connectionsAsA     Connection[]        @relation("ConnectionA")
-  connectionsAsB     Connection[]        @relation("ConnectionB")
-  pendingConnections PendingConnection[]
-  flagsRaised        VouchFlag[]         @relation("FlagRaisedBy")
-  flagsAgainst       VouchFlag[]         @relation("FlagAgainst")
-  activityEvents     ActivityEvent[]     @relation("ActivityEventOwner")
-  activityAsActor    ActivityEvent[]     @relation("ActivityEventActor")
-  vouchRevisions     VouchRevision[]     @relation("VouchRevisionAuthor")
-  vouchActionsAsActor VouchAction[]      @relation("VouchActionActor")
+  accounts            Account[]
+  vouchesReceived     Vouch[]             @relation("VouchTarget")
+  vouchesGiven        Vouch[]             @relation("VouchSource")
+  connectionsAsA      Connection[]        @relation("ConnectionA")
+  connectionsAsB      Connection[]        @relation("ConnectionB")
+  pendingConnections  PendingConnection[]
+  flagsRaised         VouchFlag[]         @relation("FlagRaisedBy")
+  flagsAgainst        VouchFlag[]         @relation("FlagAgainst")
+  activityEvents      ActivityEvent[]     @relation("ActivityEventOwner")
+  activityAsActor     ActivityEvent[]     @relation("ActivityEventActor")
+  vouchRevisions      VouchRevision[]     @relation("VouchRevisionAuthor")
+  vouchActionsAsActor VouchAction[]       @relation("VouchActionActor")
 }
 
 model Account {
@@ -93,11 +116,11 @@ model Account {
   // null | "manual" | "domain-auto"
   verificationMethod String?
 
-  pendingConnections PendingConnection[]
+  pendingConnections  PendingConnection[]
   // Admin-only back-relations: the vouch interventions this account made and
   // the reports it ruled on. Empty for every non-admin account.
-  vouchActionsAsAdmin VouchAction[] @relation("VouchActionAdminActor")
-  vouchFlagsResolved  VouchFlag[]   @relation("VouchFlagResolver")
+  vouchActionsAsAdmin VouchAction[]       @relation("VouchActionAdminActor")
+  vouchFlagsResolved  VouchFlag[]         @relation("VouchFlagResolver")
 }
 
 // The vouch feature is three tables, and which one a piece of text lives in
@@ -308,8 +331,8 @@ model VouchFlag {
 
   // Raised by the receiver: "abusive_content" | "other"
   // Raised by the giver:    "unfair_cancel"
-  reason String
-  note   String?
+  reason     String
+  note       String?
   // The exact testimonial version that was flagged. Used to be a copied
   // `testimonialSnapshot` string, which existed only because the live text
   // could be overwritten out from under it — now that revisions are
@@ -318,18 +341,18 @@ model VouchFlag {
   revisionId String?
   revision   VouchRevision? @relation(fields: [revisionId], references: [id])
 
-  status    String   @default("open") // "open" | "reviewed"
+  status              String    @default("open") // "open" | "reviewed"
   // How it was judged, recorded separately from `status` because "an admin
   // looked at this" and "an admin agreed with it" are different facts and
   // only the second one is worth counting. This is the column a
   // repeat-offender signal reads: upheld flags against a business over time,
   // rather than raw flag volume, which anyone can inflate by complaining.
   // Null while status is "open".
-  outcome              String?   // "upheld" | "dismissed"
-  resolvedAt           DateTime?
-  resolvedByAccountId  String?
-  resolvedByAccount    Account?  @relation("VouchFlagResolver", fields: [resolvedByAccountId], references: [id])
-  createdAt DateTime @default(now())
+  outcome             String? // "upheld" | "dismissed"
+  resolvedAt          DateTime?
+  resolvedByAccountId String?
+  resolvedByAccount   Account?  @relation("VouchFlagResolver", fields: [resolvedByAccountId], references: [id])
+  createdAt           DateTime  @default(now())
 
   @@index([vouchId])
 }
@@ -342,7 +365,7 @@ model VouchFlag {
 // "vouch_flagged" (-> giver), "vouch_revised" (-> receiver),
 // "connection_added" (-> the side that didn't press the button).
 model ActivityEvent {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   businessId String
   business   Business @relation("ActivityEventOwner", fields: [businessId], references: [id])
 

@@ -26,6 +26,17 @@ function revokeSsm(businessId) {
   return apiFetch(`/admin/businesses/${businessId}/revoke-ssm`, { method: "POST" });
 }
 
+// Sets the membership plan by hand — the only way to fulfil a sale until
+// there's a payment page. `expiresAt` is an ISO date string or null; the
+// backend stores it but nothing acts on it yet, so an expired date does
+// not downgrade anyone.
+function setBusinessPlan(businessId, { plan, expiresAt } = {}) {
+  return apiFetch(`/admin/businesses/${businessId}/plan`, {
+    method: "POST",
+    body: { plan, expiresAt: expiresAt || null },
+  }).then((data) => data.business);
+}
+
 // Every vouch an admin has been asked to look at, each with its full
 // timeline and the reports raised against it. `status: "all"` also returns
 // ones whose reports have already been marked reviewed.
@@ -62,6 +73,7 @@ export {
   revokeAdminClaim,
   verifySsm,
   revokeSsm,
+  setBusinessPlan,
   fetchVouchReviews,
   decideVouchReview,
   resolveVouchFlag,

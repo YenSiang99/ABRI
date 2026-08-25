@@ -9,7 +9,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
-    "admin:grant": "node scripts/grant-admin.js"
+    "admin:grant": "node scripts/grant-admin.js",
+    "plan:set": "node scripts/set-plan.js"
   },
   "keywords": [],
   "author": "",
