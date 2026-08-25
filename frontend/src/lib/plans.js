@@ -54,7 +54,11 @@ const PLAN_FEATURES = [
   // contact block on it being VISIBLE (see the row below), not writable.
   { label: "Full editable profile", free: true, plus: true, pro: true, enterprise: true },
   // GATED, in the UI only — see FEATURE_MIN_PLAN below and its counterpart
-  // in backend/src/lib/entitlements.js. /app/card is shut to Free.
+  // in backend/src/lib/entitlements.js. /app/card is not SHUT to Free: it
+  // shows them the card artwork with their own details on it, marked as a
+  // preview, and withholds the printed card, the status panel and the tap
+  // history. The dash in this column is right anyway — what Plus sells is
+  // the physical card, and a Free member doesn't get one.
   { label: "NFC card", free: false, plus: "1 card", pro: "1 card", enterprise: "Per person" },
   // ENFORCED. These four numbers must match VOUCH_CAP_BY_PLAN in
   // backend/src/lib/vouchCap.js exactly — it's a rolling 30-day window,
@@ -104,9 +108,14 @@ const PLAN_FEATURES = [
 // so the UI can explain the gate before the payload arrives (e.g. telling
 // an owner what visitors can't see on their own profile). For `nfcCard`
 // there is no endpoint yet, so this copy is currently the ONLY thing
-// shutting that screen — which is a real limit, not a safeguard: anyone can
-// edit it in a browser. Never put anything behind this that would matter if
-// it were read.
+// deciding what /app/card renders — which is a real limit, not a safeguard:
+// anyone can edit it in a browser. Never put anything behind this that would
+// matter if it were read.
+//
+// It happens not to matter for the card today: everything that entry
+// withholds is either a physical object nobody can grant themselves or mock
+// data that is false for every plan. That is luck, not design — the moment a
+// real taps table exists, this gate needs a server half.
 const FEATURE_MIN_PLAN = {
   testimonials: "plus",
   // Like `testimonials` and unlike the two below it: the server strips the

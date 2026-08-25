@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Radio, Package, MapPin, Eye, Zap, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/app/StatCard";
@@ -21,6 +22,51 @@ function Row({ label, value, mono }) {
 // so the displayed landing URL always matches a link that really works.
 function landingHost() {
   return typeof window !== "undefined" ? window.location.host : "abri.my";
+}
+
+// The card artwork, shared by the Plus page and the Free preview so the two
+// can't drift into showing different objects — the preview's whole job is to
+// be the thing that arrives in the post.
+//
+// Every field on it is REAL, read from the logged-in business. That is what
+// makes the preview worth showing at all; a mocked-up card with someone
+// else's name on it would sell nothing.
+//
+// `preview` changes exactly one thing: the bottom-right legend. "TAP TO
+// VERIFY" describes a card that exists and is in someone's hand, which is
+// false for a Free member — and the card face is the part most likely to be
+// screenshotted away from the caption explaining it. The label has to travel
+// with the image.
+function CardFace({ business, preview = false }) {
+  return (
+    <div className="relative aspect-[1.586/1] overflow-hidden rounded-3xl border border-foreground/10 bg-foreground p-8 text-background shadow-2xl">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-60">
+            ABRI · Verified Business Network
+          </div>
+          <div className="mt-8 text-2xl font-semibold tracking-tight">{business.name}</div>
+          <div className="mt-0.5 text-sm opacity-70">{business.category}</div>
+          <div className="mt-1 text-xs opacity-50">{business.location}</div>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-foreground">
+          A
+        </div>
+      </div>
+      <div className="absolute right-8 bottom-6 left-8 flex items-end justify-between font-mono text-[10px] opacity-70">
+        <span>
+          SSM {business.ssm} · Tier {business.tier}
+        </span>
+        {preview ? (
+          <span>PREVIEW · NOT YET PRINTED</span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <Radio className="h-3 w-3" /> TAP TO VERIFY
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Shown by all three states of this page — verification lock, plan lock,
@@ -61,16 +107,61 @@ function Card() {
     );
   }
 
+  // Free members get the card SHOWN to them rather than a locked panel — the
+  // artwork with their own name on it is a better argument for Plus than a
+  // description of it ever was. Same principle as the vouch buttons in
+  // components/app/UpgradePrompt.jsx: don't hide the thing you're selling.
+  //
+  // What they DON'T get is everything below this branch, and the reason is
+  // honesty rather than billing:
+  //
+  //   Status panel  — reads "Active · Founding batch · shipped Jan 2026" and
+  //                   a Card ID that is hardcoded for every member. Showing
+  //                   that to someone with no card states a fact that is
+  //                   simply untrue.
+  //   Tap stats     — read frontend/src/data/appMockData.js. Invented. Six
+  //                   taps and an 83% conversion rate on a card that was
+  //                   never printed is a fabricated record, not a teaser.
+  //   Tap history   — same mock.
+  //
+  // Omitted outright rather than blurred or locked. A blurred number invites
+  // the member to believe there IS a number behind it; there isn't one for
+  // anybody yet. Don't tease these into view when a real taps table lands —
+  // by then a Free member's figures would be a genuine, and genuinely empty,
+  // zero, which sells nothing.
+  //
+  // Note the ordering: the T1 check above wins, so this preview is only ever
+  // reached by a verified business. A T1 member has no `ssm`, and the card
+  // face would render "SSM null · Tier T1".
   if (!planAllows(business.membershipPlan, "nfcCard")) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-10">
         <PageHeader />
-        <div className="mt-8">
-          <LockedFeature
-            requiredPlan="plus"
-            title="A card comes with Plus"
-            description="Plus members get one printed ABRI card. Tapping it opens your verified profile — badge and vouch count first — even for someone who has never heard of ABRI."
-          />
+        <div className="mt-8 max-w-xl">
+          <CardFace business={business} preview />
+
+          <p className="mt-6 text-sm text-muted-foreground">
+            This is your card, with your real details on it. Plus gets it printed and posted — one
+            tap opens your verified profile, badge and vouch count first, for someone who has never
+            heard of ABRI.
+          </p>
+
+          {/* Same mono chip and "See plans" link as
+              components/app/LockedFeature.jsx and UpgradePrompt.jsx. Not
+              LockedFeature itself: that renders a dashed panel around a lock
+              icon, which is the right shape for a shut door and the wrong one
+              here, where the point is that the door is see-through. */}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              Included in Plus
+            </span>
+            <Link
+              to="/#pricing"
+              className="text-sm font-semibold text-foreground underline underline-offset-4"
+            >
+              See plans →
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -86,29 +177,7 @@ function Card() {
 
       <div className="mt-8 grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <div className="relative aspect-[1.586/1] overflow-hidden rounded-3xl border border-foreground/10 bg-foreground p-8 text-background shadow-2xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-[10px] font-medium uppercase tracking-[0.2em] opacity-60">
-                  ABRI · Verified Business Network
-                </div>
-                <div className="mt-8 text-2xl font-semibold tracking-tight">{business.name}</div>
-                <div className="mt-0.5 text-sm opacity-70">{business.category}</div>
-                <div className="mt-1 text-xs opacity-50">{business.location}</div>
-              </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-foreground">
-                A
-              </div>
-            </div>
-            <div className="absolute right-8 bottom-6 left-8 flex items-end justify-between font-mono text-[10px] opacity-70">
-              <span>
-                SSM {business.ssm} · Tier {business.tier}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Radio className="h-3 w-3" /> TAP TO VERIFY
-              </span>
-            </div>
-          </div>
+          <CardFace business={business} />
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
