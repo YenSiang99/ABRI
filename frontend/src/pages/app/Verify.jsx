@@ -2,7 +2,7 @@ import { Check, Lock, ShieldCheck } from "lucide-react";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { useAuth } from "@/context/AuthContext";
-import { tierLabel } from "@/lib/store/businesses";
+import { tierLabel } from "@/lib/trustLabels";
 import { cn } from "@/lib/utils";
 
 function buildTierData(account, business) {

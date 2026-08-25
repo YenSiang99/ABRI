@@ -1,6 +1,6 @@
 import { UserPlus, Sparkle, TrendingUp, ShieldCheck, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ladderLabel } from "@/lib/store/businesses";
+import { ladderLabel } from "@/lib/trustLabels";
 
 const ladderStyles = {
   none: "bg-muted text-muted-foreground border-border",

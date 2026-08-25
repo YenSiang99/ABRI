@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { tierLabel } from "@/lib/store/businesses";
+import { tierLabel } from "@/lib/trustLabels";
 import { planLabel, canUpgradeFrom, planAllows } from "@/lib/plans";
 import { introductions } from "@/data/appMockData";
 

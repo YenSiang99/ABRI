@@ -17,7 +17,7 @@ import { AppTierBadge } from "@/components/badge/AppTierBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { tierLabel, ladderLabel } from "@/lib/store/businesses";
+import { tierLabel, ladderLabel } from "@/lib/trustLabels";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyActivity } from "@/lib/api/activity";
