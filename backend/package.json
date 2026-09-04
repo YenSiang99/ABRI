@@ -8,6 +8,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "db:start": "sh scripts/local-db.sh start",
+    "db:stop": "sh scripts/local-db.sh stop",
+    "db:status": "sh scripts/local-db.sh status",
     "prisma:seed": "prisma db seed",
     "admin:grant": "node scripts/grant-admin.js",
     "plan:set": "node scripts/set-plan.js"

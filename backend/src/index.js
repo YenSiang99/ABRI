@@ -12,6 +12,11 @@ import { connectionRouter } from "./routes/connections.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
+// Behind nginx on the EC2 host, so the client's real IP and protocol arrive
+// as X-Forwarded-* headers rather than on the socket. Without this Express
+// reports every request as coming from 127.0.0.1 over http.
+app.set("trust proxy", 1);
+
 // credentials: true + an explicit origin (not "*") are both required for
 // the browser to actually send/accept the httpOnly session cookie.
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
