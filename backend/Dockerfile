@@ -8,11 +8,9 @@ ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
 
-# The schema has to be in place before `npm ci`, because @prisma/client's
-# postinstall generates the client against it. Copying it here rather than after
-# the install means editing the schema re-runs the install — which is the point:
-# a generated client that has drifted from the schema is the failure this
-# ordering exists to prevent.
+# The schema is copied before the install so that editing it invalidates this
+# layer and everything after it — a generated client that has drifted from the
+# schema is the failure this ordering exists to prevent.
 COPY prisma ./prisma
 
 # prisma.config.ts is what the CLI actually reads — it sets the schema path,
@@ -21,7 +19,16 @@ COPY prisma ./prisma
 # kind of difference that only shows up during a deploy.
 COPY prisma.config.ts ./
 
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund
+
+# Generated EXPLICITLY, not left to @prisma/client's postinstall. That hook does
+# not run here — prisma.config.ts takes over config resolution, and on Prisma 6
+# an --omit=dev install produced an image carrying only the stub
+# node_modules/.prisma/client (no query engine binary at all). `migrate deploy`
+# still worked, because it needs no client, so the container applied its
+# migrations and then died on the first import with "@prisma/client did not
+# initialize yet" — a failure that looks like a database problem and isn't.
+RUN npx prisma generate && npm cache clean --force
 
 COPY src ./src
 COPY scripts ./scripts
