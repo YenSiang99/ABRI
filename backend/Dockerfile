@@ -28,7 +28,16 @@ RUN npm ci --omit=dev --no-audit --no-fund
 # still worked, because it needs no client, so the container applied its
 # migrations and then died on the first import with "@prisma/client did not
 # initialize yet" — a failure that looks like a database problem and isn't.
-RUN npx prisma generate && npm cache clean --force
+#
+# The placeholder URL is required and never dialled. prisma.config.ts resolves
+# env("DATABASE_URL") when the CLI LOADS the config, before it knows the command
+# needs no database, so a build with it unset dies at
+# "PrismaConfigEnvError: Missing required environment variable: DATABASE_URL".
+# The real value is injected at runtime from /etc/abri/*.env. DIRECT_URL is not
+# needed: generate never reads it.
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+      npx prisma generate \
+    && npm cache clean --force
 
 COPY src ./src
 COPY scripts ./scripts
