@@ -13,7 +13,7 @@ import { UNCLAIMED } from "@/lib/verificationLevels";
 
 function AppDirectory() {
   const { business } = useAuth();
-  const { isConnected, connect } = useConnections();
+  const { connectionStateWith, connect } = useConnections();
   const [query, setQuery] = useState("");
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
@@ -42,14 +42,27 @@ function AppDirectory() {
     };
   }, [query, verificationLevelFilter, business.id]);
 
+  // Sends a request, or accepts one already addressed to this member — the
+  // server settles that inside POST /connections, so there is one handler
+  // here rather than two.
   async function handleConnect(target) {
     setConnectingId(target.id);
+    const wasIncoming = connectionStateWith(target.id).state === "incoming";
     const result = await connect(target.id, SOURCE_DIRECTORY);
     setConnectingId(null);
-    if (result.ok) {
-      toast.success(`Connected with ${target.name}`);
-    } else {
+    if (!result.ok) {
       toast.error(result.error);
+      return;
+    }
+    // Worded from what the server actually did, not from the button that was
+    // pressed. A directory connect normally lands "pending", and saying
+    // "Connected with X" when the other side hasn't answered is the exact
+    // claim the approval step was added to stop — the member walks away
+    // believing they have a connection they don't have.
+    if (wasIncoming || result.connection?.status === "accepted") {
+      toast.success(`You're connected with ${target.name}`);
+    } else {
+      toast.success(`Request sent to ${target.name} — you'll see it under Requests`);
     }
   }
 
@@ -63,7 +76,8 @@ function AppDirectory() {
           Directory
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Search other businesses on ABRI, view their profiles, and connect with the ones you know.
+          Search other businesses on ABRI, view their profiles, and send a connection request to
+          the ones you know.
         </p>
       </div>
 
@@ -115,7 +129,7 @@ function AppDirectory() {
               basePath="/app/business"
               showActions
               connectable={b.verificationLevel !== UNCLAIMED}
-              alreadyConnected={isConnected(b.id)}
+              connectionState={connectionStateWith(b.id).state}
               connecting={connectingId === b.id}
               onConnect={handleConnect}
             />

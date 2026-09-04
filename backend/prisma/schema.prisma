@@ -136,7 +136,10 @@ model Business {
   vouchesGiven         Vouch[]              @relation("VouchSource")
   connectionsAsA       Connection[]         @relation("ConnectionA")
   connectionsAsB       Connection[]         @relation("ConnectionB")
-  pendingConnections   PendingConnection[]
+  connectionsRequested Connection[]         @relation("ConnectionRequester")
+  following            Follow[]             @relation("FollowFrom")
+  followers            Follow[]             @relation("FollowTo")
+  deferredConnections  DeferredConnection[]
   flagsRaised          VouchFlag[]          @relation("FlagRaisedBy")
   flagsAgainst         VouchFlag[]          @relation("FlagAgainst")
   activityEvents       ActivityEvent[]      @relation("ActivityEventOwner")
@@ -176,7 +179,7 @@ model Account {
   // null | "manual" | "domain-auto"
   verificationMethod String?
 
-  pendingConnections  PendingConnection[]
+  deferredConnections DeferredConnection[]
   // Admin-only back-relations: the vouch interventions this account made and
   // the reports it ruled on. Empty for every non-admin account.
   vouchActionsAsAdmin VouchAction[]        @relation("VouchActionAdminActor")
@@ -461,6 +464,38 @@ model Connection {
   source    String
   createdAt DateTime @default(now())
 
+  // "pending" | "accepted". A connection is a CLAIM ABOUT A RELATIONSHIP,
+  // so it needs the other side's agreement — until Aug 2026 anyone could
+  // press Connect and appear in a stranger's network unilaterally, which in
+  // a directory built to make trust legible is a forgeable signal. It only
+  // hadn't bitten because connections are private to each side's own screen;
+  // "Suggested matches" would have routed real work through invented edges.
+  //
+  // A card tap is the deliberate exception and is written straight to
+  // "accepted": a physical tap is proof the two were in the same room, which
+  // is exactly the evidence an approval step exists to collect. That is what
+  // `source` is for, and the one place it changes behaviour rather than just
+  // recording history.
+  //
+  // Follow (below) is the one-way alternative for "I want to watch this
+  // business" — the thing this model deliberately no longer is.
+  status String @default("accepted")
+
+  // Which end asked. Not derivable from the A/B columns: those are ordered
+  // lexicographically by id (see orderedPair in lib/connections.js) so that
+  // one row can serve both directions, which throws away who moved first.
+  // Only meaningful while status is "pending" — it decides who may accept
+  // (the other one) and who may withdraw (this one).
+  //
+  // Backfilled to businessAId for rows that predate the column. Those are
+  // all "accepted", where the field is never read, so an arbitrary but
+  // non-null value is honest: nobody recorded who asked, and inventing a
+  // nullable column to say so would add a branch to every read forever.
+  requestedById String
+  requestedBy   Business @relation("ConnectionRequester", fields: [requestedById], references: [id])
+
+  respondedAt DateTime?
+
   businessAId String
   businessA   Business @relation("ConnectionA", fields: [businessAId], references: [id])
 
@@ -468,12 +503,62 @@ model Connection {
   businessB   Business @relation("ConnectionB", fields: [businessBId], references: [id])
 
   @@unique([businessAId, businessBId])
+  // FK hygiene, same reason as businessBId below. Nothing queries `status`,
+  // so it gets no index — see the migration for why.
+  @@index([requestedById])
   // The only read this table gets is "every edge touching me", i.e.
   // `OR: [{ businessAId }, { businessBId }]`. The unique above already
   // indexes the businessAId side; without this one Postgres can't turn the
   // other half into an index scan and has to fall back to a seq scan for
   // the whole OR rather than a BitmapOr of two.
   @@index([businessBId])
+}
+
+// One business watching another. Deliberately NOT a weaker Connection:
+//
+//   Connection — mutual, the other side accepted, both parties see it. Says
+//                "we have actually dealt with each other", and is what later
+//                features (matching, introductions) are allowed to trust.
+//   Follow     — one-way, no approval, and INVISIBLE to the business being
+//                followed. Says "I am keeping an eye on this", which is a
+//                statement about the follower and nobody else.
+//
+// Unannounced, which is not quite the same as invisible, and the difference
+// is where the line now sits. Nothing here notifies the followed business and
+// no activity event is written — it is never TOLD, and never told who
+// stopped. But since Aug 2026 it can go and look: a business may read its own
+// follower list (listFollowers in lib/follows.js, the Followers tab).
+//
+// What stays off the table is a follower COUNT, anywhere, on any profile.
+// That is the half that can't be taken back: a number on a page gets
+// solicited, farmed and compared, and following stops being a private signal
+// about the follower and becomes a public score for the followed. Both reads
+// are one query against @@index([followedId]) below; only one of them is
+// reversible. Don't add the count casually.
+//
+// Uncapped on every plan, Free included, and that is deliberate: Free needs
+// something genuinely useful to do, and a private list costs nobody anything.
+// The cap that matters is on connection REQUESTS, which are addressed to a
+// person.
+//
+// Independent of Connection: you may follow a business you are connected to
+// and vice versa. Collapsing them would mean disconnecting silently dropped
+// a watchlist entry the member never asked to lose.
+model Follow {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  followerId String
+  follower   Business @relation("FollowFrom", fields: [followerId], references: [id])
+
+  followedId String
+  followed   Business @relation("FollowTo", fields: [followedId], references: [id])
+
+  @@unique([followerId, followedId])
+  // Serves two things now: the FK's delete path on Business, and the
+  // follower-list read a business runs against its own id. Never a count on
+  // somebody else's profile — see above.
+  @@index([followedId])
 }
 
 // Bridges "scanned a card while logged out" and "account actually exists
@@ -492,7 +577,12 @@ model Connection {
 // as a generic 500. There is no case where a queued connect intent should
 // outlive the account that queued it, so the database enforces that rather
 // than each call site remembering to.
-model PendingConnection {
+// Renamed from PendingConnection in Aug 2026, when Connection gained a
+// "pending" status of its own. Two different things called pending in one
+// domain is how a reader ends up looking for a queued card tap in the
+// connection-requests inbox: this one is not a request anybody can see or
+// answer, it is an intent parked until the account exists.
+model DeferredConnection {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 

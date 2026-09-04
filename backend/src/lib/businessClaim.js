@@ -101,8 +101,8 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
 // making the claim is being deleted outright, so there's no intermediate
 // claim state left to fall back to.
 //
-// Any PendingConnection rows this account still had queued go with it —
-// PendingConnection.accountId is ON DELETE CASCADE, so the database drops
+// Any DeferredConnection rows this account still had queued go with it —
+// DeferredConnection.accountId is ON DELETE CASCADE, so the database drops
 // them rather than every account-delete in the codebase having to remember
 // to (see the model's comment in schema.prisma for why that's the right
 // place for the rule).

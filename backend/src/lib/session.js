@@ -1,7 +1,7 @@
 import { signSessionToken } from "./jwt.js";
 import { setSessionCookie } from "./cookies.js";
 import { loadAccountView } from "./accountView.js";
-import { consumePendingConnections } from "./connections.js";
+import { consumeDeferredConnections } from "./connections.js";
 
 // The one way a session starts. Every route that logs someone in goes
 // through here (routes/auth.js: login, and both verify-claim branches), so
@@ -24,7 +24,7 @@ import { consumePendingConnections } from "./connections.js";
 // — housekeeping never fails the request — except logged rather than
 // silently swallowed, since a failure here means a connection nobody made.
 async function startSession(res, accountId) {
-  await consumePendingConnections(accountId).catch((err) => {
+  await consumeDeferredConnections(accountId).catch((err) => {
     console.error("Failed to consume pending connections", err);
   });
 

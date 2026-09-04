@@ -307,7 +307,14 @@ function CardTap() {
                 ? `${business.name} has been added to your network, and you to theirs.`
                 : `${business.name} is already in your network, and you in theirs.`}
             </p>
-            <Button className="mt-4" render={<Link to="/app/network" />} nativeButton={false}>
+            {/* Straight to Connections, not to /app/network. A tap connects
+                outright — there is no request to review — so landing the
+                member on the section root would only bounce them here anyway. */}
+            <Button
+              className="mt-4"
+              render={<Link to="/app/network/connections" />}
+              nativeButton={false}
+            >
               View your network
             </Button>
           </div>

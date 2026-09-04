@@ -9,6 +9,8 @@ import {
   orderedPair,
   serializeConnection,
   createConnection,
+  acceptConnection,
+  AUTO_ACCEPT_SOURCES,
 } from "../lib/connections.js";
 import { UNCLAIMED } from "../lib/verificationLevels.js";
 
@@ -23,10 +25,20 @@ const router = Router();
 //   - a delete by either side removes it for both, because there is only
 //     one row and both parties own it equally.
 //
-// There is no update. The only mutable thing on a connection is `source`,
-// and that's first-write-wins on purpose: if A connects from the directory
-// and B later taps A's card, the row keeps "directory". Re-labelling it
-// would rewrite how the pair met, which is the one thing the field records.
+// `source` is still first-write-wins: if A connects from the directory and B
+// later taps A's card, the row keeps "directory". Re-labelling it would
+// rewrite how the pair met, which is the one thing the field records.
+//
+// Since Aug 2026 a connection also has a STATE, which adds the accept route
+// below and changes what DELETE means. A directory connect is now a request
+// the other side answers; a card tap still lands accepted, because a tap is
+// the evidence the approval step exists to collect (AUTO_ACCEPT_SOURCES).
+//
+// Withdraw, decline and remove are all DELETE. They are the same operation on
+// the same row by different people at different times, and giving each its
+// own route would mean three handlers whose bodies were one delete and three
+// slightly different ownership checks — which is how the third one ends up
+// missing the check.
 
 function fail(status, message) {
   throw Object.assign(new Error(message), { status });
@@ -56,9 +68,15 @@ async function respondWithConnection(res, connectionId, viewerBusinessId, status
   });
 }
 
-// Every edge touching the caller, newest first. Powers Network.jsx and,
-// through ConnectionsContext, the "Connected" state of every connect button
-// in the app.
+// Every edge touching the caller, newest first, PENDING ONES INCLUDED. One
+// call rather than one per status: the client needs all three groups on the
+// same screen (requests to answer, requests it sent, the network itself),
+// and every connect button in the app has to tell "connected" from "asked"
+// from "neither". Splitting this into /pending and /accepted would make the
+// common case two round trips to answer one question about one business.
+//
+// Each row carries `status` and `requestedByYou`, which is everything needed
+// to sort them — see serializeConnection.
 //
 // An account with no business gets an empty list rather than a 400: this is
 // a read, an admin account legitimately has no business, and the same call
@@ -83,6 +101,9 @@ router.get(
   }),
 );
 
+// Sends a connection request, or — for a card tap — makes the connection
+// outright — see statusForSource in lib/connections.js, which decides which.
+//
 // Idempotent by design. CardTap.jsx fires this from an effect the moment a
 // tap resolves, so the same pair can arrive twice in quick succession (a
 // re-render, StrictMode's double-invoke in dev, an impatient second tap) —
@@ -112,7 +133,38 @@ router.post(
     const existing = await prisma.connection.findUnique({
       where: { businessAId_businessBId: pair },
     });
-    if (existing) return respondWithConnection(res, existing.id, own.id);
+    if (existing) {
+      // Two ways an existing pending row settles here rather than needing a
+      // trip to the Requests tab.
+      //
+      // 1. They already asked you. Pressing Connect IS accepting: both
+      //    parties wanting the connection is the entire condition the accept
+      //    step tests for, and it has been met. Bouncing them to an inbox to
+      //    press a second button would ask the same question twice.
+      //
+      // 2. You tap their card while your own request is still outstanding.
+      //    A tap is the evidence AUTO_ACCEPT_SOURCES trusts — a fresh one
+      //    would have connected instantly — so it has to settle a pending
+      //    row too. Without this clause, politely asking first and then
+      //    meeting in person leaves you worse off than never asking, which
+      //    is precisely backwards.
+      //
+      // Both deliberately leave `source` alone: settling a request doesn't
+      // rewrite how the pair met, which is the one thing that field records.
+      const theyAsked = existing.requestedById !== own.id;
+      if (existing.status === "pending" && (theyAsked || AUTO_ACCEPT_SOURCES.has(source))) {
+        // The accepter is always whoever did NOT ask, because acceptConnection
+        // notifies the requester and nobody should be told they accepted
+        // their own request. In case 1 that's the caller; in case 2 it's the
+        // other end of the pair, which has to be derived — the A/B columns
+        // are ordered by id, not by direction.
+        const otherEnd =
+          existing.businessAId === own.id ? existing.businessBId : existing.businessAId;
+        const accepterId = theyAsked ? own.id : otherEnd;
+        await prisma.$transaction((tx) => acceptConnection(tx, existing, accepterId));
+      }
+      return respondWithConnection(res, existing.id, own.id);
+    }
 
     try {
       const connection = await prisma.$transaction((tx) =>
@@ -138,10 +190,53 @@ router.post(
   }),
 );
 
-// Either party can remove, and it removes for both — there's one row and
-// they own it equally. No confirmation handshake and no notification to the
-// other side: see createConnection in lib/connections.js for why removal is
-// deliberately silent.
+// The recipient says yes. Only the recipient: the requester pressing this
+// would be approving their own request, which is the one thing the whole
+// status column exists to prevent.
+//
+// Not idempotent-by-shrug like POST — accepting an already-accepted
+// connection answers 400 rather than 200. POST is fired by an effect and can
+// legitimately arrive twice; this one is a button press on a card that
+// disappears afterwards, so a second one means the client is out of date and
+// saying so is more useful than pretending.
+router.post(
+  "/:id/accept",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const own = await loadOwnBusiness(req);
+
+    const connection = await prisma.connection.findUnique({ where: { id: req.params.id } });
+    if (!connection) fail(404, "Connection request not found.");
+    if (connection.businessAId !== own.id && connection.businessBId !== own.id) {
+      fail(403, "This isn't your connection request.");
+    }
+    if (connection.status !== "pending") fail(400, "This connection isn't waiting on you.");
+    if (connection.requestedById === own.id) {
+      fail(403, "You sent this request — it's for them to accept.");
+    }
+
+    await prisma.$transaction((tx) => acceptConnection(tx, connection, own.id));
+    await respondWithConnection(res, connection.id, own.id);
+  }),
+);
+
+// One route, three jobs, because they are the same write by different people:
+//
+//   remove   — an accepted connection, by either side. Removes it for both;
+//              there is one row and they own it equally.
+//   withdraw — a pending request, by the business that sent it.
+//   decline  — a pending request, by the business it was sent to.
+//
+// Declining DELETES rather than recording a rejection. Nothing needs to
+// remember that someone said no: a stored "declined" would either block the
+// pair forever (a block feature nobody asked for) or be reopenable anyway,
+// and it would sit in the database as a permanent note about a social
+// refusal. Volume is what makes re-asking a problem, and volume is the
+// connection cap's job, not this table's.
+//
+// No confirmation handshake and no notification in any of the three cases —
+// see createConnection in lib/connections.js for why removal is deliberately
+// silent. That applies doubly to a decline.
 router.delete(
   "/:id",
   requireAuth,
@@ -150,8 +245,10 @@ router.delete(
 
     const connection = await prisma.connection.findUnique({ where: { id: req.params.id } });
     if (!connection) fail(404, "Connection not found.");
-    // The only guard this route needs, and the one place a wrong answer
-    // would let someone delete an edge between two other businesses.
+    // Still the only guard this route needs, and it covers all three jobs
+    // above: both ends may delete, whatever the status and whoever asked.
+    // It remains the one place a wrong answer would let someone delete an
+    // edge between two other businesses.
     if (connection.businessAId !== own.id && connection.businessBId !== own.id) {
       fail(403, "This isn't your connection.");
     }

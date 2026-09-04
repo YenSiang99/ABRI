@@ -10,13 +10,25 @@
 // only lists in-flight vouches) won't contain it.
 const GIVEN_TAB_TYPES = new Set(["vouch_published", "vouch_cancelled", "vouch_expired"]);
 
+// Connection events that name something already SETTLED. Both land on the
+// actor's profile, because the message names them and there is nothing left
+// to do about it. `connection_requested` is deliberately not in here — a
+// request is work, and work goes to the page that can clear it.
+const SETTLED_CONNECTION_TYPES = new Set(["connection_added", "connection_accepted"]);
+
 function activityLink(event) {
-  if (event.type === "connection_added") {
+  if (SETTLED_CONNECTION_TYPES.has(event.type)) {
     // The profile of whoever connected, since the message names them. Falls
-    // back to the network list if the actor has since been removed — the
+    // back to the connections list if the actor has since been removed — the
     // event survives its actor, because actorBusinessId is nullable.
-    return event.actorId ? `/app/business/${event.actorId}` : "/app/network";
+    return event.actorId ? `/app/business/${event.actorId}` : "/app/network/connections";
   }
+
+  // "X wants to connect with you" is the one connection event with something
+  // owed, so it goes to the Requests page rather than to X's profile. Sending
+  // the reader to a profile would make them find their way to the accept
+  // button themselves, which is the trip this link exists to save.
+  if (event.type === "connection_requested") return "/app/network/requests";
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
 

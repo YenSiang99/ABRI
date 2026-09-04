@@ -450,7 +450,7 @@ router.post(
       repPhone,
       repRole,
       passwordHash,
-      // Carried through the token rather than a PendingConnection row: on
+      // Carried through the token rather than a DeferredConnection row: on
       // this path there is no account to hang one off yet. verify-claim
       // turns it into a row moments before startSession consumes it.
       connectTargetId: connectTarget,
@@ -504,7 +504,7 @@ router.post(
     // can sit in an admin queue for days before its first session.
     // Guarded: a queued nicety must never sink the claim it rode in on.
     if (connectTarget) {
-      await prisma.pendingConnection
+      await prisma.deferredConnection
         .create({ data: { accountId: account.id, businessId: connectTarget } })
         .catch((err) => console.error("Failed to queue connect intent", err));
     }

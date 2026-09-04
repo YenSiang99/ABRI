@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams} from "react-router-dom";
-import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
+import { ArrowLeft, MapPin, Building2, Radio, Clock } from "lucide-react";
 
 import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
 import { fetchBusiness } from "@/lib/api/businesses";
@@ -60,7 +60,7 @@ function BusinessProfile({ inApp = false }) {
   const { id } = useParams();
   const backLink = useBackLink(inApp);
   const { business: actingBusiness } = useAuth();
-  const { isConnected, connect } = useConnections();
+  const { connectionStateWith, connect, disconnect } = useConnections();
   const [vouchOpen, setVouchOpen] = useState(false);
   // Controlled rather than defaultValue, so ?tab=vouches is a link target.
   // Same shape Vouches.jsx uses: unknown values fall back, and the default
@@ -120,23 +120,55 @@ function BusinessProfile({ inApp = false }) {
   const vouchGate = useUpgradeGate("giveVouch");
   const canVouch =
     inApp && VOUCHABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) && isVouchable(business, actingBusiness);
-  const canConnect =
+  // Governs both buttons below: you have to be in the app, looking at
+  // somebody else, and that somebody has to be claimed. An unclaimed listing
+  // has no owner to agree to a connection or to generate anything worth
+  // following.
+  const canRelate =
     inApp &&
     actingBusiness &&
     business &&
     actingBusiness.id !== business.id &&
     business.verificationLevel !== UNCLAIMED;
-  const alreadyConnected = canConnect && isConnected(business.id);
 
+  // Four states, not two, since connections became mutual — see
+  // connectionStateWith in ConnectionsContext. Resolved here rather than in
+  // the JSX so the button below reads as one switch on one value.
+  const { state: connectState, connection } = canRelate
+    ? connectionStateWith(business.id)
+    : { state: "none", connection: null };
+
+  // Sends a request, or accepts theirs. The server handles the second case
+  // inside POST /connections — pressing Connect on someone who already asked
+  // you IS accepting, and bouncing them to the Requests tab to press a second
+  // button would be asking the same question twice.
   async function handleConnect() {
     setConnecting(true);
+    const wasIncoming = connectState === "incoming";
     const result = await connect(business.id, SOURCE_DIRECTORY);
     setConnecting(false);
-    if (result.ok) {
-      toast.success(`Connected with ${business.name}`);
-    } else {
+    if (!result.ok) {
       toast.error(result.error);
+      return;
     }
+    // Worded from what actually happened, not from what was pressed. A
+    // directory connect normally lands "pending", and telling someone
+    // "Connected" when the other side hasn't answered is the exact lie the
+    // approval step was added to stop.
+    if (wasIncoming || result.connection?.status === "accepted") {
+      toast.success(`You're connected with ${business.name}`);
+    } else {
+      toast.success(`Request sent to ${business.name}`);
+    }
+  }
+
+  async function handleWithdraw() {
+    if (!connection) return;
+    setConnecting(true);
+    const result = await disconnect(connection.id);
+    setConnecting(false);
+    if (result.ok) toast(`Withdrew your request to ${business.name}`);
+    else toast.error(result.error);
   }
 
   if (status === "loading") {
@@ -216,14 +248,27 @@ function BusinessProfile({ inApp = false }) {
                 <ExplainBadge axis="verification" business={business}>
                   <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
                 </ExplainBadge>
-                {canConnect &&
-                  (alreadyConnected ? (
+                {canRelate &&
+                  (connectState === "connected" ? (
                     <Button size="sm" variant="secondary" disabled>
                       Connected
                     </Button>
+                  ) : connectState === "requested" ? (
+                    // Live, not disabled: "Requested" with no way out strands
+                    // the member on a request they can't take back. This is
+                    // the withdraw affordance, and the only place one exists
+                    // outside the Requests tab.
+                    <Button size="sm" variant="secondary" onClick={handleWithdraw} disabled={connecting}>
+                      <Clock className="h-3.5 w-3.5" />
+                      {connecting ? "Withdrawing…" : "Requested · Withdraw"}
+                    </Button>
+                  ) : connectState === "incoming" ? (
+                    <Button size="sm" onClick={handleConnect} disabled={connecting}>
+                      {connecting ? "Accepting…" : "Accept request"}
+                    </Button>
                   ) : (
                     <Button size="sm" onClick={handleConnect} disabled={connecting}>
-                      {connecting ? "Connecting…" : "Connect"}
+                      {connecting ? "Sending…" : "Connect"}
                     </Button>
                   ))}
                 {canVouch && (

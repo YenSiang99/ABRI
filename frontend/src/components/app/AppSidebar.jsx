@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -12,19 +13,41 @@ import {
   Lock,
   ClipboardCheck,
   Flag,
+  Inbox,
+  Users,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useConnections } from "@/context/ConnectionsContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { verificationLevelLabel } from "@/lib/trustLabels";
 import { membershipTierLabel, canUpgradeFromMembershipTier, membershipTierAllows } from "@/lib/membershipTiers";
 import { CLAIMED } from "@/lib/verificationLevels";
 
+// Network is the one item with children, and it has them because it holds
+// three different relationships that a single page kept blurring: requests
+// are work, connections are mutual and agreed, following is one-way and
+// unannounced. As tabs on one screen they read as three views of the same
+// list. As routes they read as what they are.
+//
+// It is also where the next thing goes. Groups, when it arrives, is a fourth
+// child here rather than a fifth top-level item — which is the point of
+// paying for the nesting now, while there are only three.
 const WORKSPACE_ITEMS = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
   { title: "My Profile", url: "/app/profile", icon: UserCircle },
   { title: "Vouches", url: "/app/vouches", icon: Handshake, lockWhenPending: true },
-  { title: "Network", url: "/app/network", icon: Compass },
+  {
+    title: "Network",
+    url: "/app/network",
+    icon: Compass,
+    children: [
+      // Requests first: it's the only one of the three with work in it.
+      { title: "Requests", url: "/app/network/requests", icon: Inbox },
+      { title: "Connections", url: "/app/network/connections", icon: Users },
+    ],
+  },
   { title: "Directory", url: "/app/directory", icon: Search },
 ];
 
@@ -68,6 +91,92 @@ function NavBadge({ count, label }) {
   );
 }
 
+// One row, used at both depths and by the admin list, so a top-level item and
+// a child can't drift apart on padding or hover colour. `depth` is the only
+// difference: an indent and a slightly smaller label.
+function NavRow({ item, active, onNavigate, locked = false, depth = 0, children }) {
+  return (
+    <Link
+      to={item.url}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors",
+        depth === 0 ? "px-2.5" : "py-1.5 pr-2.5 pl-8 text-[13px]",
+        active
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+      )}
+    >
+      <item.icon className={depth === 0 ? "h-4 w-4" : "h-3.5 w-3.5"} />
+      <span className="flex-1">{item.title}</span>
+      {locked && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
+      {children}
+    </Link>
+  );
+}
+
+// A parent that navigates nowhere. The header is a button, not a Link,
+// because /app/network is only a redirect to its first child — making it a
+// link would put two rows in the sidebar that land on the same page, and the
+// member would have no way to tell which one they were on.
+//
+// Opens on its own whenever a child is active, so arriving from a badge, a
+// deep link or the Connections page's "Review" button never leaves the
+// member looking at a collapsed section that doesn't contain the page they
+// can see. The manual toggle only matters when you're somewhere else.
+function NavSection({ item, pathname, isActive, onNavigate, incomingCount }) {
+  const sectionActive = pathname.startsWith(item.url);
+  const [manuallyOpen, setManuallyOpen] = useState(false);
+  const open = sectionActive || manuallyOpen;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setManuallyOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors",
+          sectionActive
+            ? "text-sidebar-foreground"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        )}
+      >
+        <item.icon className="h-4 w-4" />
+        <span className="flex-1">{item.title}</span>
+        {/* The count follows the work down to the child that owns it. While
+            the section is collapsed it has to surface on the parent instead,
+            or a member with requests waiting sees nothing at all. */}
+        {!open && <NavBadge count={incomingCount} label="requests waiting on you" />}
+        <ChevronDown
+          className={cn("h-3.5 w-3.5 transition-transform", open ? "" : "-rotate-90")}
+        />
+      </button>
+
+      {open && (
+        <div className="mt-0.5 flex flex-col gap-0.5">
+          {item.children.map((child) => (
+            <NavRow
+              key={child.title}
+              item={child}
+              active={isActive(child.url)}
+              onNavigate={onNavigate}
+              depth={1}
+            >
+              {/* Only inbound requests. The ones you sent are on the same
+                  page, but a badge for those would nag about work that
+                  belongs to somebody else. Same rule as the Vouches badge. */}
+              {child.url === "/app/network/requests" && (
+                <NavBadge count={incomingCount} label="waiting on you" />
+              )}
+            </NavRow>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SidebarNav({
   pathname,
   onNavigate,
@@ -76,13 +185,17 @@ function SidebarNav({
   locked,
   unreadCount,
   vouchActionCount,
+  incomingCount,
   onSignOut,
 }) {
-  // Prefix match, except for the two urls that are prefixes of their own
-  // children — /app is under everything, and /app/admin is under
-  // /app/admin/vouch-reviews. Those need an exact match or they'd light up
-  // alongside the child that's actually open.
-  const EXACT = new Set(["/app", "/app/admin"]);
+  // Prefix match, except for the urls that are prefixes of their own
+  // children — /app is under everything, /app/admin is under
+  // /app/admin/vouch-reviews, and /app/network is under all three of its own
+  // children. Those need an exact match or they'd light up alongside the
+  // child that's actually open. (/app/network never renders as a row at all,
+  // but it goes in the set anyway so the next reader doesn't have to work out
+  // why one section parent is missing.)
+  const EXACT = new Set(["/app", "/app/admin", "/app/network"]);
   const isActive = (url) => (EXACT.has(url) ? pathname === url : pathname.startsWith(url));
 
   return (
@@ -102,20 +215,12 @@ function SidebarNav({
             </div>
             <div className="mt-2 flex flex-col gap-1">
               {ADMIN_ITEMS.map((item) => (
-                <Link
+                <NavRow
                   key={item.title}
-                  to={item.url}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive(item.url)
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span className="flex-1">{item.title}</span>
-                </Link>
+                  item={item}
+                  active={isActive(item.url)}
+                  onNavigate={onNavigate}
+                />
               ))}
             </div>
           </>
@@ -125,48 +230,50 @@ function SidebarNav({
               Workspace
             </div>
             <div className="mt-2 flex flex-col gap-1">
-              {WORKSPACE_ITEMS.map((item) => (
-                <Link
-                  key={item.title}
-                  to={item.url}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive(item.url)
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span className="flex-1">{item.title}</span>
-                  {item.lockWhenPending && locked && (
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                  {/* The feed lives on the dashboard, so that's where the
-                      unread count belongs — a badge on any other item would
-                      point at a page that can't clear it. */}
-                  {item.url === "/app" && <NavBadge count={unreadCount} label="unread" />}
-                  {/* Counts only vouches whose turn is yours, matching the
-                      Requests tab badge. Hidden while locked, where the page
-                      itself is a LockedFeature and the count would point at
-                      work the member can't reach.
+              {WORKSPACE_ITEMS.map((item) =>
+                item.children ? (
+                  <NavSection
+                    key={item.title}
+                    item={item}
+                    pathname={pathname}
+                    isActive={isActive}
+                    onNavigate={onNavigate}
+                    incomingCount={incomingCount}
+                  />
+                ) : (
+                  <NavRow
+                    key={item.title}
+                    item={item}
+                    active={isActive(item.url)}
+                    onNavigate={onNavigate}
+                    locked={item.lockWhenPending && locked}
+                  >
+                    {/* The feed lives on the dashboard, so that's where the
+                        unread count belongs — a badge on any other item would
+                        point at a page that can't clear it. */}
+                    {item.url === "/app" && <NavBadge count={unreadCount} label="unread" />}
+                    {/* Counts only vouches whose turn is yours, matching the
+                        Requests tab badge. Hidden while locked, where the page
+                        itself is a LockedFeature and the count would point at
+                        work the member can't reach.
 
-                      NOT hidden for a Free member, though — a plan lock and
-                      a verification lock call this differently, on purpose.
-                      A Free member's vouch requests are real, addressed to
-                      them, and readable in full; only publishing one is
-                      priced. The badge points at something genuinely
-                      waiting, and the nag is the pitch.
+                        NOT hidden for a Free member, though — a plan lock and
+                        a verification lock call this differently, on purpose.
+                        A Free member's vouch requests are real, addressed to
+                        them, and readable in full; only publishing one is
+                        priced. The badge points at something genuinely
+                        waiting, and the nag is the pitch.
 
-                      The rule, for whatever badge comes next: count it when
-                      the member can at least OPEN what it refers to. Hide it
-                      when the page behind it is a LockedFeature, where the
-                      count would be advertising work that isn't there. */}
-                  {item.url === "/app/vouches" && !locked && (
-                    <NavBadge count={vouchActionCount} label="waiting on you" />
-                  )}
-                </Link>
-              ))}
+                        The rule, for whatever badge comes next: count it when
+                        the member can at least OPEN what it refers to. Hide it
+                        when the page behind it is a LockedFeature, where the
+                        count would be advertising work that isn't there. */}
+                    {item.url === "/app/vouches" && !locked && (
+                      <NavBadge count={vouchActionCount} label="waiting on you" />
+                    )}
+                  </NavRow>
+                ),
+              )}
             </div>
 
             <div className="mt-5 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -177,23 +284,13 @@ function SidebarNav({
                 const planLocked =
                   item.lockFeature && !membershipTierAllows(business?.membershipTier, item.lockFeature);
                 return (
-                  <Link
+                  <NavRow
                     key={item.title}
-                    to={item.url}
-                    onClick={onNavigate}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                      isActive(item.url)
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    <span className="flex-1">{item.title}</span>
-                    {((item.lockWhenPending && locked) || planLocked) && (
-                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </Link>
+                    item={item}
+                    active={isActive(item.url)}
+                    onNavigate={onNavigate}
+                    locked={(item.lockWhenPending && locked) || planLocked}
+                  />
                 );
               })}
             </div>
@@ -282,6 +379,10 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const { business, isAdmin, logout } = useAuth();
   const { unreadCount, vouchActionCount } = useNotifications();
+  // Requests waiting on THIS member, for the Network badge. Read here rather
+  // than inside NavSection so the sidebar has one place that talks to
+  // contexts, matching how the other two counts arrive.
+  const { incoming } = useConnections();
 
   if (!business && !isAdmin) return null;
 
@@ -304,6 +405,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           locked={locked}
           unreadCount={unreadCount}
           vouchActionCount={vouchActionCount}
+          incomingCount={incoming.length}
           onSignOut={handleSignOut}
         />
       </aside>
@@ -328,6 +430,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               locked={locked}
               unreadCount={unreadCount}
               vouchActionCount={vouchActionCount}
+              incomingCount={incoming.length}
               onSignOut={handleSignOut}
             />
           </aside>

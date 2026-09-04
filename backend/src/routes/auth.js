@@ -163,10 +163,10 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
     // Queued rather than connected directly, even though the session starts
     // three lines below and could just as well do it here: this way the
     // domain-match path and the days-later manual-review path both connect
-    // through the same code in consumePendingConnections, instead of one
+    // through the same code in consumeDeferredConnections, instead of one
     // rehearsed constantly and the other only in production.
     if (connectTargetId) {
-      await prisma.pendingConnection
+      await prisma.deferredConnection
         .create({ data: { accountId: account.id, businessId: connectTargetId } })
         .catch((err) => console.error("Failed to queue connect intent", err));
     }

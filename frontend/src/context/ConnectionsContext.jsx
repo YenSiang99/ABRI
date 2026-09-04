@@ -3,12 +3,22 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import {
   fetchConnections,
   createConnection,
+  acceptConnection as apiAcceptConnection,
   removeConnection as apiRemoveConnection,
 } from "@/lib/api/connections";
 import { useAuth } from "./AuthContext";
 
-// One copy of "who am I connected to", shared by everything that renders a
-// connect button. Four pages need this and only one of them (Network) is
+// One copy of "who am I connected to, and who is waiting on whom", shared by
+// everything that renders a connect button.
+//
+// Since connections became mutual (Aug 2026) a button has four states, not
+// two, and every one of them has to be answerable without a fetch:
+//   connected  — an accepted edge exists
+//   requested  — you asked, they haven't answered
+//   incoming   — they asked, it's on you
+//   neither    — offer to connect
+// `connectionStateWith(id)` is the single accessor for that; the raw lists
+// below are for Network.jsx, which is the only screen actually about them. Four pages need this and only one of them (Network) is
 // actually about connections — the other three just need to know whether to
 // say "Connect" or "Connected". Without a shared copy each would fetch the
 // whole list on mount to answer that, and each would carry its own version
@@ -70,13 +80,54 @@ function ConnectionsProvider({ children }) {
     [isCurrent, loaded.connections],
   );
 
-  const connectedIds = useMemo(
-    () => new Set(connections.map((c) => c.counterparty?.id).filter(Boolean)),
+  // Split once here rather than at each of the three call sites that need
+  // it. `accepted` is what "your network" means everywhere in the app;
+  // `incoming` is an inbox; `outgoing` is a sent-items list that mostly
+  // exists so a profile page can say "Requested" instead of offering a
+  // button that would do nothing.
+  const accepted = useMemo(
+    () => connections.filter((c) => c.status === "accepted"),
+    [connections],
+  );
+  const incoming = useMemo(
+    () => connections.filter((c) => c.status === "pending" && !c.requestedByYou),
+    [connections],
+  );
+  const outgoing = useMemo(
+    () => connections.filter((c) => c.status === "pending" && c.requestedByYou),
     [connections],
   );
 
+  // One map from counterparty id to the row, so a button can resolve its
+  // state and the id it would act on in a single lookup. Built from the full
+  // list because a pair has at most one row whatever its status.
+  const byCounterparty = useMemo(() => {
+    const map = new Map();
+    for (const c of connections) {
+      if (c.counterparty?.id) map.set(c.counterparty.id, c);
+    }
+    return map;
+  }, [connections]);
+
+  const connectedIds = useMemo(
+    () => new Set(accepted.map((c) => c.counterparty?.id).filter(Boolean)),
+    [accepted],
+  );
+
+  // Kept meaning exactly what it always did — an ACCEPTED edge — because
+  // every existing caller uses it to decide whether to say "Connected". A
+  // pending request must not read as connected; that is the whole change.
   function isConnected(id) {
     return connectedIds.has(id);
+  }
+
+  // The four-state answer, plus the row to act on. Returns `state` and
+  // `connection` so a caller never has to search the lists itself.
+  function connectionStateWith(id) {
+    const connection = byCounterparty.get(id) ?? null;
+    if (!connection) return { state: "none", connection: null };
+    if (connection.status === "accepted") return { state: "connected", connection };
+    return { state: connection.requestedByYou ? "requested" : "incoming", connection };
   }
 
   // Replaces the whole list for whichever business is current now, not the
@@ -125,6 +176,24 @@ function ConnectionsProvider({ children }) {
     }
   }
 
+  // Accepting is its own call rather than a flavour of connect(), because
+  // the server refuses an accept from the requester and reusing connect()
+  // here would hide which of the two a caller meant.
+  async function acceptConnection(connectionId) {
+    try {
+      const connection = await apiAcceptConnection(connectionId);
+      replaceConnections((current) =>
+        current.map((c) => (c.id === connection.id ? connection : c)),
+      );
+      return { ok: true, connection };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // Also withdraw, and also decline — one server route serves all three (see
+  // routes/connections.js), so one function does here too. The local update
+  // is identical in every case: the row goes.
   async function disconnect(connectionId) {
     try {
       await apiRemoveConnection(connectionId);
@@ -140,10 +209,15 @@ function ConnectionsProvider({ children }) {
 
   const value = {
     connections,
+    accepted,
+    incoming,
+    outgoing,
     status,
     connectedIds,
     isConnected,
+    connectionStateWith,
     connect,
+    acceptConnection,
     disconnect,
     refreshConnections,
   };

@@ -15,7 +15,8 @@ import { AppLayout } from "@/pages/app/AppLayout";
 import { Dashboard } from "@/pages/app/Dashboard";
 import { Profile } from "@/pages/app/Profile";
 import { Vouches } from "@/pages/app/Vouches";
-import { Network } from "@/pages/app/Network";
+import { NetworkRequests } from "@/pages/app/network/NetworkRequests";
+import { NetworkConnections } from "@/pages/app/network/NetworkConnections";
 import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Verify } from "@/pages/app/Verify";
 import { Plan } from "@/pages/app/Plan";
@@ -52,7 +53,14 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="profile" element={<Profile />} />
             <Route path="vouches" element={<Vouches />} />
-            <Route path="network" element={<Network />} />
+            {/* Network is a section, not a page — the sidebar expands to
+                its three children and there is no combined view. Bare
+                /app/network lands on Connections, which is what a member
+                means by "my network"; the redirect also keeps every old link
+                and bookmark working. */}
+            <Route path="network" element={<Navigate to="/app/network/connections" replace />} />
+            <Route path="network/requests" element={<NetworkRequests />} />
+            <Route path="network/connections" element={<NetworkConnections />} />
             <Route path="directory" element={<AppDirectory />} />
             <Route path="business/:id" element={<BusinessProfile inApp />} />
             <Route path="verify" element={<Verify />} />

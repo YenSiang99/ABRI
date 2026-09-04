@@ -24,10 +24,19 @@ const ACTIVITY_MESSAGES = {
   vouch_flagged: (actorName) => `${actorName} flagged your vouch for admin review.`,
   vouch_revised: (actorName) => `${actorName} updated their vouch for you — ready for review.`,
 
-  // Goes only to the side that didn't press the button — see
-  // createConnection in lib/connections.js. There's no removal counterpart
-  // on purpose.
+  // The three connection events, and the distinction that matters most:
+  // connection_added is a fact, connection_requested is a to-do. Only a card
+  // tap produces the first now (AUTO_ACCEPT_SOURCES in lib/connections.js) —
+  // a directory connect asks, and wording an ask like a done deal is how it
+  // sits unanswered because the reader was told it had already happened.
+  //
+  // All three go only to the side that didn't press the button. There is no
+  // removal, decline or unfollow counterpart on purpose: "X removed you",
+  // "X declined you" and "X stopped following you" are hostile notifications
+  // the reader can do nothing about.
   connection_added: (actorName) => `${actorName} connected with you.`,
+  connection_requested: (actorName) => `${actorName} wants to connect with you.`,
+  connection_accepted: (actorName) => `${actorName} accepted your connection request.`,
 
   // Admin decisions on a flagged vouch. These take no actorName — an admin
   // isn't a business, so the event carries actorBusinessId null and there is
@@ -43,6 +52,7 @@ const ACTIVITY_MESSAGES = {
   vouch_review_sent_back_receiver: () =>
     "An admin reviewed the flagged vouch and sent it back to be edited.",
   vouch_review_cancelled: () => "An admin cancelled the flagged vouch after reviewing it.",
+
 };
 
 function messageFor(type, actorName) {

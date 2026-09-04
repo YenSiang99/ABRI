@@ -1,15 +1,21 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Clock } from "lucide-react";
 
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { CLAIMED } from "@/lib/verificationLevels";
 
+// `connectionState` is the four-state answer from connectionStateWith in
+// ConnectionsContext, not a boolean. A connection has had a middle since
+// Aug 2026 — you asked and they haven't answered — and a card that can only
+// say "Connect" or "Connected" has nowhere to put it. It would go on
+// rendering "Connect" over an outstanding request, which reads as though
+// the press did nothing.
 function BusinessCard({
   business,
   basePath = "/business",
   connectable = false,
-  alreadyConnected = false,
+  connectionState = "none",
   // Connecting is a round trip to the server, so the button has to say so —
   // otherwise a card sits looking untouched until the response lands, and
   // an impatient second click fires a second request.
@@ -51,9 +57,20 @@ function BusinessCard({
             View Profile <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>
           {connectable &&
-            (alreadyConnected ? (
+            (connectionState === "connected" ? (
               <Button size="sm" variant="secondary" disabled>
                 Connected
+              </Button>
+            ) : connectionState === "requested" ? (
+              // Inert here, unlike the same state on the profile page, which
+              // offers Withdraw. This is a browsing grid: withdrawing is
+              // silent (the other side is never told a request existed), so
+              // a mis-click among a dozen cards would undo something the
+              // member couldn't see had happened. Withdraw lives on the
+              // profile and in Network → Requests, both of which are places
+              // you go on purpose.
+              <Button size="sm" variant="secondary" disabled>
+                <Clock className="h-3.5 w-3.5" /> Requested
               </Button>
             ) : (
               <Button
@@ -67,7 +84,17 @@ function BusinessCard({
                   onConnect(business);
                 }}
               >
-                {connecting ? "Connecting…" : "Connect"}
+                {/* "Accept" when they asked first. The click does the same
+                    thing either way — POST /connections accepts a request
+                    already addressed to you — but calling that "Connect"
+                    hides that somebody is waiting on this member. */}
+                {connecting
+                  ? connectionState === "incoming"
+                    ? "Accepting…"
+                    : "Sending…"
+                  : connectionState === "incoming"
+                    ? "Accept request"
+                    : "Connect"}
               </Button>
             ))}
         </div>

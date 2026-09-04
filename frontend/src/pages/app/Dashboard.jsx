@@ -378,7 +378,7 @@ function Dashboard() {
               </h2>
             </div>
             <Link
-              to="/app/network"
+              to="/app/network/connections"
               className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
             >
               Browse network →
