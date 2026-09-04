@@ -356,9 +356,14 @@ function AdminReview() {
       .finally(() => setLoading(false));
   }
 
+  // Guarded on isAdmin, not just on the early return below: hooks run before
+  // that return, so a non-admin who somehow lands here (a stale `from` after
+  // an admin signed out used to do it) would fire GET /admin/claims and be
+  // toasted "Admin access required." on the way out.
   useEffect(() => {
+    if (!isAdmin) return;
     loadData().catch(() => {});
-  }, []);
+  }, [isAdmin]);
 
   // ProtectedRoute + AppLayout already keep non-admins out of /app/admin;
   // this is a fallback in case that ever changes underneath this page.

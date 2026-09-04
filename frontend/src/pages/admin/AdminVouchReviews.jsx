@@ -335,7 +335,11 @@ function AdminVouchReviews() {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
 
+  // See the comment on the same effect in AdminReview.jsx: the !isAdmin
+  // return below happens after hooks run, so the guard has to be here too or
+  // a non-admin mount still fires the request and toasts the 403.
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     fetchVouchReviews()
       .then((rows) => {
@@ -350,7 +354,7 @@ function AdminVouchReviews() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAdmin]);
 
   // Mirrors AdminReview.jsx — ProtectedRoute + AppLayout already keep
   // non-admins out of /app/admin/*, this is the fallback.

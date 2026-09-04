@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   UserCircle,
@@ -379,6 +379,7 @@ function SidebarNav({
 
 function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
   const { unreadCount, vouchActionCount } = useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
@@ -390,10 +391,20 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
 
   const locked = business?.verificationLevel === CLAIMED;
 
-  // No explicit navigate() here — ProtectedRoute (wrapping every /app/*
-  // route this sidebar renders inside) redirects to /login as soon as
-  // isAuthenticated flips false, so this just needs to flip that flag.
+  // Navigates BEFORE flipping the auth flag, and the order is the whole
+  // point. Letting ProtectedRoute do the redirect (which is what this used
+  // to do) means it also records state.from = wherever you were standing —
+  // and that `from` outlives the session, so the NEXT person to log in on
+  // this browser gets dropped onto the last person's page. Leaving from
+  // /login ourselves means ProtectedRoute is already unmounted when
+  // isAuthenticated flips, so nothing is recorded.
+  //
+  // A `from` still gets written for the involuntary cases (a deep link
+  // opened while logged out, an expired cookie on reload), which is the
+  // case it exists to serve: those really should resume where you were
+  // headed. Signing out is not that.
   function handleSignOut() {
+    navigate("/login", { replace: true });
     logout();
   }
 

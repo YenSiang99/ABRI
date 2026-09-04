@@ -13,6 +13,21 @@ const fieldClass =
   "w-full rounded-sm border border-grey-300 px-3.5 py-2.5 text-base md:text-sm text-ink outline-none focus:border-ink dark:border-border dark:text-foreground dark:focus:border-yellow";
 const labelClass = "text-[13px] font-bold text-ink dark:text-foreground";
 
+// Where to land after a successful login. `from` is the page ProtectedRoute
+// was guarding when it bounced to /login — but it belongs to whoever was
+// there LAST, which is not necessarily whoever just logged in. Signing out of
+// /app/admin and logging back in as a member used to restore /app/admin for
+// them: AdminReview mounted, fired GET /admin/claims before its own !isAdmin
+// guard could redirect, and greeted the member with an "Admin access
+// required." toast. So `from` is honoured only where this account may
+// actually go, and admins always land in their own subtree (AppLayout
+// confines them there anyway).
+function destinationAfterLogin(from, isAdmin) {
+  if (isAdmin) return "/app/admin";
+  if (!from || from.startsWith("/app/admin")) return "/app";
+  return from;
+}
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,7 +54,7 @@ function Login() {
     }
     // Deliberately leaves `submitting` set: the navigate below unmounts this
     // form, and clearing it first flashes the idle button for a frame.
-    navigate(location.state?.from?.pathname ?? (result.isAdmin ? "/app/admin" : "/app"), {
+    navigate(destinationAfterLogin(location.state?.from?.pathname, result.isAdmin), {
       replace: true,
     });
   }
