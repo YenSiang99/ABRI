@@ -6,19 +6,13 @@ import { fetchBusinesses, fetchBusiness } from "@/lib/api/businesses";
 import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { BUSINESS_CATEGORIES, BUSINESS_LOCATIONS } from "@/lib/businessVocab";
 import { UNCLAIMED } from "@/lib/verificationLevels";
-
-const CATEGORIES = [
-  "Corporate Secretarial",
-  "Accounting & Tax",
-  "Law",
-  "IT Consulting",
-];
 
 const EMPTY_FORM = {
   businessId: null,
   businessName: "",
-  category: CATEGORIES[0],
+  category: BUSINESS_CATEGORIES[0],
   location: "",
   domain: null,
   regNumber: "",
@@ -372,7 +366,7 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
             onChange={(e) => onChange("category", e.target.value)}
             className={cn(fieldClass, "mt-1.5")}
           >
-            {CATEGORIES.map((category) => (
+            {BUSINESS_CATEGORIES.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>
@@ -382,13 +376,23 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
 
         <div>
           <label className={labelClass}>Location</label>
-          <input
-            type="text"
+          {/* A select, not a text input. Everything that groups or matches
+              businesses compares this column exactly, so "PJ" and
+              "Petaling  Jaya" are businesses nothing can ever match — and
+              they'd never find out. The list is in lib/businessVocab.js,
+              mirrored from the server, which rejects anything else. */}
+          <select
             value={form.location}
             onChange={(e) => onChange("location", e.target.value)}
-            placeholder="e.g. Petaling Jaya"
             className={cn(fieldClass, "mt-1.5")}
-          />
+          >
+            <option value="">Select a location</option>
+            {BUSINESS_LOCATIONS.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </select>
           {errors.location && <p className={errorClass}>{errors.location}</p>}
         </div>
 

@@ -14,6 +14,7 @@ import { publicBusinessView } from "../lib/accountView.js";
 import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
+import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED } from "../lib/verificationLevels.js";
 
@@ -379,6 +380,17 @@ router.post(
 
     if (!businessName?.trim() || !category?.trim() || !location?.trim()) {
       return res.status(400).json({ error: "Business name, category, and location are required." });
+    }
+    // Both are closed lists (lib/businessVocab.js), and this is the only route
+    // that writes them. Checked on the server rather than trusted from the
+    // form: the directory filters and groups on these two columns by exact
+    // equality, so a value that isn't in the list is a business nothing can
+    // ever match, and nothing about that failure is visible to them.
+    if (!isValidCategory(category.trim())) {
+      return res.status(400).json({ error: "Pick a category from the list." });
+    }
+    if (!isValidLocation(location.trim())) {
+      return res.status(400).json({ error: "Pick a location from the list." });
     }
     if (!repEmail || !EMAIL_RE.test(repEmail)) {
       return res.status(400).json({ error: "Enter a valid email." });
