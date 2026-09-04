@@ -35,7 +35,11 @@ Everything here works the same for every business. **Free is Core with limits**,
   Net effect, worth stating plainly: **a Free business has no vouches at all.** Requests still land in their queue, with the notification and the full testimonial — that unanswerable request is the pitch.
 - [x] **Report a bad vouch** — either side reports, the vouch freezes until an admin rules.
 - [x] **Admin review screens** — approve claims, rule on reported vouches.
-- [x] **Connections** — two businesses become linked, from a card tap or the directory.
+- [x] **Connections** — two businesses become linked, and **both sides have to agree**. A directory connect sends a request the other side accepts or declines; a card tap connects outright, because a tap is physical proof the two were in the same room, which is the evidence the approval step exists to collect (`AUTO_ACCEPT_SOURCES`).
+  Until Aug 2026 anyone could press Connect and appear in a stranger's network unilaterally. In a directory built to make trust legible that is a **forgeable signal** — it only hadn't bitten because connections are private to each side's own screen, and "Suggested matches" would have routed real work through invented edges.
+  Withdraw, decline and remove are one `DELETE`. **Declining leaves no record**: nothing stores that someone said no. Volume is the connection cap's problem, not this table's.
+- [x] **Network is a section, not a page** — `/app/network` is a sidebar group with three routes under it: **Requests**, **Connections**, **Following** (which itself has Following / Followers tabs). They were one tabbed screen until Aug 2026, where the three read as three views of one list.
+  The split is by whether there's work in it: a request is owed by somebody, so it gets its own route, its own sidebar badge (inbound only — a badge for requests *you* sent would nag about somebody else's work), and is where `connection_requested` notifications land. Connections and Followers are finished states, so they can sit behind tabs. Groups, when it arrives, is a fourth child here rather than a fifth top-level nav item — which is the point of paying for the nesting at three.
 - [x] **Activity feed and unread count** — "someone vouched for you", "someone connected with you".
 - [x] **NFC tap page** — tapping a card opens that business's page, no account needed (`/m/:businessId`, reads `GET /businesses/:id`). An anonymous tapper sees the verification badge and is asked to log in or register — contact details sit behind the same door as the connection. The member's own card screen (`frontend/src/pages/app/Card.jsx`) still renders tap counts and history from `frontend/src/data/appMockData.js`; **no tap is recorded anywhere**.
 - [x] **The plan field** — each business stores `free / plus / pro / enterprise`, when it started, when it runs out.
@@ -53,11 +57,15 @@ Everything here works the same for every business. **Free is Core with limits**,
 
 **Left to do**
 
-- [ ] **Ask for a vouch** — a member requests a vouch instead of waiting to receive one. No endpoint, no UI; the "Requests" tab is inbound in-flight vouches, not asks. `[To build]`
 - [ ] **Delete the last of the mock data** — mostly done. `frontend/src/lib/store/*` and `data/businesses.js` are gone (the `tierLabel`/`ladderLabel` maps moved to `lib/trustLabels.js`), and `appMockData.js` is down to one export after the introductions screen was deleted. **Still fake:** NFC tap stats on `pages/app/Card.jsx` (`appMockData.js`), the dashboard's hardcoded "47 profile views", and its pre-ticked verification steps. Each one still looks like a working feature. `[Partial]`
 - [ ] **Search ranking by plan** — paid members above free ones. `[To build]`
-- [ ] **Connection cap for Free** — sending is uncapped today; it shouldn't be. `[To build]`
-- [ ] **Follow a business** — watch a business without connecting. One-way, no approval. `[To build]`
+- [ ] **Connection cap for Free** — outbound **requests** per period, not edges. Capping something anyone could create unilaterally was never going to hold; now that a request lands on someone's desk, a cap on sending them means something. Following stays uncapped on every plan. `[To build]`
+- [x] **Follow a business** — one-way, no approval, and **unannounced**: nobody is notified when you follow them, no activity event is written, and nobody is told when you stop. A business *can* read its own follower list (Network → Following → Followers), which is the one thing it can see.
+  What stays off the table is a **follower count on a profile**, anywhere. That's the half that can't be taken back — a number on a page gets solicited, farmed and compared, and following stops being a private signal about the follower and becomes a public score for the followed. Both reads are one query against the same index; only one is reversible.
+  **What a follow gets you: opening the profile. That's the whole list.** Anything involving the other party — messaging, introductions, collaboration — requires a **connection**, because a connection took two people to make and a follow took one. That's the line to hold as features get added.
+  Deliberately not a weaker connection, and independent of one: you can follow a business you're connected to, and disconnecting doesn't silently drop a watchlist entry nobody asked to lose. **Uncapped on every plan, Free included** — Free needs something genuinely useful it can do, and a private list costs nobody anything.
+  `Follow` table, `/follows` routes (`GET /`, `GET /followers`, `POST`, `DELETE /:businessId` — both reads keyed off the session, never a path id), `FollowsContext`. Following an unclaimed (T0) listing is refused: there's no owner, so nothing could ever appear. "Tell me when this gets claimed" is a better feature and the reason to revisit that line.
+- [ ] **Messaging** — the action a connection unlocks and a follow doesn't. Connections only, by design: it's the payoff that makes the accept step worth having, and the reason a forgeable connection would have been a real problem rather than a cosmetic one. Nothing built yet. `[To build]`
 - [ ] **"Get verified" prompt** — a permanent banner on a free member's own dashboard. `[To build]`
 - [ ] **Sending WhatsApp messages** — one shared pipe. Every alert, digest and reminder below uses it, so build it once and well. `[To build]`
 - [ ] **Payment and renewal** — take the money, set the expiry, remind before it runs out, drop to Free if unpaid. `[To build]`
@@ -174,6 +182,10 @@ Each block is worth shipping on its own. Don't start one before the block above 
 | Referral tracker + summary | 3–4 weeks                     | none                                                       |
 | Written weekly summary     | ~1 week on top of the tracker | ~USD 0.01 per member per week (Claude API)                 |
 | Introduction writer        | ~1 week                       | ~USD 0.005 per introduction                                |
+
+### Dropped
+
+- **Ask for a vouch.** Cut Aug 2026, never built. Vouching is a give-first motion — asking inverts it into a favour you chase, and a vouch you had to solicit is worth less as a signal than one that arrived unprompted. The "Requests" tab stays what it is: inbound in-flight vouches, not asks.
 
 ### Two calls worth revisiting
 
