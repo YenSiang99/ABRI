@@ -3,6 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { Button } from "@/components/ui/button";
+import { CLAIMED } from "@/lib/verificationLevels";
 
 function BusinessCard({
   business,
@@ -33,12 +34,12 @@ function BusinessCard({
             {business.category} · {business.location}
           </div>
           <div className="mt-2.5">
-            <VerificationBadge tier={business.tier} size="inline" chip />
+            <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
           </div>
         </div>
       </div>
       <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
-        {business.tier === "T1"
+        {business.verificationLevel === CLAIMED
           ? "Vouches unlock after SSM verification"
           : business.vouchCount > 0
             ? `${business.vouchCount} vouches`

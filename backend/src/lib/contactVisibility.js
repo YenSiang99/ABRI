@@ -34,7 +34,7 @@ function contactVisibility(business, viewer) {
   // Owner-plan is reported FIRST when both conditions fail. Telling an
   // anonymous visitor to log in, when logging in would still show them
   // nothing, spends the one action we asked of them and teaches them that
-  // the prompt lies. Same principle as the tier-beats-plan precedence in the
+  // the prompt lies. Same principle as the verification-beats-billing precedence in the
   // UI: name the blocker that would still be standing after the reader does
   // exactly as they were told.
   //

@@ -9,12 +9,13 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { messageFor, pruneActivityEvents } from "../lib/activityEvents.js";
-import { ladderFor } from "../lib/vouchLadder.js";
+import { vouchLevelFor } from "../lib/vouchLevel.js";
 import { publicBusinessView } from "../lib/accountView.js";
 import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
 import { loadAccountView } from "../lib/accountView.js";
+import { UNCLAIMED } from "../lib/verificationLevels.js";
 
 const router = Router();
 
@@ -30,17 +31,24 @@ async function resolveConnectTarget(connectTargetId, claimedBusinessId) {
   const target = await prisma.business.findUnique({ where: { id: connectTargetId } });
   // T0 means unclaimed, and POST /connections refuses those too — no point
   // queueing an intent that would be dropped on the way out.
-  if (!target || target.tier === "T0") return null;
+  if (!target || target.verificationLevel === UNCLAIMED) return null;
   return target.id;
 }
 
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const { search, tier } = req.query;
+    const { search, verificationLevel } = req.query;
     const businesses = await prisma.business.findMany({
       where: {
-        ...(tier ? { tier } : {}),
+        // NOTE: an unrecognised query key is simply NO FILTER here, not a
+        // 400 — so a client and server that disagree about this param name
+        // fail silently and wide. That is not hypothetical: Register.jsx
+        // filters on UNCLAIMED to find claimable listings, and a dropped
+        // filter there offers already-claimed businesses for claiming.
+        // Renaming this param means renaming lib/api/businesses.js in the
+        // same commit.
+        ...(verificationLevel ? { verificationLevel } : {}),
         ...(search
           ? {
               OR: [
@@ -50,20 +58,31 @@ router.get(
             }
           : {}),
       },
-      include: { _count: { select: { vouchesReceived: { where: { status: "published" } } } } },
+      include: {
+        _count: {
+          select: {
+            vouchesReceived: { where: { status: "published" } },
+            // Needed for the top vouch level, which is 25 received AND 10
+            // given. Counting only one direction caps every business at
+            // "trusted" with nothing to show it happened.
+            vouchesGiven: { where: { status: "published" } },
+          },
+        },
+      },
       orderBy: { name: "asc" },
     });
     res.json({
-      // ladder alongside vouchCount — components like VouchBadge assume
+      // vouchLevel alongside vouchCount — components like VouchBadge assume
       // every business object carries both (see
       // components/badge/VouchBadge.jsx, which indexes an icon map by
-      // ladder with no undefined fallback).
+      // vouchLevel; it now falls back rather than throwing, but shipping the
+      // field is still the contract).
       // Contact details are stripped UNCONDITIONALLY here, which is why this
       // route needs no optionalAuth and no contactLocked flag: it has no
       // viewer-dependent behaviour at all, and identical output for everyone
       // is the assertion that keeps it that way.
       //
-      // Two reasons. BusinessCard.jsx renders name/category/location/tier/
+      // Two reasons. BusinessCard.jsx renders name/category/location/level/
       // vouchCount and has nowhere to put a phone number, so nothing here
       // would read them. And shipping every listing's phone number to every
       // session would be the best scraping surface in the app, built to serve
@@ -77,7 +96,10 @@ router.get(
       businesses: businesses.map(({ _count, ...business }) => ({
         ...publicBusinessView(business),
         vouchCount: _count.vouchesReceived,
-        ladder: ladderFor(_count.vouchesReceived),
+        vouchLevel: vouchLevelFor({
+          received: _count.vouchesReceived,
+          given: _count.vouchesGiven,
+        }),
       })),
     });
   }),
@@ -103,7 +125,7 @@ router.get(
         vouchesReceived: {
           where: { status: "published" },
           include: {
-            fromBusiness: { select: { id: true, name: true, category: true, tier: true } },
+            fromBusiness: { select: { id: true, name: true, category: true, verificationLevel: true } },
             currentRevision: { select: { comment: true } },
           },
         },
@@ -112,12 +134,12 @@ router.get(
     if (!business) return res.status(404).json({ error: "Business not found." });
 
     // Read the plan off the RAW row: publicBusinessView strips
-    // membershipPlan, so asking can() about its output denies everything.
+    // membershipTier, so asking can() about its output denies everything.
     const showTestimonials = can(business, "testimonials");
 
     // Deliberately adjacent to the line above, and for the same reason: this
     // reads the plan off the RAW row too. publicBusinessView strips
-    // membershipPlan, so a gate computed after it would see every business as
+    // membershipTier, so a gate computed after it would see every business as
     // free and withhold from everyone.
     const contact = contactVisibility(business, req.account);
 

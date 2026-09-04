@@ -80,7 +80,7 @@ function Footer() {
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-grey-200 pt-6 text-[13px] text-grey-500 dark:border-border dark:text-muted-foreground">
           <span>© 2026 ABRI. All rights reserved.</span>
           <span className="flex items-center gap-2">
-            <VerificationIcon tier="verified" size="small" />
+            <VerificationIcon mark="verified" size="small" />
             Verified against SSM records
           </span>
         </div>

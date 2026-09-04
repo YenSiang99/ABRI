@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { toast } from "@/lib/toast";
 
@@ -21,8 +21,8 @@ function AppBusinessCard({ business }) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <AppTierBadge tier={business.tier} />
-        <VouchBadge ladder={business.ladder} />
+        <AppVerificationBadge verificationLevel={business.verificationLevel} />
+        <VouchBadge vouchLevel={business.vouchLevel} />
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">

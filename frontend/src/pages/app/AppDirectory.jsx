@@ -6,15 +6,16 @@ import { useAuth } from "@/context/AuthContext";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
-import { TIER_FILTERS } from "@/lib/directoryFilter";
+import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { toast } from "@/lib/toast";
+import { UNCLAIMED } from "@/lib/verificationLevels";
 
 function AppDirectory() {
   const { business } = useAuth();
   const { isConnected, connect } = useConnections();
   const [query, setQuery] = useState("");
-  const [tierFilter, setTierFilter] = useState("all");
+  const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
   // Which row's Connect button is mid-flight, so it can show progress and
@@ -24,7 +25,7 @@ function AppDirectory() {
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      fetchBusinesses({ search: query.trim(), tier: tierFilter === "all" ? undefined : tierFilter })
+      fetchBusinesses({ search: query.trim(), verificationLevel: verificationLevelFilter === "all" ? undefined : verificationLevelFilter })
         .then((results) => {
           if (cancelled) return;
           setBusinesses(results.filter((b) => b.id !== business.id));
@@ -39,7 +40,7 @@ function AppDirectory() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, tierFilter, business.id]);
+  }, [query, verificationLevelFilter, business.id]);
 
   async function handleConnect(target) {
     setConnectingId(target.id);
@@ -78,14 +79,14 @@ function AppDirectory() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {TIER_FILTERS.map((filter) => (
+        {VERIFICATION_LEVEL_FILTERS.map((filter) => (
           <button
             key={filter.value}
             type="button"
-            onClick={() => setTierFilter(filter.value)}
+            onClick={() => setVerificationLevelFilter(filter.value)}
             className={cn(
               "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-              tierFilter === filter.value
+              verificationLevelFilter === filter.value
                 ? "border-foreground bg-foreground text-background"
                 : "border-border text-muted-foreground hover:bg-muted",
             )}
@@ -113,7 +114,7 @@ function AppDirectory() {
               business={b}
               basePath="/app/business"
               showActions
-              connectable={b.tier !== "T0"}
+              connectable={b.verificationLevel !== UNCLAIMED}
               alreadyConnected={isConnected(b.id)}
               connecting={connectingId === b.id}
               onConnect={handleConnect}

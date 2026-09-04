@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
@@ -254,7 +254,7 @@ function VouchRequestCard({ vouch, onChanged }) {
   const [reviseOpen, setReviseOpen] = useState(false);
   // Covers Accept and Revert, which are one decision priced together — see
   // the `acceptVouch` note in backend/src/lib/entitlements.js. Cancel and
-  // Flag stay open to every plan on purpose: a member must always be able to
+  // Flag stay open to every tier on purpose: a member must always be able to
   // refuse a vouch or report an abusive one without paying for the privilege.
   //
   // The card itself is never gated. A Free member sees the request, the
@@ -308,7 +308,7 @@ function VouchRequestCard({ vouch, onChanged }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{other.name}</span>
-            <AppTierBadge tier={other.tier} />
+            <AppVerificationBadge verificationLevel={other.verificationLevel} />
             {yourTurn ? (
               <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
                 Your turn

@@ -10,6 +10,7 @@ import {
   serializeConnection,
   createConnection,
 } from "../lib/connections.js";
+import { UNCLAIMED } from "../lib/verificationLevels.js";
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.post(
     if (!target) fail(404, "Business not found.");
     // No caller-side tier check to match: an account only has a businessId
     // at all by way of an approved claim, which sets T1.
-    if (target.tier === "T0") fail(400, "This business hasn't been claimed yet.");
+    if (target.verificationLevel === UNCLAIMED) fail(400, "This business hasn't been claimed yet.");
 
     const pair = orderedPair(own.id, target.id);
     const existing = await prisma.connection.findUnique({

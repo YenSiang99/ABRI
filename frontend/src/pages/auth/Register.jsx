@@ -6,6 +6,7 @@ import { fetchBusinesses, fetchBusiness } from "@/lib/api/businesses";
 import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { UNCLAIMED } from "@/lib/verificationLevels";
 
 const CATEGORIES = [
   "Corporate Secretarial",
@@ -66,7 +67,7 @@ function Register() {
     let cancelled = false;
     fetchBusiness(preselectedId)
       .then((business) => {
-        if (cancelled || business.tier !== "T0") return;
+        if (cancelled || business.verificationLevel !== UNCLAIMED) return;
         setForm((f) => ({
           ...f,
           businessId: business.id,
@@ -246,7 +247,7 @@ function SearchStep({ onSelect, onManual }) {
     if (!q) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      fetchBusinesses({ search: q, tier: "T0" })
+      fetchBusinesses({ search: q, verificationLevel: UNCLAIMED })
         .then((businesses) => {
           if (cancelled) return;
           setResults(businesses);

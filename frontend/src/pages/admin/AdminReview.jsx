@@ -9,14 +9,15 @@ import {
   revokeAdminClaim,
   verifySsm,
   revokeSsm,
-  setBusinessPlan,
+  setBusinessMembershipTier,
 } from "@/lib/api/admin";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/AuthContext";
-import { PLAN_ORDER, planLabel } from "@/lib/plans";
+import { MEMBERSHIP_TIER_ORDER, membershipTierLabel } from "@/lib/membershipTiers";
+import { CLAIMED, SSM_VERIFIED } from "@/lib/verificationLevels";
 
 function ClaimantLine({ account }) {
   return (
@@ -37,7 +38,7 @@ function claimStepState(account) {
 
 function ssmStepState(account, business) {
   if (account.claimStatus !== "approved") return "locked";
-  return business.tier === "T2" ? "done" : "current";
+  return business.verificationLevel === SSM_VERIFIED ? "done" : "current";
 }
 
 // Each step's actions live next to that step, not in a separate row, so it's
@@ -97,33 +98,33 @@ function UndoAction({ children, ...props }) {
   );
 }
 
-function planStepState(account) {
+function membershipTierStepState(account) {
   // An unclaimed listing has nobody to bill, so the step stays shut until
-  // the claim is approved. Every claimed business has a plan (schema
+  // the claim is approved. Every claimed business has a membership tier (schema
   // default "free"), which is why there is no "current" state here.
   return account.claimStatus === "approved" ? "done" : "locked";
 }
 
-// Date inputs want YYYY-MM-DD; planExpiresAt arrives as a full ISO string.
+// Date inputs want YYYY-MM-DD; membershipTierExpiresAt arrives as a full ISO string.
 function dateInputValue(iso) {
   return iso ? String(iso).slice(0, 10) : "";
 }
 
-// Remounted by its key in ReviewTimeline whenever the saved plan changes,
+// Remounted by its key in ReviewTimeline whenever the saved tier changes,
 // which is what resets these two fields after a save — cheaper and harder
 // to get wrong than syncing local state back to props in an effect.
-function PlanFields({ business, onSetPlan }) {
-  const [plan, setPlan] = useState(business.membershipPlan);
-  const [expiresAt, setExpiresAt] = useState(dateInputValue(business.planExpiresAt));
+function MembershipTierFields({ business, onSetMembershipTier }) {
+  const [membershipTier, setMembershipTier] = useState(business.membershipTier);
+  const [expiresAt, setExpiresAt] = useState(dateInputValue(business.membershipTierExpiresAt));
   const [saving, setSaving] = useState(false);
 
   const dirty =
-    plan !== business.membershipPlan ||
-    expiresAt !== dateInputValue(business.planExpiresAt);
+    membershipTier !== business.membershipTier ||
+    expiresAt !== dateInputValue(business.membershipTierExpiresAt);
 
   async function handleSave() {
     setSaving(true);
-    await onSetPlan(business.id, { plan, expiresAt });
+    await onSetMembershipTier(business.id, { membershipTier, expiresAt });
     setSaving(false);
   }
 
@@ -134,31 +135,31 @@ function PlanFields({ business, onSetPlan }) {
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-2">
         <select
-          aria-label="Membership plan"
-          value={plan}
-          onChange={(e) => setPlan(e.target.value)}
+          aria-label="Membership tier"
+          value={membershipTier}
+          onChange={(e) => setMembershipTier(e.target.value)}
           className={fieldClass}
         >
-          {PLAN_ORDER.map((value) => (
+          {MEMBERSHIP_TIER_ORDER.map((value) => (
             <option key={value} value={value}>
-              {planLabel[value]}
+              {membershipTierLabel[value]}
             </option>
           ))}
         </select>
         <input
           type="date"
-          aria-label="Plan expiry date"
+          aria-label="Membership expiry date"
           value={expiresAt}
           onChange={(e) => setExpiresAt(e.target.value)}
           className={fieldClass}
         />
         <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
-          {saving ? "Saving…" : "Save plan"}
+          {saving ? "Saving…" : "Save tier"}
         </Button>
       </div>
       {/* Said out loud because the field looks like it does something it
-          doesn't: no code reads planExpiresAt yet, so a date that has
-          passed leaves the business on its plan. */}
+          doesn't: no code reads membershipTierExpiresAt yet, so a date that has
+          passed leaves the business on its tier. */}
       <p className="mt-1.5 text-[11.5px] text-muted-foreground">
         The expiry date is recorded only — nothing downgrades automatically yet.
       </p>
@@ -173,11 +174,11 @@ function ReviewTimeline({
   onRemove,
   onVerifySsm,
   onRevokeSsm,
-  onSetPlan,
+  onSetMembershipTier,
 }) {
   const claimStatus = claimStepState(account);
   const ssmStatus = ssmStepState(account, business);
-  const planStatus = planStepState(account);
+  const membershipTierStatus = membershipTierStepState(account);
 
   function confirmRemove(message) {
     if (window.confirm(message)) onRemove(account);
@@ -252,26 +253,26 @@ function ReviewTimeline({
           on a business, and there is no payment page to fulfil a sale
           anywhere else. */}
       <BreadcrumbStep
-        label="Plan"
+        label="Membership"
         sublabel={
-          planStatus === "locked"
+          membershipTierStatus === "locked"
             ? "Waiting on claim"
-            : `${planLabel[business.membershipPlan] ?? business.membershipPlan}${
+            : `${membershipTierLabel[business.membershipTier] ?? business.membershipTier}${
                 business.isFoundingMember ? " · founding member" : ""
               }${
-                business.planExpiresAt
-                  ? ` · until ${dateInputValue(business.planExpiresAt)}`
+                business.membershipTierExpiresAt
+                  ? ` · until ${dateInputValue(business.membershipTierExpiresAt)}`
                   : ""
               }`
         }
-        status={planStatus}
+        status={membershipTierStatus}
         isLast
       >
-        {planStatus === "done" && (
-          <PlanFields
-            key={`${business.membershipPlan}:${business.planExpiresAt ?? ""}`}
+        {membershipTierStatus === "done" && (
+          <MembershipTierFields
+            key={`${business.membershipTier}:${business.membershipTierExpiresAt ?? ""}`}
             business={business}
-            onSetPlan={onSetPlan}
+            onSetMembershipTier={onSetMembershipTier}
           />
         )}
       </BreadcrumbStep>
@@ -279,7 +280,7 @@ function ReviewTimeline({
   );
 }
 
-function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan }) {
+function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier }) {
   return (
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="font-bold text-foreground">{business.name}</div>
@@ -297,7 +298,7 @@ function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevo
           onRemove={onRemove}
           onVerifySsm={onVerifySsm}
           onRevokeSsm={onRevokeSsm}
-          onSetPlan={onSetPlan}
+          onSetMembershipTier={onSetMembershipTier}
         />
       </div>
     </div>
@@ -307,12 +308,12 @@ function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevo
 function claimQueue(account, business) {
   if (account.claimStatus === "pending") return "pendingClaim";
   if (!business) return null;
-  if (business.tier === "T1") return "pendingSsm";
-  if (business.tier === "T2") return "verified";
+  if (business.verificationLevel === CLAIMED) return "pendingSsm";
+  if (business.verificationLevel === SSM_VERIFIED) return "verified";
   return null;
 }
 
-function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan }) {
+function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier }) {
   if (claims.length === 0) {
     return <p className="mt-10 text-sm text-muted-foreground">Nothing in this queue right now.</p>;
   }
@@ -327,7 +328,7 @@ function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSe
           onRemove={onRemove}
           onVerifySsm={onVerifySsm}
           onRevokeSsm={onRevokeSsm}
-          onSetPlan={onSetPlan}
+          onSetMembershipTier={onSetMembershipTier}
         />
       ))}
     </div>
@@ -342,8 +343,8 @@ function AdminReview() {
   // GET /admin/claims embeds the raw Business row, billing columns and all.
   // This page used to pair each claim with a row from GET /businesses
   // instead, which runs every row through omitBillingFields — so
-  // membershipPlan never arrived and the plan step had nothing to show.
-  // Nothing here reads vouchCount or ladder, the only fields that endpoint
+  // membershipTier never arrived and the tier step had nothing to show.
+  // Nothing here reads vouchCount or vouchLevel, the only fields that endpoint
   // added, so the second request is gone rather than merged.
   function loadData() {
     return fetchAdminClaims()
@@ -386,8 +387,8 @@ function AdminReview() {
     );
   const onVerifySsm = (businessId) => withRefresh(() => verifySsm(businessId));
   const onRevokeSsm = (businessId) => withRefresh(() => revokeSsm(businessId));
-  const onSetPlan = (businessId, fields) =>
-    withRefresh(() => setBusinessPlan(businessId, fields));
+  const onSetMembershipTier = (businessId, fields) =>
+    withRefresh(() => setBusinessMembershipTier(businessId, fields));
 
   const claims = accounts
     .filter((account) => account.business)
@@ -399,7 +400,7 @@ function AdminReview() {
     verified: claims.filter((c) => claimQueue(c.account, c.business) === "verified"),
   };
 
-  const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetPlan };
+  const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier };
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">

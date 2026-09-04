@@ -1,9 +1,9 @@
 import { prisma } from "../prisma.js";
 import { serializeAccount } from "./serialize.js";
-import { ladderFor } from "./vouchLadder.js";
+import { vouchLevelFor } from "./vouchLevel.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
-// the frontend expects: vouchCount/ladder derived at read time (never
+// the frontend expects: vouchCount/vouchLevel derived at read time (never
 // stored, per schema.prisma) plus a flat `vouches` list mirroring the old
 // mock store's shape so components like VouchListItem don't need to branch
 // on where the data came from.
@@ -12,7 +12,7 @@ import { ladderFor } from "./vouchLadder.js";
 // every caller's query to have already filtered — a vouch only becomes a
 // trust signal once its receiver has accepted it (see the Vouch review
 // state machine in schema.prisma); pending/reverted/under_review/cancelled
-// rows must never count toward vouchCount/ladder or appear in the public
+// rows must never count toward vouchCount/vouchLevel or appear in the public
 // `vouches` list.
 // Billing columns are for the business itself and for admins, never for
 // whoever is looking at it. They live on the same row as the public profile
@@ -33,9 +33,9 @@ import { ladderFor } from "./vouchLadder.js";
 // before adding a third.
 function omitBillingFields(business) {
   const {
-    membershipPlan: _membershipPlan,
-    planStartedAt: _planStartedAt,
-    planExpiresAt: _planExpiresAt,
+    membershipTier: _membershipTier,
+    membershipTierStartedAt: _membershipTierStartedAt,
+    membershipTierExpiresAt: _membershipTierExpiresAt,
     isFoundingMember: _isFoundingMember,
     ...publicFields
   } = business;
@@ -78,7 +78,7 @@ function omitContactFields(business) {
 //
 // showContact comes from contactVisibility(business, viewer) and MUST be
 // computed on the RAW row, before this function runs: omitBillingFields
-// strips membershipPlan, so can() asked about this function's output would
+// strips membershipTier, so can() asked about this function's output would
 // deny everything and every business would silently look free. Same trap the
 // testimonials gate in routes/businesses.js already warns about.
 function publicBusinessView(business, { showContact = false } = {}) {
@@ -95,10 +95,15 @@ function serializeBusiness(business) {
   const { vouchesReceived, vouchesGiven, ...rest } = business;
   const published = vouchesReceived.filter((v) => v.status === "published");
   const vouchCount = published.length;
+  // Both directions, because the top vouch level ("leader") is the one rung
+  // that rewards GIVING — 25 received AND 10 given. Passing only the received
+  // count silently caps every business at "trusted", which is exactly how
+  // that rung went unreachable for months.
+  const vouchesGivenPublished = (vouchesGiven ?? []).filter((v) => v.status === "published").length;
   return {
     ...rest,
     vouchCount,
-    ladder: ladderFor(vouchCount),
+    vouchLevel: vouchLevelFor({ received: vouchCount, given: vouchesGivenPublished }),
     // Who this business already has a vouch OUT to, and where it stands.
     // Mirrors the 409 guard in routes/vouches.js exactly: cancelled rows are
     // omitted because a cancelled pair may vouch again, and every other
@@ -114,7 +119,7 @@ function serializeBusiness(business) {
       fromBusinessId: v.fromBusinessId,
       fromName: v.fromBusiness.name,
       fromCategory: v.fromBusiness.category,
-      fromTier: v.fromBusiness.tier,
+      fromVerificationLevel: v.fromBusiness.verificationLevel,
       // Joined through currentRevision rather than read off the Vouch row:
       // the denormalized `testimonial` column this used to read is gone
       // (see schema.prisma), because it was the thing a revise overwrote.
@@ -135,7 +140,7 @@ async function loadAccountView(accountId) {
         include: {
           vouchesReceived: {
             include: {
-              fromBusiness: { select: { name: true, category: true, tier: true } },
+              fromBusiness: { select: { name: true, category: true, verificationLevel: true } },
               currentRevision: { select: { comment: true } },
             },
             orderBy: { createdAt: "desc" },

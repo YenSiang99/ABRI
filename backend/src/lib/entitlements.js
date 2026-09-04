@@ -1,25 +1,35 @@
 // "Is this business allowed to do X?" — the one place a feature gate asks
-// about a plan, so a gate is never re-derived at a call site and never
+// about a membership tier, so a gate is never re-derived at a call site and never
 // drifts from another gate's idea of what a plan includes.
 //
-// The second plan-reading module after lib/vouchCap.js, and the split
+// The second tier-reading module after lib/vouchCap.js, and the split
 // between them is deliberate: vouchCap answers "how many", this answers
 // "at all". A quantity and a boolean want different shapes, and collapsing
 // them would mean every yes/no feature carried a meaningless number.
 //
-// schema.prisma's membershipPlan comment requires the plan union and
-// VOUCH_CAP_BY_PLAN to move in the same commit. That invariant now covers
-// this file too: a new plan needs a PLAN_RANK entry, or every gate denies
+// schema.prisma's membershipTier comment requires the plan union and
+// VOUCH_CAP_BY_MEMBERSHIP_TIER to move in the same commit. That invariant now covers
+// this file too: a new tier needs a MEMBERSHIP_TIER_RANK entry, or every gate denies
 // it (loudly — see below — but denies it).
 
-// Plans are a ladder, not a set of unrelated bundles: every tier so far is
-// a strict superset of the one below it. Ranking them once here means a
-// feature declares a MINIMUM rather than listing the plans that include
-// it — which is what stops a later edit granting something to Plus and
-// forgetting Pro.
-const PLAN_RANK = { free: 0, plus: 1, pro: 2, enterprise: 3 };
+// The membership tiers are cumulative, not a set of unrelated bundles: every
+// tier so far is a strict superset of the one below it. Ranking them once
+// here means a feature declares a MINIMUM rather than listing the tiers that
+// include it — which is what stops a later edit granting something to Plus
+// and forgetting Pro.
+//
+// This comment used to call them "a ladder", and the change is not cosmetic:
+// "ladder" was the VOUCH axis's name, so the one sentence in this codebase
+// that had to be clearest about billing was the sentence borrowing another
+// axis's word for it. The vouch axis is now vouchLevelFor() in
+// lib/vouchLevel.js and shares nothing with this file.
+//
+// Ranks, not the ordered array lib/verificationLevels.js uses, because this
+// map is read with >= (see can() below) while verification levels are only
+// ever read with === and Set.has. The two shapes disagree on purpose.
+const MEMBERSHIP_TIER_RANK = { free: 0, plus: 1, pro: 2, enterprise: 3 };
 
-const FEATURE_MIN_PLAN = {
+const FEATURE_MIN_MEMBERSHIP_TIER = {
   // Third parties see the vouch COUNT on every plan; only paid plans show
   // the words. See ABRI-feature-checklist.md's Free tier: "'12 vouches' is
   // visible, the written words are not."
@@ -32,7 +42,7 @@ const FEATURE_MIN_PLAN = {
   // gate, cancelling Plus would cost them nothing they could see.
   //
   // That path is one admin click away today (POST /admin/businesses/:id/plan)
-  // and becomes automatic the moment planExpiresAt starts being enforced.
+  // and becomes automatic the moment membershipTierExpiresAt starts being enforced.
   // Don't remove this as unreachable — it's the thing that will be reached.
   testimonials: "plus",
 
@@ -83,33 +93,34 @@ const FEATURE_MIN_PLAN = {
   // plan that included something the product didn't have. If a replacement
   // Pro feature arrives, it gets its own entry under its own name.
   nfcCard: "plus",
+
 };
 
 function can(business, feature) {
-  const minimum = FEATURE_MIN_PLAN[feature];
+  const minimum = FEATURE_MIN_MEMBERSHIP_TIER[feature];
   if (minimum === undefined) {
     // Throws where an unknown PLAN only warns: an unknown plan is bad data
     // arriving at runtime, but an unknown feature is a typo in the calling
     // code. Returning false there would make a gate that never opens look
     // exactly like a gate that works, which is the worst way to find out.
     throw new Error(
-      `Unknown feature ${JSON.stringify(feature)}. Known: ${Object.keys(FEATURE_MIN_PLAN).join(", ")}.`
+      `Unknown feature ${JSON.stringify(feature)}. Known: ${Object.keys(FEATURE_MIN_MEMBERSHIP_TIER).join(", ")}.`
     );
   }
 
-  const rank = PLAN_RANK[business?.membershipPlan];
+  const rank = MEMBERSHIP_TIER_RANK[business?.membershipTier];
   if (rank === undefined) {
     // Same call as vouchCap.js's: deny rather than throw, because an
     // off-union plan value is our data bug, not the visitor's, and a
     // public profile shouldn't 500 over it. Warn so we find out from the
     // logs rather than from a member asking why their page looks wrong.
     console.warn(
-      `[entitlements] Unknown membershipPlan ${JSON.stringify(business?.membershipPlan)} — ` +
+      `[entitlements] Unknown membershipTier ${JSON.stringify(business?.membershipTier)} — ` +
         `denying "${feature}".`
     );
     return false;
   }
-  return rank >= PLAN_RANK[minimum];
+  return rank >= MEMBERSHIP_TIER_RANK[minimum];
 }
 
-export { PLAN_RANK, FEATURE_MIN_PLAN, can };
+export { MEMBERSHIP_TIER_RANK, FEATURE_MIN_MEMBERSHIP_TIER, can };

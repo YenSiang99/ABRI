@@ -54,7 +54,7 @@ function hasTurn(vouch, businessId, expectedRole) {
   return roleFor(vouch, businessId) === expectedRole && turnFor(vouch) === expectedRole;
 }
 
-const BUSINESS_SELECT = { id: true, name: true, category: true, tier: true };
+const BUSINESS_SELECT = { id: true, name: true, category: true, verificationLevel: true };
 
 // One include for every vouch read — both sides of the relation, the live
 // revision, and the full child history, which serializeVouch below then

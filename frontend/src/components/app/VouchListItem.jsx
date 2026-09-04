@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
@@ -84,7 +84,7 @@ function FlagCancelDialog({ vouch, other, open, onOpenChange, onSuccess }) {
 //   - the full serializeVouch payload (see backend/src/lib/vouchTurn.js),
 //     which carries counterparty/status/timeline — from /vouches/given and
 //     /vouches/received;
-//   - the flat fromName/fromCategory/fromTier shape that accountView.js
+//   - the flat fromName/fromCategory/fromVerificationLevel shape that accountView.js
 //     builds for the public profile, still used by pages/app/Profile.jsx.
 // `counterparty` is the discriminator. The flat shape has no history, so
 // the timeline simply doesn't render for it.
@@ -103,7 +103,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
   const other =
     vouch.counterparty ??
     (mode === "received"
-      ? { id: vouch.fromBusinessId, name: vouch.fromName, category: vouch.fromCategory, tier: vouch.fromTier }
+      ? { id: vouch.fromBusinessId, name: vouch.fromName, category: vouch.fromCategory, verificationLevel: vouch.fromVerificationLevel }
       : null);
   if (!other) return null;
 
@@ -133,7 +133,7 @@ function VouchListItem({ vouch, mode, onChanged }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">{other.name}</span>
-            <AppTierBadge tier={other.tier} />
+            <AppVerificationBadge verificationLevel={other.verificationLevel} />
             {statusLabel && (
               <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {statusLabel}

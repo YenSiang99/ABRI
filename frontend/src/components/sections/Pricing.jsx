@@ -1,4 +1,4 @@
-import { PlanComparison } from "@/components/sections/PlanComparison";
+import { MembershipTierComparison } from "@/components/sections/MembershipTierComparison";
 
 function Pricing() {
   return (
@@ -18,7 +18,7 @@ function Pricing() {
           </p>
         </div>
 
-        <PlanComparison />
+        <MembershipTierComparison />
 
         <div className="mx-auto mt-11 max-w-[640px] rounded-md bg-surface-2 px-7 py-5 text-center text-[14.5px] text-grey-600 dark:bg-muted dark:text-muted-foreground">
           <b className="text-ink dark:text-foreground">Founding 100 — by invitation only.</b> The

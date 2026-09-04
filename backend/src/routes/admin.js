@@ -12,7 +12,8 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
 import { serializeVouch, VOUCH_INCLUDE, BUSINESS_SELECT } from "../lib/vouchTurn.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
-import { PLAN_RANK } from "../lib/entitlements.js";
+import { MEMBERSHIP_TIER_RANK } from "../lib/entitlements.js";
+import { CLAIMED, SSM_VERIFIED } from "../lib/verificationLevels.js";
 
 const router = Router();
 
@@ -112,7 +113,7 @@ router.post(
 
 // Undoes an already-approved claim — deletes the account entirely and
 // drops the business back to T0. For an admin fixing a fat-fingered
-// approval, not a "downgrade one tier" operation (contrast with
+// approval, not a "downgrade one level" operation (contrast with
 // /businesses/:id/revoke-ssm below) — the whole claim is being unwound,
 // so T0 is the only place left to land.
 router.post(
@@ -143,7 +144,7 @@ router.post(
     const business = await prisma.business.findUnique({
       where: { id: req.params.id },
     });
-    if (!business || business.tier !== "T1") {
+    if (!business || business.verificationLevel !== CLAIMED) {
       return res
         .status(400)
         .json({
@@ -152,7 +153,7 @@ router.post(
     }
     const updated = await prisma.business.update({
       where: { id: business.id },
-      data: { tier: "T2" },
+      data: { verificationLevel: SSM_VERIFIED },
     });
     res.json({ business: updated });
   }),
@@ -164,55 +165,55 @@ router.post(
     const business = await prisma.business.findUnique({
       where: { id: req.params.id },
     });
-    if (!business || business.tier !== "T2") {
+    if (!business || business.verificationLevel !== SSM_VERIFIED) {
       return res
         .status(400)
         .json({ error: "Business isn't currently SSM-verified." });
     }
     const updated = await prisma.business.update({
       where: { id: business.id },
-      data: { tier: "T1" },
+      data: { verificationLevel: CLAIMED },
     });
     res.json({ business: updated });
   }),
 );
 
-// Moves a business onto a membership plan by hand. There is no payment page
+// Moves a business onto a membership tier by hand. There is no payment page
 // yet, so this IS how a sale gets fulfilled — and it replaces having to SSH
-// in and run scripts/set-plan.js to do it.
+// in and run scripts/set-membership-tier.js to do it.
 //
-// planExpiresAt is RECORDED, NOT ENFORCED. Nothing reads the column (see
+// membershipTierExpiresAt is RECORDED, NOT ENFORCED. Nothing reads the column (see
 // schema.prisma), so a date in the past downgrades nobody; expiry belongs
 // to the payment-and-renewal work. It's writable now so an admin selling a
 // year of Plus has somewhere to put the date, and so renewal has real data
 // to act on when it lands.
 //
 // isFoundingMember is deliberately NOT writable here. The other two writers
-// (lib/businessClaim.js, scripts/set-plan.js) only ever set it true — that
-// is the entire reason it was split out of membershipPlan — so this route
+// (lib/businessClaim.js, scripts/set-membership-tier.js) only ever set it true — that
+// is the entire reason it was split out of membershipTier — so this route
 // doesn't touch the column at all, rather than offering a way to strip
 // founding status as a side effect of an unrelated downgrade.
 router.post(
-  "/businesses/:id/plan",
+  "/businesses/:id/membership-tier",
   asyncHandler(async (req, res) => {
-    const { plan, expiresAt } = req.body ?? {};
+    const { membershipTier, expiresAt } = req.body ?? {};
 
-    // Checked against the entitlements ladder rather than a list kept here:
+    // Checked against the entitlements rank rather than a list kept here:
     // a value this route accepted but can() didn't recognise would be sold,
     // stored, and then quietly denied every gated feature (and capped at
     // the strictest vouch limit — see lib/vouchCap.js).
-    if (!Object.hasOwn(PLAN_RANK, plan)) {
+    if (!Object.hasOwn(MEMBERSHIP_TIER_RANK, membershipTier)) {
       return res
         .status(400)
-        .json({ error: `Unknown plan. Pick one of: ${Object.keys(PLAN_RANK).join(", ")}.` });
+        .json({ error: `Unknown membership tier. Pick one of: ${Object.keys(MEMBERSHIP_TIER_RANK).join(", ")}.` });
     }
 
-    // Empty clears it — a plan that doesn't lapse, which is what every
+    // Empty clears it — a tier that doesn't lapse, which is what every
     // business has today.
-    let planExpiresAt = null;
+    let membershipTierExpiresAt = null;
     if (expiresAt) {
-      planExpiresAt = new Date(expiresAt);
-      if (Number.isNaN(planExpiresAt.getTime())) {
+      membershipTierExpiresAt = new Date(expiresAt);
+      if (Number.isNaN(membershipTierExpiresAt.getTime())) {
         return res.status(400).json({ error: "That expiry date isn't a real date." });
       }
     }
@@ -223,11 +224,11 @@ router.post(
     const updated = await prisma.business.update({
       where: { id: business.id },
       data: {
-        membershipPlan: plan,
-        // Only restarted when the plan actually moves. Correcting an expiry
+        membershipTier,
+        // Only restarted when the tier actually moves. Correcting an expiry
         // date shouldn't rewrite when the membership began.
-        ...(business.membershipPlan === plan ? {} : { planStartedAt: new Date() }),
-        planExpiresAt,
+        ...(business.membershipTier === membershipTier ? {} : { membershipTierStartedAt: new Date() }),
+        membershipTierExpiresAt,
       },
     });
 

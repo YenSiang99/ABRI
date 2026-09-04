@@ -1,20 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams} from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio } from "lucide-react";
 
-import { isVouchable, VOUCHABLE_TIERS } from "@/lib/vouchRules";
+import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
+import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
+import { CLAIMED, UNCLAIMED } from "@/lib/verificationLevels";
 
 function VouchCard({ vouch }) {
   return (
@@ -60,6 +62,18 @@ function BusinessProfile({ inApp = false }) {
   const { business: actingBusiness } = useAuth();
   const { isConnected, connect } = useConnections();
   const [vouchOpen, setVouchOpen] = useState(false);
+  // Controlled rather than defaultValue, so ?tab=vouches is a link target.
+  // Same shape Vouches.jsx uses: unknown values fall back, and the default
+  // tab omits the param entirely.
+  const [tabParams, setTabParams] = useSearchParams();
+  const PROFILE_TABS = ["overview", "vouches", "card"];
+  const tab = PROFILE_TABS.includes(tabParams.get("tab")) ? tabParams.get("tab") : "overview";
+  const setTab = (value) => {
+    const next = new URLSearchParams(tabParams);
+    if (value === "overview") next.delete("tab");
+    else next.set("tab", value);
+    setTabParams(next, { replace: true });
+  };
   const [business, setBusiness] = useState(null);
   const [error, setError] = useState(null);
   const [loadedId, setLoadedId] = useState(null);
@@ -105,13 +119,13 @@ function BusinessProfile({ inApp = false }) {
   // it. See components/app/UpgradePrompt.jsx.
   const vouchGate = useUpgradeGate("giveVouch");
   const canVouch =
-    inApp && VOUCHABLE_TIERS.has(actingBusiness?.tier) && isVouchable(business, actingBusiness);
+    inApp && VOUCHABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) && isVouchable(business, actingBusiness);
   const canConnect =
     inApp &&
     actingBusiness &&
     business &&
     actingBusiness.id !== business.id &&
-    business.tier !== "T0";
+    business.verificationLevel !== UNCLAIMED;
   const alreadyConnected = canConnect && isConnected(business.id);
 
   async function handleConnect() {
@@ -152,8 +166,8 @@ function BusinessProfile({ inApp = false }) {
     );
   }
 
-  const isUnclaimed = business.tier === "T0";
-  const isPendingVerification = business.tier === "T1";
+  const isUnclaimed = business.verificationLevel === UNCLAIMED;
+  const isPendingVerification = business.verificationLevel === CLAIMED;
   // vouchCount comes from the server rather than vouchesReceived.length:
   // on a free business the array is withheld but the count is not, and
   // conflating them is what would silently show "0 vouches" for a business
@@ -193,7 +207,15 @@ function BusinessProfile({ inApp = false }) {
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <VerificationBadge tier={business.tier} size="inline" chip />
+                {/* Tappable, and this is THE surface the explainer exists
+                    for: a visitor meeting "L2" on a business they don't know
+                    has no other way to find out what it means, and won't
+                    leave this page to go looking. `business` is the company
+                    being LOOKED AT, so the dialog marks their rung, never
+                    the viewer's. */}
+                <ExplainBadge axis="verification" business={business}>
+                  <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
+                </ExplainBadge>
                 {canConnect &&
                   (alreadyConnected ? (
                     <Button size="sm" variant="secondary" disabled>
@@ -279,7 +301,7 @@ function BusinessProfile({ inApp = false }) {
       </div>
 
       {!isUnclaimed && (
-        <Tabs defaultValue="overview" className="mt-8">
+        <Tabs value={tab} onValueChange={setTab} className="mt-8">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="vouches">

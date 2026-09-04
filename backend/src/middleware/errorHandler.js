@@ -26,10 +26,12 @@ function errorHandler(err, req, res, next) {
       error: err.message,
       // Only set by a paywall throw (failUpgrade in routes/vouches.js), and
       // the reason those are 402s rather than 403s: the client shows an
-      // upgrade prompt naming this plan instead of toasting the message.
+      // upgrade prompt naming this membership tier instead of toasting the
+      // message. Renamed from `upgradeRequired`, which never said upgrade to
+      // WHAT — the value was always a tier key.
       // Keyed off the field rather than off the status so a future 402 that
       // isn't a plan gate can't accidentally open a pricing dialog.
-      ...(err.upgradeRequired ? { upgradeRequired: err.upgradeRequired } : {}),
+      ...(err.requiredMembershipTier ? { requiredMembershipTier: err.requiredMembershipTier } : {}),
     });
   }
 

@@ -1,10 +1,10 @@
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { cn } from "@/lib/utils";
 
-function AppTierBadge({ tier, className }) {
+function AppVerificationBadge({ verificationLevel, className }) {
   return (
     <VerificationBadge
-      tier={tier}
+      verificationLevel={verificationLevel}
       size="inline"
       chip
       className={cn("border-border bg-card", className)}
@@ -12,4 +12,4 @@ function AppTierBadge({ tier, className }) {
   );
 }
 
-export { AppTierBadge };
+export { AppVerificationBadge };

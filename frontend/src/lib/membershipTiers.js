@@ -1,12 +1,21 @@
-// The four billing tiers, and the feature matrix behind the pricing table.
+// The four membership TIERS, and the feature matrix behind the pricing table.
+// The one axis of this product that is for sale — which is what the word
+// "tier" now means, and the only thing it means.
+//
+// The two EARNED axes (verification level, vouch level) are quarantined in
+// lib/trustLabels.js and must never be labelled from here; see that file's
+// header. The exported label map is `membershipTierLabel`, not `tierLabel`,
+// and that is the one naming decision in this rename a build cannot check
+// for you.
+//
 // Lives here rather than inside the Pricing section because two surfaces
-// need it — the public comparison table and the member's own plan label in
+// need it — the public comparison table and the member's own tier chip in
 // AppSidebar — and a later in-app upgrade screen will be a third. Mirrors
-// backend/prisma/schema.prisma's Business.membershipPlan union; the values
+// backend/prisma/schema.prisma's Business.membershipTier union; the values
 // below are the ones actually stored, the labels are only for display.
-const PLAN_ORDER = ["free", "plus", "pro", "enterprise"];
+const MEMBERSHIP_TIER_ORDER = ["free", "plus", "pro", "enterprise"];
 
-const planLabel = {
+const membershipTierLabel = {
   free: "Free",
   plus: "Plus",
   pro: "Pro",
@@ -17,23 +26,23 @@ const planLabel = {
 // outcome and lets the feature rows justify it, rather than leading with a
 // feature count — a business owner decides on "will this get me work",
 // not on how many ticks a column has.
-const planPitch = {
+const membershipTierPitch = {
   free: "People can find me.",
   plus: "People can trust me.",
   pro: "The network brings me business.",
   enterprise: "One account for my whole organisation.",
 };
 
-const planPrice = {
+const membershipTierPrice = {
   free: "RM0",
   plus: "RM490",
   pro: "RM1,490",
   enterprise: "Custom",
 };
 
-// Suffix rather than part of planPrice so the table can typeset it smaller,
+// Suffix rather than part of membershipTierPrice so the table can typeset it smaller,
 // and so "Custom" doesn't render as "Custom / year".
-const planPriceNote = {
+const membershipTierPriceNote = {
   free: "forever",
   plus: "/ year",
   pro: "/ year",
@@ -44,7 +53,7 @@ const planPriceNote = {
 // string renders as-is for the rows where the answer is a quantity rather
 // than a yes/no. Kept deliberately short — this is the table that has to be
 // readable at a glance on a phone, not the full build checklist.
-const PLAN_FEATURES = [
+const MEMBERSHIP_TIER_FEATURES = [
   { label: "Listed in the directory", free: true, plus: true, pro: true, enterprise: true },
   { label: "SSM-verified badge", free: false, plus: true, pro: true, enterprise: true },
   // Free, and nothing anywhere gates it: PATCH /businesses/me asks only for
@@ -53,7 +62,7 @@ const PLAN_FEATURES = [
   // page is table stakes for being listed at all — what Plus buys is the
   // contact block on it being VISIBLE (see the row below), not writable.
   { label: "Full editable profile", free: true, plus: true, pro: true, enterprise: true },
-  // GATED, in the UI only — see FEATURE_MIN_PLAN below and its counterpart
+  // GATED, in the UI only — see FEATURE_MIN_MEMBERSHIP_TIER below and its counterpart
   // in backend/src/lib/entitlements.js. /app/card is not SHUT to Free: it
   // shows them the card artwork with their own details on it, marked as a
   // preview, and withholds the printed card, the status panel and the tap
@@ -75,7 +84,7 @@ const PLAN_FEATURES = [
   // What it can't do is publish one. Net effect, and the thing to say out
   // loud rather than let a reader discover: a Free business has no vouches.
   { label: "Accept vouches onto your profile", free: false, plus: true, pro: true, enterprise: true },
-  // ENFORCED, by FEATURE_MIN_PLAN in backend/src/lib/entitlements.js —
+  // ENFORCED, by FEATURE_MIN_MEMBERSHIP_TIER in backend/src/lib/entitlements.js —
   // GET /businesses/:id withholds the text itself, not just the UI.
   //
   // Vouch caps, this row and the contact-details row below are the only
@@ -112,7 +121,36 @@ const PLAN_FEATURES = [
   { label: "Team accounts", free: false, plus: false, pro: false, enterprise: true },
 ];
 
-// Mirrors FEATURE_MIN_PLAN in backend/src/lib/entitlements.js, which is
+// The features tier `t` adds over the tier below it, for the in-app upgrade
+// cards on pages/app/Plan.jsx. Derived from MEMBERSHIP_TIER_FEATURES rather
+// than written out a second time: a card list that restates the matrix in its
+// own words is the drift this file's single-source layout exists to prevent.
+//
+// A row belongs to tier `t` when its value CHANGED from the tier below AND is
+// truthy. That falls out correctly for the three shapes of row in the matrix:
+//
+//   booleans   — appear once, on the tier that first turns them on.
+//   quantities — appear on every tier that raises them ("20 / mo" then
+//                "40 / mo"), and drop off where they don't ("Top" under Pro
+//                stays "Top" under Enterprise, so Enterprise doesn't claim it).
+//   constants  — never appear as a delta at all: a row that reads the same
+//                in every column is not something any tier is buying.
+//
+// `free` is the base case: its own truthy rows, since there is no tier below.
+//
+// Returns { label, detail } rather than a formatted string — detail is null
+// for a plain boolean and the cell's own text for a quantity. Typography is
+// the page's job, not this file's.
+function membershipTierUpgrades(t) {
+  const i = MEMBERSHIP_TIER_ORDER.indexOf(t);
+  if (i < 0) return [];
+  const below = MEMBERSHIP_TIER_ORDER[i - 1];
+  return MEMBERSHIP_TIER_FEATURES.filter(
+    (row) => Boolean(row[t]) && (below === undefined || row[t] !== row[below]),
+  ).map((row) => ({ label: row.label, detail: row[t] === true ? null : row[t] }));
+}
+
+// Mirrors FEATURE_MIN_MEMBERSHIP_TIER in backend/src/lib/entitlements.js, which is
 // the authority — keep the two in step.
 //
 // For `testimonials` the server strips the data and this copy exists only
@@ -127,7 +165,7 @@ const PLAN_FEATURES = [
 // withholds is either a physical object nobody can grant themselves or mock
 // data that is false for every plan. That is luck, not design — the moment a
 // real taps table exists, this gate needs a server half.
-const FEATURE_MIN_PLAN = {
+const FEATURE_MIN_MEMBERSHIP_TIER = {
   testimonials: "plus",
   // Like `testimonials` and unlike the two below it: the server strips the
   // data, so this copy only lets the UI explain a gate that is already
@@ -138,7 +176,7 @@ const FEATURE_MIN_PLAN = {
   // this feature deliberately doesn't have.
   contactDetails: "plus",
   // Both server-enforced (POST /vouches and POST /vouches/:id/accept
-  // respectively, which answer 402 with an `upgradeRequired` plan). Unlike
+  // respectively, which answer 402 with an `requiredMembershipTier` plan). Unlike
   // every other entry here, these two are read to decide whether a button
   // OPENS ITS ACTION OR AN UPGRADE PROMPT — never whether it renders. The
   // affordance staying visible is the whole mechanism: a Free member is
@@ -154,31 +192,32 @@ const FEATURE_MIN_PLAN = {
 
 // True when `plan` reaches the minimum tier for `feature`. Unknown plan or
 // unknown feature returns false, matching the server's deny-by-default.
-function planAllows(plan, feature) {
-  const minimum = FEATURE_MIN_PLAN[feature];
-  const i = PLAN_ORDER.indexOf(plan);
-  const min = PLAN_ORDER.indexOf(minimum);
+function membershipTierAllows(plan, feature) {
+  const minimum = FEATURE_MIN_MEMBERSHIP_TIER[feature];
+  const i = MEMBERSHIP_TIER_ORDER.indexOf(plan);
+  const min = MEMBERSHIP_TIER_ORDER.indexOf(minimum);
   return minimum !== undefined && i > -1 && i >= min;
 }
 
 // Everyone except the top tier has somewhere to go. Derived from
-// PLAN_ORDER rather than comparing against "enterprise" by name, so adding
+// MEMBERSHIP_TIER_ORDER rather than comparing against "enterprise" by name, so adding
 // a tier above it can't leave a dead Upgrade link pointing nowhere.
 // An unrecognised plan gets `false`: the caller can't say where to upgrade
 // TO, so it shouldn't offer.
-function canUpgradeFrom(plan) {
-  const i = PLAN_ORDER.indexOf(plan);
-  return i > -1 && i < PLAN_ORDER.length - 1;
+function canUpgradeFromMembershipTier(plan) {
+  const i = MEMBERSHIP_TIER_ORDER.indexOf(plan);
+  return i > -1 && i < MEMBERSHIP_TIER_ORDER.length - 1;
 }
 
 export {
-  PLAN_ORDER,
-  PLAN_FEATURES,
-  FEATURE_MIN_PLAN,
-  planAllows,
-  planLabel,
-  planPitch,
-  planPrice,
-  planPriceNote,
-  canUpgradeFrom,
+  MEMBERSHIP_TIER_ORDER,
+  MEMBERSHIP_TIER_FEATURES,
+  FEATURE_MIN_MEMBERSHIP_TIER,
+  membershipTierAllows,
+  membershipTierUpgrades,
+  membershipTierLabel,
+  membershipTierPitch,
+  membershipTierPrice,
+  membershipTierPriceNote,
+  canUpgradeFromMembershipTier,
 };

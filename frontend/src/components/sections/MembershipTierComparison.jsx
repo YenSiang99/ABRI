@@ -1,14 +1,14 @@
+import { Check } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { VerificationIcon } from "@/components/badge/VerificationIcon";
 import {
-  PLAN_ORDER,
-  PLAN_FEATURES,
-  planLabel,
-  planPitch,
-  planPrice,
-  planPriceNote,
-} from "@/lib/plans";
+  MEMBERSHIP_TIER_ORDER,
+  MEMBERSHIP_TIER_FEATURES,
+  membershipTierLabel,
+  membershipTierPitch,
+  membershipTierPrice,
+  membershipTierPriceNote,
+} from "@/lib/membershipTiers";
 import { cn } from "@/lib/utils";
 
 // The four-column pricing table. Split out of Pricing.jsx so the matrix
@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 //
 // Plus is the featured column rather than Pro: it's the volume tier, and
 // the table's job is to move free members one step, not to sell the top.
-const FEATURED_PLAN = "plus";
+const FEATURED_MEMBERSHIP_TIER = "plus";
 
 const CTA = {
   free: { label: "Create free account", to: "/register" },
@@ -36,7 +36,13 @@ function FeatureCell({ value }) {
   if (value === true) {
     return (
       <span className="inline-flex" title="Included">
-        <VerificationIcon tier="verified" size="small" />
+        {/* A plain tick, deliberately NOT VerificationIcon. That mark's yellow
+            is the SSM-verified colour, and using it as a generic "included" ✓
+            made every paid row of this table read as a trust claim — the
+            exact collision the chip comment in components/app/AppSidebar.jsx
+            warns about, one level up. The billing table gets no yellow and no
+            circular trust marks. */}
+        <Check className="h-4 w-4 text-foreground" aria-hidden />
         <span className="sr-only">Included</span>
       </span>
     );
@@ -59,7 +65,7 @@ function FeatureCell({ value }) {
   );
 }
 
-function PlanComparison() {
+function MembershipTierComparison() {
   return (
     // Four plan columns will not fit a phone, so the table scrolls inside
     // its own container rather than forcing the page body sideways. The
@@ -67,7 +73,7 @@ function PlanComparison() {
     // keyboard — without it the right-hand columns are mouse-only.
     <div
       role="region"
-      aria-label="Plan comparison"
+      aria-label="Membership tier comparison"
       tabIndex={0}
       className="mx-auto max-w-[1000px] overflow-x-auto focus-visible:ring-2 focus-visible:ring-yellow focus-visible:outline-none"
     >
@@ -85,33 +91,33 @@ function PlanComparison() {
             >
               <span className="sr-only">Feature</span>
             </th>
-            {PLAN_ORDER.map((plan) => (
+            {MEMBERSHIP_TIER_ORDER.map((plan) => (
               <th
                 key={plan}
                 scope="col"
                 className={cn(
                   "border-b border-grey-200 p-3 align-bottom dark:border-border",
-                  plan === FEATURED_PLAN &&
+                  plan === FEATURED_MEMBERSHIP_TIER &&
                     "rounded-t-lg border-x border-t border-ink bg-white dark:border-yellow dark:bg-card"
                 )}
               >
                 <span className="block text-[13px] font-extrabold text-ink dark:text-foreground">
-                  {planLabel[plan]}
+                  {membershipTierLabel[plan]}
                 </span>
                 <span className="mt-1 block text-[11.5px] leading-snug font-normal text-grey-500 dark:text-muted-foreground">
-                  {planPitch[plan]}
+                  {membershipTierPitch[plan]}
                 </span>
                 <span className="mt-2.5 block text-[22px] leading-none font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
-                  {planPrice[plan]}
+                  {membershipTierPrice[plan]}
                 </span>
                 <span className="mt-1 block text-[11px] font-semibold text-grey-500 dark:text-muted-foreground">
-                  {planPriceNote[plan]}
+                  {membershipTierPriceNote[plan]}
                 </span>
                 <Link
                   to={CTA[plan].to}
                   className={cn(
                     "mt-3 inline-flex w-full items-center justify-center rounded-sm border px-3 py-2 text-[12.5px] leading-none font-bold transition-all hover:-translate-y-px",
-                    plan === FEATURED_PLAN
+                    plan === FEATURED_MEMBERSHIP_TIER
                       ? "border-transparent bg-yellow text-yellow-ink hover:bg-yellow-hi hover:shadow-md"
                       : "border-grey-300 text-ink hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
                   )}
@@ -123,7 +129,7 @@ function PlanComparison() {
           </tr>
         </thead>
         <tbody>
-          {PLAN_FEATURES.map((row) => (
+          {MEMBERSHIP_TIER_FEATURES.map((row) => (
             <tr key={row.label} className="group">
               <th
                 scope="row"
@@ -131,12 +137,12 @@ function PlanComparison() {
               >
                 {row.label}
               </th>
-              {PLAN_ORDER.map((plan) => (
+              {MEMBERSHIP_TIER_ORDER.map((plan) => (
                 <td
                   key={plan}
                   className={cn(
                     "border-b border-grey-100 px-3 py-2.5 text-center dark:border-border",
-                    plan === FEATURED_PLAN &&
+                    plan === FEATURED_MEMBERSHIP_TIER &&
                       "border-x border-ink bg-white dark:border-yellow dark:bg-card"
                   )}
                 >
@@ -150,12 +156,12 @@ function PlanComparison() {
               and read as an unfinished outline. */}
           <tr aria-hidden="true">
             <td className="p-0" />
-            {PLAN_ORDER.map((plan) => (
+            {MEMBERSHIP_TIER_ORDER.map((plan) => (
               <td
                 key={plan}
                 className={cn(
                   "h-2 p-0",
-                  plan === FEATURED_PLAN &&
+                  plan === FEATURED_MEMBERSHIP_TIER &&
                     "rounded-b-lg border-x border-b border-ink bg-white dark:border-yellow dark:bg-card"
                 )}
               />
@@ -167,4 +173,4 @@ function PlanComparison() {
   );
 }
 
-export { PlanComparison };
+export { MembershipTierComparison };

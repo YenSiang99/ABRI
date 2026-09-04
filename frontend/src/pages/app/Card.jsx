@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/app/StatCard";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
-import { planAllows } from "@/lib/plans";
+import { membershipTierAllows } from "@/lib/membershipTiers";
 import { nfcTaps } from "@/data/appMockData";
 import { toast } from "@/lib/toast";
+import { CLAIMED } from "@/lib/verificationLevels";
+import { verificationLevelLabel } from "@/lib/trustLabels";
 
 function Row({ label, value, mono }) {
   return (
@@ -48,15 +50,22 @@ function CardFace({ business, preview = false }) {
           <div className="mt-8 text-2xl font-semibold tracking-tight">{business.name}</div>
           <div className="mt-0.5 text-sm opacity-70">{business.category}</div>
           <div className="mt-1 text-xs opacity-50">{business.location}</div>
+          {/* The verification level, in sans, on the card FRONT. It used to be
+              printed in the footer's mono as "Tier L2" — the typeface reserved
+              for billing, a hundred pixels above a mono "Included in Plus"
+              chip, which made an earned signal look like a bought one. This
+              also makes BusinessProfile.jsx's promise true: verification
+              status renders before contact details on every tap. */}
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">
+            {verificationLevelLabel[business.verificationLevel]}
+          </div>
         </div>
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-foreground">
           A
         </div>
       </div>
       <div className="absolute right-8 bottom-6 left-8 flex items-end justify-between font-mono text-[10px] opacity-70">
-        <span>
-          SSM {business.ssm} · Tier {business.tier}
-        </span>
+        <span>SSM {business.ssm}</span>
         {preview ? (
           <span>PREVIEW · NOT YET PRINTED</span>
         ) : (
@@ -93,7 +102,7 @@ function Card() {
   // as the vouches tab in BusinessProfile.jsx. "Finish getting verified" is
   // more useful to someone who can't use the feature either way than "this
   // is on a paid plan", which would only be true after they had.
-  if (business.tier === "T1") {
+  if (business.verificationLevel === CLAIMED) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-10">
         <PageHeader />
@@ -132,8 +141,8 @@ function Card() {
   //
   // Note the ordering: the T1 check above wins, so this preview is only ever
   // reached by a verified business. A T1 member has no `ssm`, and the card
-  // face would render "SSM null · Tier T1".
-  if (!planAllows(business.membershipPlan, "nfcCard")) {
+  // face would render "SSM null".
+  if (!membershipTierAllows(business.membershipTier, "nfcCard")) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-10">
         <PageHeader />
@@ -146,7 +155,7 @@ function Card() {
             heard of ABRI.
           </p>
 
-          {/* Same mono chip and "See plans" link as
+          {/* Same mono chip and "See tiers" link as
               components/app/LockedFeature.jsx and UpgradePrompt.jsx. Not
               LockedFeature itself: that renders a dashed panel around a lock
               icon, which is the right shape for a shut door and the wrong one
@@ -156,10 +165,10 @@ function Card() {
               Included in Plus
             </span>
             <Link
-              to="/#pricing"
+              to="/app/plan"
               className="text-sm font-semibold text-foreground underline underline-offset-4"
             >
-              See plans →
+              See tiers →
             </Link>
           </div>
         </div>

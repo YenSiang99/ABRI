@@ -13,24 +13,19 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/app/StatCard";
 import { AppBusinessCard } from "@/components/app/AppBusinessCard";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { tierLabel, ladderLabel } from "@/lib/trustLabels";
+import { verificationLevelLabel, vouchLevelLabel } from "@/lib/trustLabels";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyActivity } from "@/lib/api/activity";
 import { isVouchable } from "@/lib/vouchRules";
 import { activityLink } from "@/lib/activityLinks";
 import { cn } from "@/lib/utils";
-
-const NEXT_TIER_STEPS = [
-  { label: "SSM cross-check confirmed", done: true },
-  { label: "Director-name match", done: true },
-  { label: "Complete optional eKYC", done: false },
-  { label: "Verify representative identity", done: false },
-];
+import { CLAIMED } from "@/lib/verificationLevels";
+import { nextVerificationLevel } from "@/lib/verificationLevelData";
 
 // One line of the activity feed. Clickable whenever the event names somewhere
 // to go — every message is about something that happened on another page, so
@@ -110,9 +105,10 @@ function ActivityRow({ event, onOpen }) {
 }
 
 function Dashboard() {
-  const { business } = useAuth();
+  const { account, business } = useAuth();
   const { markOneRead, markAllRead } = useNotifications();
-  const pending = business.tier === "T1";
+  const pending = business.verificationLevel === CLAIMED;
+  const nextLevel = nextVerificationLevel(account, business);
 
   const [suggested, setSuggested] = useState([]);
   const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
@@ -172,9 +168,18 @@ function Dashboard() {
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
             {business.name}
           </h1>
+          {/* Linked because this is where members meet these two words for the
+              first time and have nowhere to ask. Wrapped at the CALL SITE, not
+              inside the badge components — those also render on public
+              profiles and directory cards, and a visitor tapping a stranger's
+              badge must not land on their own levels page. */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <AppTierBadge tier={business.tier} />
-            <VouchBadge ladder={business.ladder} />
+            <Link to="/app/verify" aria-label="What the verification level means">
+              <AppVerificationBadge verificationLevel={business.verificationLevel} />
+            </Link>
+            <Link to="/app/vouches" aria-label="What the vouch level means">
+              <VouchBadge vouchLevel={business.vouchLevel} />
+            </Link>
           </div>
         </div>
         <Link
@@ -244,55 +249,85 @@ function Dashboard() {
           hint="Petaling Jaya corridor"
           icon={Eye}
         />
+        {/* Both cards show the LABEL as the value and the machine detail as
+            the hint. They used to disagree — this one rendered the raw code
+            "L2" with the label demoted to a hint, while the one below rendered
+            its label as the value. Two adjacent cards, same kind of data,
+            opposite conventions. */}
         <StatCard
-          label="Verification tier"
-          value={business.tier}
-          hint={tierLabel[business.tier]}
+          label="Verification level"
+          value={verificationLevelLabel[business.verificationLevel]}
+          hint={business.verificationLevel}
           icon={ShieldCheck}
+          to="/app/verify"
         />
         <StatCard
           label="Vouch level"
-          value={ladderLabel[business.ladder]}
-          hint="Based on vouch activity"
+          value={vouchLevelLabel[business.vouchLevel]}
+          hint={
+            business.vouches.length === 1
+              ? "1 vouch received"
+              : `${business.vouches.length} vouches received`
+          }
           icon={Award}
+          to="/app/vouches"
         />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-1">
-          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Progress to T3
-          </div>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
-            Identity-Verified
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Complete the remaining steps to unlock the T3 badge and Network
-            Leader eligibility.
-          </p>
-          <ul className="mt-5 space-y-3">
-            {NEXT_TIER_STEPS.map((step) => (
-              <li key={step.label} className="flex items-start gap-3 text-sm">
-                {step.done ? (
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
-                    <Check className="h-3 w-3" />
+        {/* Derived from lib/verificationLevelData.js, the same source
+            /app/verify reads. This panel used to hold its own hardcoded step
+            list and say "Progress to L3" to every member regardless of their
+            actual level — and its steps disagreed with what the levels page
+            said L3 required. Two explainers giving different answers.
+
+            Renders nothing at the top level, where there is no next step to
+            show. */}
+        {nextLevel ? (
+          <Link
+            to="/app/verify"
+            className="block rounded-2xl border border-border bg-card p-6 transition-colors hover:bg-secondary lg:col-span-1"
+          >
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Progress to {nextLevel.verificationLevel}
+            </div>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+              {verificationLevelLabel[nextLevel.verificationLevel]}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">{nextLevel.blurb}</p>
+            <ul className="mt-5 space-y-3">
+              {nextLevel.steps.map((step) => (
+                <li key={step.id} className="flex items-start gap-3 text-sm">
+                  {step.done ? (
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  ) : (
+                    <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className={step.done ? "text-muted-foreground line-through" : "text-foreground"}>
+                    {step.label}
                   </span>
-                ) : (
-                  <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-                )}
-                <span
-                  className={
-                    step.done
-                      ? "text-muted-foreground line-through"
-                      : "text-foreground"
-                  }
-                >
-                  {step.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Unlocks:</span> {nextLevel.unlocks}
+            </div>
+          </Link>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-1">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Verification level
+            </div>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground">
+              {verificationLevelLabel[business.verificationLevel]}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              You're at the top of the verification ladder. Nothing further to check.
+            </p>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
           <div className="flex items-center gap-2">

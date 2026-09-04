@@ -17,21 +17,37 @@ datasource db {
 // matches the frontend's existing routing contract (/business/:id,
 // /m/:businessId) exactly, so the app layer must slugify on create.
 model Business {
-  id          String   @id
-  name        String
-  category    String
-  location    String
-  // T0 Listed · T1 Claimed · T2 SSM-Verified · T3 Identity-Verified · T4 Transaction-Trusted
-  // Stays T0 until some account's claim is actually APPROVED — multiple
-  // accounts can hold pending claims against a T0 business at once (see
-  // Account.claimStatus below); tier only moves once one of them wins.
-  tier        String   @default("T0")
-  description String?
-  services    String[] @default([])
-  ssm         String?
+  id                String   @id
+  name              String
+  category          String
+  location          String
+  // L0 Unclaimed · L1 Claimed · L2 SSM-Verified · L3 Identity-Verified
+  // · L4 Transaction-Trusted
+  //
+  // A LEVEL, not a tier, and the distinction is the product's one naming
+  // rule: a TIER is bought, a LEVEL is earned or claimed. This column is
+  // the thing money cannot move — ABRI-feature-checklist.md §6 lists
+  // "verification cannot be bought" as non-negotiable — so it can never be
+  // called a tier. membershipTier below is the axis that can be, and it is
+  // the only one.
+  //
+  // Stays L0 until some account's claim is actually APPROVED — multiple
+  // accounts can hold pending claims against an L0 business at once (see
+  // Account.claimStatus below); the level only moves once one of them wins.
+  //
+  // Renamed from `tier`, values T0-T4, in
+  // migrations/20260831120000_rename_axes_tier_level. The union lives in
+  // lib/verificationLevels.js — this schema has no Prisma enums, so that
+  // module is the only thing constraining this column, and a value outside
+  // it fails every Set.has gate silently: no vouching, no badge icon, and
+  // nothing in the logs.
+  verificationLevel String   @default("L0")
+  description       String?
+  services          String[] @default([])
+  ssm               String?
   // Canonical email domain, set at seed/import time — used to auto-approve
   // a claim when the claimant's email matches it. Never claimant-editable.
-  domain      String?
+  domain            String?
 
   // Contact fields. Which of the two groups a column is in IS what it means,
   // and the split is enforced in exactly one place — omitContactFields in
@@ -71,8 +87,14 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // "free" | "plus" | "pro" | "enterprise" — the billing tier, and the
-  // third axis on a business after verification tier and vouch ladder.
+  // "free" | "plus" | "pro" | "enterprise" — the membership TIER, and the
+  // third axis on a business after the verification LEVEL above and the
+  // vouch LEVEL, which is derived and has no column at all.
+  //
+  // The names are the rule, and the rule is one sentence: a TIER is bought,
+  // a LEVEL is earned or claimed. This column is the only thing in the
+  // product anyone can buy. If a fourth axis ever appears, its name decides
+  // itself — money moves it, or it doesn't.
   // Determines the vouch-giving cap (see lib/vouchCap.js), which is
   // currently the only behaviour it gates. Deliberately never surfaced as
   // a profile badge — it must not read as a third kind of TRUST signal
@@ -80,23 +102,24 @@ model Business {
   // member's own sidebar, styled as billing metadata.
   //
   // Renamed from "basic"/"premium"/"enterprise" in
-  // migrations/20260817120000_rename_membership_plans. Any change to this
-  // union has to move VOUCH_CAP_BY_PLAN in lib/vouchCap.js in the same
-  // commit — a value here with no entry there silently removes the cap —
-  // and PLAN_RANK in lib/entitlements.js, which is where the plan half of
-  // the contact gate (`contactDetails`) is ranked. lib/contactVisibility.js
-  // consumes that; it is the other reader of this column.
-  membershipPlan String @default("free")
+  // migrations/20260817120000_rename_membership_plans, and from
+  // `membershipPlan` in 20260831120000_rename_axes_tier_level. Any change to
+  // this union has to move VOUCH_CAP_BY_MEMBERSHIP_TIER in lib/vouchCap.js
+  // in the same commit — a value here with no entry there silently removes
+  // the cap — and MEMBERSHIP_TIER_RANK in lib/entitlements.js, which is
+  // where the tier half of the contact gate (`contactDetails`) is ranked.
+  // lib/contactVisibility.js consumes that; it is the other reader.
+  membershipTier String @default("free")
 
-  // Null until the business first lands on a plan (set at claim approval).
-  // planExpiresAt stays null for plans that don't lapse; nothing reads it
+  // Null until the business first lands on a tier (set at claim approval).
+  // membershipTierExpiresAt stays null for tiers that don't lapse; nothing reads it
   // yet, but renewal is the next thing to touch this row and a nullable
   // column costs nothing to add now versus a second migration later.
-  planStartedAt DateTime?
-  planExpiresAt DateTime?
+  membershipTierStartedAt DateTime?
+  membershipTierExpiresAt DateTime?
 
-  // The founding-100 programme, split out of membershipPlan so it survives
-  // every later plan change. It used to be encoded AS the plan (founding
+  // The founding-100 programme, split out of membershipTier so it survives
+  // every later tier change. It used to be encoded AS the plan (founding
   // members were assigned "premium"), which meant the first upgrade,
   // downgrade or expiry silently erased the fact that they were founding
   // members at all. Earned once, never revoked — see businessClaim.js.
@@ -108,18 +131,19 @@ model Business {
   // steady state this is back to one — but the relation has to allow many
   // to support both that transient dispute window AND (later) multiple
   // legitimate team members under one business.
-  accounts            Account[]
-  vouchesReceived     Vouch[]             @relation("VouchTarget")
-  vouchesGiven        Vouch[]             @relation("VouchSource")
-  connectionsAsA      Connection[]        @relation("ConnectionA")
-  connectionsAsB      Connection[]        @relation("ConnectionB")
-  pendingConnections  PendingConnection[]
-  flagsRaised         VouchFlag[]         @relation("FlagRaisedBy")
-  flagsAgainst        VouchFlag[]         @relation("FlagAgainst")
-  activityEvents      ActivityEvent[]     @relation("ActivityEventOwner")
-  activityAsActor     ActivityEvent[]     @relation("ActivityEventActor")
-  vouchRevisions      VouchRevision[]     @relation("VouchRevisionAuthor")
-  vouchActionsAsActor VouchAction[]       @relation("VouchActionActor")
+  accounts             Account[]
+  vouchesReceived      Vouch[]              @relation("VouchTarget")
+  vouchesGiven         Vouch[]              @relation("VouchSource")
+  connectionsAsA       Connection[]         @relation("ConnectionA")
+  connectionsAsB       Connection[]         @relation("ConnectionB")
+  pendingConnections   PendingConnection[]
+  flagsRaised          VouchFlag[]          @relation("FlagRaisedBy")
+  flagsAgainst         VouchFlag[]          @relation("FlagAgainst")
+  activityEvents       ActivityEvent[]      @relation("ActivityEventOwner")
+  activityAsActor      ActivityEvent[]      @relation("ActivityEventActor")
+  vouchRevisions       VouchRevision[]      @relation("VouchRevisionAuthor")
+  vouchActionsAsActor  VouchAction[]        @relation("VouchActionActor")
+
 }
 
 model Account {
@@ -155,8 +179,8 @@ model Account {
   pendingConnections  PendingConnection[]
   // Admin-only back-relations: the vouch interventions this account made and
   // the reports it ruled on. Empty for every non-admin account.
-  vouchActionsAsAdmin VouchAction[]       @relation("VouchActionAdminActor")
-  vouchFlagsResolved  VouchFlag[]         @relation("VouchFlagResolver")
+  vouchActionsAsAdmin VouchAction[]        @relation("VouchActionAdminActor")
+  vouchFlagsResolved  VouchFlag[]          @relation("VouchFlagResolver")
 }
 
 // The vouch feature is three tables, and which one a piece of text lives in
@@ -178,7 +202,7 @@ model Account {
 // how LinkedIn recommendations need the recipient's approval before going
 // live, rather than a bilateral edit negotiation. The receiver has four
 // actions and each is one transition:
-//   pending -> published (accept; counts toward vouchCount/ladder)
+//   pending -> published (accept; counts toward vouchCount/vouchLevel)
 //   pending -> cancelled (cancel, or 14 days pass untouched — see
 //     lib/vouchExpiry.js for the lazy, no-cron expiry check)
 //   pending -> reverted (revert: sent back to be edited, capped at
@@ -248,7 +272,7 @@ model Vouch {
 
   // One vouch per (voucher, target) pair — the mock store didn't enforce
   // this, but letting the same business vouch for another unlimited times
-  // undermines the signal. vouchCount/ladder are intentionally NOT stored
+  // undermines the signal. vouchCount/vouchLevel are intentionally NOT stored
   // here (unlike the mock's business.vouchCount) — derive them by counting
   // published rows in this relation at query time so they can never drift
   // out of sync.

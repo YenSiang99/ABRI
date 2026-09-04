@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 import { CATEGORY_SERVICES } from "../src/lib/categoryServices.js";
+import { UNCLAIMED } from "../src/lib/verificationLevels.js";
 
 const prisma = new PrismaClient();
 
@@ -40,9 +41,9 @@ const businesses = [
 // genuinely have none. "Withheld" and "empty" are different states and must
 // not be demonstrable only in theory.
 //
-// Deliberately NOT seeded: membershipPlan and the plan dates. Every row here
-// stays on the default free plan, so a fresh database shows the LOCKED side
-// of the gate by default; scripts/set-plan.js is the only mover of plans and
+// Deliberately NOT seeded: membershipTier and its dates. Every row here
+// stays on the default free tier, so a fresh database shows the LOCKED side
+// of the gate by default; scripts/set-membership-tier.js is the only mover of tiers and
 // is how you get a row to the unlocked side.
 const CONTACT_COLUMNS = ["phone", "whatsapp", "email", "website", "address", "openingHours"];
 
@@ -58,7 +59,7 @@ async function main() {
     await prisma.business.upsert({
       where: { id: b.id },
       // Contact columns ONLY. This used to be `update: {}` — non-destructive
-      // by design, because a re-run must never reset the tier or plan of a
+      // by design, because a re-run must never reset the verification level or membership tier of a
       // business somebody has since claimed. That's still true, and it's why
       // this isn't widened to the whole row. But `{}` also meant a column
       // added AFTER the first seed run could never land on the 21 existing
@@ -79,7 +80,7 @@ async function main() {
         domain: b.domain,
         description: b.description,
         services: CATEGORY_SERVICES[b.category] ?? [],
-        tier: "T0",
+        verificationLevel: UNCLAIMED,
         ...contact,
       },
     });

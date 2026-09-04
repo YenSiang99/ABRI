@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Info, Plus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { VouchBadge } from "@/components/badge/VouchBadge";
+import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import { VouchListItem } from "@/components/app/VouchListItem";
 import { VouchRequestCard } from "@/components/app/VouchRequestCard";
 import { VouchDialog } from "@/components/app/VouchDialog";
@@ -13,6 +15,62 @@ import { useNotifications } from "@/context/NotificationsContext";
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { fetchVouchesGiven, fetchVouchesReceived, fetchVouchRequests } from "@/lib/api/vouches";
 import { toast } from "@/lib/toast";
+import { CLAIMED } from "@/lib/verificationLevels";
+import { vouchLevelLabel } from "@/lib/trustLabels";
+import { nextVouchLevel, remainingFor } from "@/lib/vouchLevelData";
+
+// Where this business stands on the vouch ladder, in one row.
+//
+// The vouch ladder used to be explained on /app/levels, three sections down a
+// page about all three axes. It belongs here instead: a vouch level has no
+// steps to tick off and nothing to buy, so a page of its own would have been
+// a page with nothing to press, and the only two things that move it — giving
+// a vouch and being given one — are already on this screen.
+//
+// One row, not a section. The five rungs live in the explainer dialog behind
+// the pill, so a member who already knows what "Top 20%" means isn't made to
+// scroll past the definition every time they come here to answer a request.
+//
+// Both counts are PUBLISHED-only, matching what vouchLevelFor() counts in
+// backend/src/lib/vouchLevel.js — an unpublished vouch moves nothing. They
+// come from this page's own already-loaded lists rather than a fetch of their
+// own; the old /app/levels called fetchVouchesGiven() purely to print this
+// number on a page that had no other use for it.
+function VouchStanding({ business, received, given, loading }) {
+  // The pill is trusted from the server, the hint is derived here. While the
+  // lists are still loading we have the former and not the latter, so the
+  // counts show an em dash — a 0 would be a claim — and the hint is withheld
+  // rather than computed from zeroes, which would tell a Trusted Business
+  // they need one more vouch to reach First Vouch.
+  const next = loading ? null : nextVouchLevel({ received, given });
+  const remaining = next ? remainingFor(next, { received, given }) : null;
+
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-card px-4 py-3">
+      <ExplainBadge axis="vouch" business={business}>
+        <VouchBadge vouchLevel={business.vouchLevel} />
+      </ExplainBadge>
+
+      <span className="text-sm text-muted-foreground">
+        {loading ? "\u2014" : received} received · {loading ? "\u2014" : given} given
+      </span>
+
+      {remaining && (
+        <span className="text-sm text-muted-foreground">
+          · {remaining} to{" "}
+          <span className="font-medium text-foreground">{vouchLevelLabel[next.key]}</span>
+        </span>
+      )}
+
+      <ExplainBadge axis="vouch" business={business} className="ml-auto">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5" />
+          What do these levels mean?
+        </span>
+      </ExplainBadge>
+    </div>
+  );
+}
 
 // The tabs split on what KIND of thing a vouch is, not on direction.
 // "Requests" is a workflow — an in-flight negotiation where what matters is
@@ -40,9 +98,9 @@ const TABS = ["requests", "received", "given"];
 function Vouches() {
   const { business, refreshAccount } = useAuth();
   const { refreshVouchActions } = useNotifications();
-  const locked = business.tier === "T1";
-  // Verification beats plan, matching the server's check order in
-  // POST /vouches: `locked` (T1, not yet SSM-verified) still wins below and
+  const locked = business.verificationLevel === CLAIMED;
+  // Verification beats billing, matching the server's check order in
+  // POST /vouches: `locked` (L1, not yet SSM-verified) still wins below and
   // shows "Vouching unlocks after SSM verification", because that is free
   // and is genuinely the next step. Only a verified member gets pitched.
   const vouchGate = useUpgradeGate("giveVouch");
@@ -103,7 +161,7 @@ function Vouches() {
   // declined/etc) — an event-handler call, not an effect, so setState
   // here is unrelated to the effect-only lint constraint above. Also
   // refreshes AuthContext's `business` — accepting a vouch changes *this*
-  // business's own received-vouch state (vouchCount/ladder/vouches),
+  // business's own received-vouch state (vouchCount/vouchLevel/vouches),
   // which AuthContext otherwise only fetches once on mount and nothing
   // else would refresh.
   function refetchAll() {
@@ -148,7 +206,8 @@ function Vouches() {
             Vouches
           </h1>
           <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Real peers staking their reputation on real businesses. Give a vouch, unlock the next tier.
+            Real peers staking their reputation on real businesses. A vouch you give raises their vouch level, not
+            yours.
           </p>
         </div>
 
@@ -169,6 +228,18 @@ function Vouches() {
           </>
         )}
       </div>
+
+      {/* Hidden for an L1 member. The header beside it already says
+          "Vouching unlocks after SSM verification", and a ladder they cannot
+          step onto yet is noise above a screen of locked panels. */}
+      {!locked && (
+        <VouchStanding
+          business={business}
+          received={receivedPublished.length}
+          given={published.length}
+          loading={loading}
+        />
+      )}
 
       <Tabs value={tab} onValueChange={handleTabChange} className="mt-8">
         <TabsList>

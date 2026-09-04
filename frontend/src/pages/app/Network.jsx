@@ -4,7 +4,7 @@ import { ArrowUpRight, MapPin, Radio, Link2, Search, Users } from "lucide-react"
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_NFC_SCAN, SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { toast } from "@/lib/toast";
@@ -49,7 +49,7 @@ function ConnectionCard({ connection }) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        <AppTierBadge tier={business.tier} />
+        <AppVerificationBadge verificationLevel={business.verificationLevel} />
         {source === SOURCE_NFC_SCAN ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
             <Radio className="h-3 w-3" /> Card tap

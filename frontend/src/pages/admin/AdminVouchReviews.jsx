@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 
 import { fetchVouchReviews, decideVouchReview, resolveVouchFlag } from "@/lib/api/admin";
 import { VouchTimeline } from "@/components/app/VouchTimeline";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -231,10 +231,10 @@ function ReviewCard({ review, onReplace }) {
     <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-bold text-foreground">{review.fromBusiness?.name}</span>
-        <AppTierBadge tier={review.fromBusiness?.tier} />
+        <AppVerificationBadge verificationLevel={review.fromBusiness?.verificationLevel} />
         <span className="text-muted-foreground">vouched for</span>
         <span className="font-bold text-foreground">{review.toBusiness?.name}</span>
-        <AppTierBadge tier={review.toBusiness?.tier} />
+        <AppVerificationBadge verificationLevel={review.toBusiness?.verificationLevel} />
         {review.frozen ? (
           <span className="rounded-full bg-yellow px-2 py-0.5 text-[11px] font-bold text-yellow-ink">
             On hold — waiting on you

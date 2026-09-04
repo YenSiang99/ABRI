@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Pencil, Radio, MapPin, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,15 +14,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AppTierBadge } from "@/components/badge/AppTierBadge";
+import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { VouchBadge } from "@/components/badge/VouchBadge";
 import { VouchListItem } from "@/components/app/VouchListItem";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
 import { updateMyBusiness } from "@/lib/api/businesses";
 import { ContactDetails } from "@/components/business/ContactDetails";
-import { planAllows } from "@/lib/plans";
+import { membershipTierAllows } from "@/lib/membershipTiers";
 import { toast } from "@/lib/toast";
+import { CLAIMED } from "@/lib/verificationLevels";
 
 function Stat({ label, value }) {
   return (
@@ -141,7 +143,7 @@ function EditProfileDialog({ business, onSaved }) {
                 these in deserves to know who will actually see them. */}
             <p className="mt-1 text-xs text-muted-foreground">
               Phone, WhatsApp and email are shown to logged-in members, on Plus and above.
-              Website, address and opening hours are public on every plan.
+              Website, address and opening hours are public on every tier.
             </p>
           </div>
 
@@ -224,17 +226,17 @@ function EditProfileDialog({ business, onSaved }) {
 
 function Profile() {
   const { account, business, refreshAccount } = useAuth();
-  const locked = business.tier === "T1";
+  const locked = business.verificationLevel === CLAIMED;
   // The owner always sees their own testimonials here (/auth/me is
   // ungated) — this is only about what VISITORS get on the public profile.
   const testimonialsHidden =
-    business.vouchCount > 0 && !planAllows(business.membershipPlan, "testimonials");
+    business.vouchCount > 0 && !membershipTierAllows(business.membershipTier, "testimonials");
   // Same shape as the line above, and the same reason: /auth/me is ungated, so
   // the owner always sees their own contact details here. These two flags are
   // only about what VISITORS get on the public profile.
   const hasAnyContact = Boolean(business.phone || business.whatsapp || business.email);
-  const contactHidden = hasAnyContact && !planAllows(business.membershipPlan, "contactDetails");
-  const contactEmpty = !hasAnyContact && planAllows(business.membershipPlan, "contactDetails");
+  const contactHidden = hasAnyContact && !membershipTierAllows(business.membershipTier, "contactDetails");
+  const contactEmpty = !hasAnyContact && membershipTierAllows(business.membershipTier, "contactDetails");
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -261,8 +263,16 @@ function Profile() {
                 {account?.createdAt && <span>Member since {formatMemberSince(account.createdAt)}</span>}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <AppTierBadge tier={business.tier} />
-                <VouchBadge ladder={business.ladder} />
+                {/* Linked, same as the Dashboard row and for the same reason.
+                    Wrapped here rather than inside the badge components — they
+                    also render on other businesses' profiles, where this link
+                    would be wrong. */}
+                <Link to="/app/verify" aria-label="What the verification level means">
+                  <AppVerificationBadge verificationLevel={business.verificationLevel} />
+                </Link>
+                <Link to="/app/vouches" aria-label="What the vouch level means">
+                  <VouchBadge vouchLevel={business.vouchLevel} />
+                </Link>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
                   <Radio className="h-3 w-3" /> Live
                 </span>
@@ -312,7 +322,7 @@ function Profile() {
               see, so the gap is concrete rather than abstract. */}
           {contactHidden && (
             <LockedFeature
-              requiredPlan="plus"
+              requiredMembershipTier="plus"
               title="Your contact details aren't shown to anyone"
               description="You've added them, but nobody visiting your profile or tapping your card can see them."
             />
@@ -322,7 +332,7 @@ function Profile() {
               so — a visitor would just see a profile with no phone number. */}
           {contactEmpty && (
             <p className="text-sm text-muted-foreground">
-              Your plan shows your contact details to members — but you haven't added any yet. Use
+              Your tier shows your contact details to members — but you haven't added any yet. Use
               Edit profile to add a phone number, WhatsApp or email.
             </p>
           )}
@@ -351,7 +361,7 @@ function Profile() {
           {!locked && testimonialsHidden && (
             <div className="md:col-span-2">
               <LockedFeature
-                requiredPlan="plus"
+                requiredMembershipTier="plus"
                 title="Your written vouches aren't shown"
                 description={`Visitors can see that you have ${business.vouchCount} ${
                   business.vouchCount === 1 ? "vouch" : "vouches"

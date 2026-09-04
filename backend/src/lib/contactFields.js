@@ -39,14 +39,14 @@ const EDITABLE_FIELDS = [
 
 // Rejected loudly rather than ignored, with a reason, because each one is a
 // question somebody will reasonably ask:
-//   tier            — earned via POST /admin/businesses/:id/verify-ssm. Self-
+//   verificationLevel — earned via POST /admin/businesses/:id/verify-ssm. Self-
 //                     service would make the badge worthless, which is the
 //                     entire product.
-//   membershipPlan  — POST /admin/businesses/:id/plan is the only writer.
-//     planStartedAt   Self-serve here is free Plus for everyone, including
-//     planExpiresAt   the gate these very fields sit behind.
+//   membershipTier  — POST /admin/businesses/:id/plan is the only writer.
+//     membershipTierStartedAt   Self-serve here is free Plus for everyone, including
+//     membershipTierExpiresAt   the gate these very fields sit behind.
 //   isFoundingMember— only ever set true, by lib/businessClaim.js. It was
-//                     split out of membershipPlan precisely so no later write
+//                     split out of membershipTier precisely so no later write
 //                     could erase it; even the admin plan route won't touch it.
 //   domain          — feeds matchesBusinessDomain, which AUTO-APPROVES claims.
 //                     An owner who can set this can pre-approve their own next
@@ -62,12 +62,12 @@ const PROTECTED_FIELDS = [
   "name",
   "category",
   "location",
-  "tier",
+  "verificationLevel",
   "ssm",
   "domain",
-  "membershipPlan",
-  "planStartedAt",
-  "planExpiresAt",
+  "membershipTier",
+  "membershipTierStartedAt",
+  "membershipTierExpiresAt",
   "isFoundingMember",
 ];
 

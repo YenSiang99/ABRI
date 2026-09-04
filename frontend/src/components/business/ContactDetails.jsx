@@ -86,7 +86,7 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
         // reason === "owner_plan". No link and no mention of a plan: the
         // visitor can do nothing about this, and naming the plan would
         // surface someone's billing status as a profile signal, which
-        // schema.prisma's membershipPlan comment rules out.
+        // schema.prisma's membershipTier comment rules out.
         <ContactRow icon={Lock} label="Contact details">
           <span className="text-grey-600 dark:text-muted-foreground">
             {name} hasn&apos;t published a phone number, WhatsApp or email.

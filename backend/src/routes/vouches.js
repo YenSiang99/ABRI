@@ -8,6 +8,7 @@ import { createActivityEvent } from "../lib/activityEvents.js";
 import { applyExpiryIfNeeded } from "../lib/vouchExpiry.js";
 import { hasTurn, roleFor, serializeVouch, VOUCH_INCLUDE } from "../lib/vouchTurn.js";
 import { can } from "../lib/entitlements.js";
+import { VOUCHABLE_VERIFICATION_LEVELS } from "../lib/verificationLevels.js";
 
 const router = Router();
 
@@ -29,9 +30,9 @@ const router = Router();
 // ending the vouch were the same button press and neither could be done
 // alone.
 //
-// Matches the mock store's VOUCHABLE_TIERS — a business must be
+// Matches the mock store's VOUCHABLE_VERIFICATION_LEVELS — a business must be
 // SSM-verified (T2+) to give or receive a vouch.
-const VOUCHABLE_TIERS = new Set(["T2", "T3", "T4"]);
+
 // "under_review" belongs here: a flagged vouch is unsettled — it has no
 // closedAt and can still become published — so it stays in the in-flight
 // queue rather than dropping into the settled given/received records.
@@ -48,17 +49,17 @@ function fail(status, message) {
 }
 
 // The paywall's throw, and deliberately not just a fail(403). 403 is "you
-// may never" — what an unverified tier gets — and this is a door with a
-// price on it. The 402 plus `upgradeRequired` is what lets the client open
+// may never" — what an unverified LEVEL gets — and this is a door with a
+// price on it. The 402 plus `requiredMembershipTier` is what lets the client open
 // an upgrade prompt naming the plan rather than toasting the message; see
 // middleware/errorHandler.js, which is the only thing that reads the field.
 //
-// Every gate below runs AFTER the tier check on the same route. Verification
+// Every gate below runs AFTER the level check on the same route. Verification
 // beats plan everywhere in this product: an unverified Free member should
 // hear "get SSM-verified", which is free and is the actual next step, not
 // "pay us" for a door that would still be shut afterwards.
 function failUpgrade(plan, message) {
-  throw Object.assign(new Error(message), { status: 402, upgradeRequired: plan });
+  throw Object.assign(new Error(message), { status: 402, requiredMembershipTier: plan });
 }
 
 async function loadOwnBusiness(req) {
@@ -93,7 +94,7 @@ router.post(
     const { toBusinessId, testimonial } = req.body ?? {};
     const fromBusiness = await loadOwnBusiness(req);
 
-    if (!VOUCHABLE_TIERS.has(fromBusiness.tier)) {
+    if (!VOUCHABLE_VERIFICATION_LEVELS.has(fromBusiness.verificationLevel)) {
       fail(403, "Your business must be SSM-verified before you can vouch.");
     }
 
@@ -114,7 +115,7 @@ router.post(
     // through the cap for free and charged a resurrected old row against
     // its original date. One "submit" action exists per attempt, which is
     // exactly "times this business submitted something".
-    const cap = vouchCapFor(fromBusiness.membershipPlan);
+    const cap = vouchCapFor(fromBusiness.membershipTier);
     const submittedCount = await prisma.vouchAction.count({
       where: {
         action: "submit",
@@ -132,7 +133,7 @@ router.post(
 
     const toBusiness = await prisma.business.findUnique({ where: { id: toBusinessId } });
     if (!toBusiness) fail(404, "Business not found.");
-    if (!VOUCHABLE_TIERS.has(toBusiness.tier)) {
+    if (!VOUCHABLE_VERIFICATION_LEVELS.has(toBusiness.verificationLevel)) {
       fail(400, "This business isn't SSM-verified yet.");
     }
 

@@ -13,7 +13,7 @@
     "db:status": "sh scripts/local-db.sh status",
     "prisma:seed": "prisma db seed",
     "admin:grant": "node scripts/grant-admin.js",
-    "plan:set": "node scripts/set-plan.js"
+    "tier:set": "node scripts/set-membership-tier.js"
   },
   "keywords": [],
   "author": "",

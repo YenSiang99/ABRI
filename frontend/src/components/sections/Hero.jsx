@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { VerificationIcon } from "@/components/badge/VerificationIcon";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
+import { SSM_VERIFIED } from "@/lib/verificationLevels";
 
 function Hero() {
   return (
@@ -40,7 +41,7 @@ function Hero() {
             </a>
           </div>
           <div className="mt-[26px] flex items-center gap-2.5 text-[13px] text-grey-500 dark:text-muted-foreground">
-            <VerificationIcon tier="verified" size="small" />
+            <VerificationIcon mark="verified" size="small" />
             Anchored to official Companies Commission of Malaysia data
           </div>
         </div>
@@ -60,13 +61,18 @@ function Hero() {
               <div>
                 <div className="flex flex-wrap items-center gap-2 text-[19px] font-extrabold text-ink dark:text-foreground">
                   Meridian Accounting
-                  <VerificationIcon tier="verified" size="medium" />
+                  <VerificationIcon mark="verified" size="medium" />
                 </div>
                 <div className="mt-[3px] text-[13.5px] text-grey-600 dark:text-muted-foreground">
                   Accounting &amp; tax · Petaling Jaya · Member since 2026
                 </div>
                 <div className="mt-2">
-                  <VerificationBadge tier="verified" size="inline" chip />
+                  {/* A real LEVEL, not the marketing mark. This passed
+                      "verified" — a VerificationIcon value — through the level
+                      badge, which worked only while one map answered to both
+                      vocabularies. It renders "SSM-Verified" either way, which
+                      is what the mock card is illustrating. */}
+                  <VerificationBadge verificationLevel={SSM_VERIFIED} size="inline" chip />
                 </div>
               </div>
             </div>

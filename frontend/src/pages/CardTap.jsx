@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { ContactDetails } from "@/components/business/ContactDetails";
+import { UNCLAIMED } from "@/lib/verificationLevels";
 
 function BackLink() {
   return (
@@ -49,7 +50,7 @@ function CardPanel({ business, children }) {
               </span>
             </div>
             <div className="mt-3">
-              <VerificationBadge tier={business.tier} size="inline" chip />
+              <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
             </div>
           </div>
         </div>
@@ -69,7 +70,7 @@ function CardPanel({ business, children }) {
           T0 is suppressed rather than locked: an unclaimed listing has no
           owner, and the "isn't on ABRI yet" panel below already says so.
           A lock there would imply there is something to unlock. */}
-      {business.tier !== "T0" && (
+      {business.verificationLevel !== UNCLAIMED && (
         <div className="mt-6">
           <ContactDetails
             business={business}
@@ -149,7 +150,7 @@ function CardTap() {
     myBusiness &&
     business &&
     !isSelf &&
-    business.tier !== "T0" &&
+    business.verificationLevel !== UNCLAIMED &&
     !alreadyConnected;
 
   async function attemptConnect(target) {
@@ -202,7 +203,7 @@ function CardTap() {
     );
   }
 
-  if (business.tier === "T0") {
+  if (business.verificationLevel === UNCLAIMED) {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />

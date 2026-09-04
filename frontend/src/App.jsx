@@ -18,6 +18,7 @@ import { Vouches } from "@/pages/app/Vouches";
 import { Network } from "@/pages/app/Network";
 import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Verify } from "@/pages/app/Verify";
+import { Plan } from "@/pages/app/Plan";
 import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
@@ -55,6 +56,21 @@ function App() {
             <Route path="directory" element={<AppDirectory />} />
             <Route path="business/:id" element={<BusinessProfile inApp />} />
             <Route path="verify" element={<Verify />} />
+            <Route path="plan" element={<Plan />} />
+            {/* /app/levels was one page explaining all three axes at once.
+                It was split: verification kept this page, the vouch ladder
+                moved onto /app/vouches where you can act on it, and the tier
+                table became /app/plan. The "what does this mark mean" half of
+                its job went to components/badge/BadgeExplainer.jsx instead,
+                because that question gets asked in front of somebody else's
+                badge, where no page can reach it.
+
+                Verification gets the redirect because it is what the page was
+                originally FOR — /app/verify was its route until the other two
+                axes were bolted on. Deep links carrying #vouch or #membership
+                lose their hash here; every internal link was repointed, so
+                this only catches a member's own old bookmarks. */}
+            <Route path="levels" element={<Navigate to="/app/verify" replace />} />
             <Route path="card" element={<Card />} />
             <Route path="admin" element={<AdminReview />} />
             <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />

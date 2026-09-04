@@ -16,8 +16,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { tierLabel } from "@/lib/trustLabels";
-import { planLabel, canUpgradeFrom, planAllows } from "@/lib/plans";
+import { verificationLevelLabel } from "@/lib/trustLabels";
+import { membershipTierLabel, canUpgradeFromMembershipTier, membershipTierAllows } from "@/lib/membershipTiers";
+import { CLAIMED } from "@/lib/verificationLevels";
 
 const WORKSPACE_ITEMS = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
@@ -37,7 +38,7 @@ const ADMIN_ITEMS = [
 ];
 
 // Two independent reasons an item can be shut, so two fields rather than
-// one: lockWhenPending is verification (tier T1), lockFeature is the plan.
+// one: lockWhenPending is verification (level L1), lockFeature is the plan.
 // The NFC card is behind both, and the page itself decides which message
 // to show when they overlap.
 //
@@ -46,6 +47,9 @@ const ADMIN_ITEMS = [
 // backed entirely by mock data, and whatever Pro gets in its place will
 // almost certainly want the same pair.
 const TRUST_ITEMS = [
+  // "Levels & tiers" while this was one page covering all three axes. Named
+  // for the one axis it covers now: the vouch ladder moved onto /app/vouches
+  // and the tier table became /app/plan, which the tier chip below links to.
   { title: "Verification", url: "/app/verify", icon: ShieldCheck },
   { title: "NFC Card", url: "/app/card", icon: CreditCard, lockWhenPending: true, lockFeature: "nfcCard" },
 ];
@@ -171,7 +175,7 @@ function SidebarNav({
             <div className="mt-2 flex flex-col gap-1">
               {TRUST_ITEMS.map((item) => {
                 const planLocked =
-                  item.lockFeature && !planAllows(business?.membershipPlan, item.lockFeature);
+                  item.lockFeature && !membershipTierAllows(business?.membershipTier, item.lockFeature);
                 return (
                   <Link
                     key={item.title}
@@ -206,33 +210,52 @@ function SidebarNav({
               </div>
               <div className="flex min-w-0 flex-col text-left">
                 <span className="truncate text-sm font-medium text-sidebar-foreground">{business.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {tierLabel[business.tier] ?? "Listed"}
+                <Link
+                  to="/app/verify"
+                  className="truncate text-xs text-muted-foreground hover:text-sidebar-foreground"
+                >
+                  {verificationLevelLabel[business.verificationLevel] ?? business.verificationLevel}
                   {business.ssm ? ` · ${business.ssm}` : ""}
-                </span>
+                </Link>
               </div>
             </div>
             {/* Billing metadata, NOT a third trust signal — see the
-                membershipPlan comment in schema.prisma. A squared mono chip
-                rather than the circular mark VerificationBadge uses or the
-                pill VouchBadge uses, so it can't be misread as a rank
-                alongside the verification tier shown directly above it.
+                membershipTier comment in schema.prisma. The one axis on this
+                page that was BOUGHT rather than earned, and it has to LOOK
+                bought.
+
+                Three shapes, three meanings, and they must stay distinct:
+                  verification level — circular mark, bold sans, yellow/ink
+                  vouch level        — rounded-full pill, inline icon
+                  membership tier    — squared rounded-sm mono chip, muted
+
+                Squared rather than the circular mark VerificationBadge uses
+                or the pill VouchBadge uses, so it can't be misread as a rank
+                alongside the verification level shown directly above it.
                 Both chips stay muted for the same reason: the yellow this
-                first used is VerificationIcon's "verified" colour, which
-                one line under "SSM-Verified" read as a second trust mark. */}
-            {planLabel[business.membershipPlan] && (
+                first used is VerificationIcon's "verified" colour, which one
+                line under "SSM-Verified" read as a second trust mark.
+
+                The Aug 2026 rename made the shapes matter MORE, not less.
+                Two of the three axes are now both called levels, so the
+                typography is what tells a reader which one earned nothing
+                and which one was paid for. */}
+            {membershipTierLabel[business.membershipTier] && (
               <div className="mt-1 flex items-center gap-2 px-2 py-1.5">
-                <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
-                  {planLabel[business.membershipPlan]}
-                </span>
+                <Link
+                  to="/app/plan"
+                  className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase hover:text-sidebar-foreground"
+                >
+                  {membershipTierLabel[business.membershipTier]}
+                </Link>
                 {business.isFoundingMember && (
                   <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase">
                     Founding
                   </span>
                 )}
-                {canUpgradeFrom(business.membershipPlan) && (
+                {canUpgradeFromMembershipTier(business.membershipTier) && (
                   <Link
-                    to="/#pricing"
+                    to="/app/plan"
                     className="ml-auto text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
                   >
                     Upgrade
@@ -262,7 +285,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
 
   if (!business && !isAdmin) return null;
 
-  const locked = business?.tier === "T1";
+  const locked = business?.verificationLevel === CLAIMED;
 
   // No explicit navigate() here — ProtectedRoute (wrapping every /app/*
   // route this sidebar renders inside) redirects to /login as soon as

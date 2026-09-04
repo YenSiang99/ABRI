@@ -11,9 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/context/AuthContext";
-import { FEATURE_MIN_PLAN, planAllows, planLabel } from "@/lib/plans";
+import { FEATURE_MIN_MEMBERSHIP_TIER, membershipTierAllows, membershipTierLabel } from "@/lib/membershipTiers";
 
-// The upgrade prompt, and the pattern every plan-gated ACTION in the app
+// The upgrade prompt, and the pattern every tier-gated ACTION in the app
 // goes through. Distinct from components/app/LockedFeature.jsx, which is
 // the other half of the same idea and answers a different question:
 //
@@ -31,7 +31,7 @@ import { FEATURE_MIN_PLAN, planAllows, planLabel } from "@/lib/plans";
 // front of an ungated route is just a lie with a price on it.
 //
 // The client-side check is the UX, never the enforcement. The server answers
-// 402 with `upgradeRequired` on all of these (backend/src/routes/vouches.js);
+// 402 with `requiredMembershipTier` on all of these (backend/src/routes/vouches.js);
 // this only saves the member a round trip and a toast.
 
 // Per-feature copy, in one place so the same gate reads identically wherever
@@ -50,7 +50,7 @@ const UPGRADE_COPY = {
   acceptVouch: {
     title: "Publishing vouches is part of Plus",
     description:
-      "Someone has vouched for you. Plus is what puts it on your public profile, where it counts towards your trust ladder and is the first thing a visitor sees. Free accounts can receive vouches but not publish them.",
+      "Someone has vouched for you. Plus is what puts it on your public profile, where it counts towards your vouch level and is the first thing a visitor sees. Free accounts can receive vouches but not publish them.",
   },
   contactDetails: {
     title: "Being reachable is part of Plus",
@@ -63,7 +63,7 @@ const UPGRADE_COPY = {
   // prevent. Add one only if a card ACTION ever needs pricing at click time.
 };
 
-// `feature` is a key of FEATURE_MIN_PLAN. Returns everything a call site
+// `feature` is a key of FEATURE_MIN_MEMBERSHIP_TIER. Returns everything a call site
 // needs to run the pattern:
 //
 //   allowed  — plain boolean, for the cases that want to render something
@@ -82,7 +82,7 @@ const UPGRADE_COPY = {
 function useUpgradeGate(feature) {
   const { business } = useAuth();
   const [open, setOpen] = useState(false);
-  const allowed = planAllows(business?.membershipPlan, feature);
+  const allowed = membershipTierAllows(business?.membershipTier, feature);
 
   function guard(action) {
     return (...args) => {
@@ -99,9 +99,9 @@ function useUpgradeGate(feature) {
 // button it guards rather than hoisting it to the page root.
 function UpgradePrompt({ gate }) {
   const copy = UPGRADE_COPY[gate.feature];
-  const plan = planLabel[FEATURE_MIN_PLAN[gate.feature]];
+  const plan = membershipTierLabel[FEATURE_MIN_MEMBERSHIP_TIER[gate.feature]];
 
-  // A missing entry means someone added a feature to FEATURE_MIN_PLAN and
+  // A missing entry means someone added a feature to FEATURE_MIN_MEMBERSHIP_TIER and
   // wired a gate to it without writing the pitch. Rendering an empty dialog
   // would look like a bug in the button; rendering nothing at all makes the
   // button look broken. Neither is worth guessing over, so say it plainly —
@@ -119,7 +119,7 @@ function UpgradePrompt({ gate }) {
           {/* Same squared mono chip as the sidebar's plan label and
               LockedFeature's, for the same reason: it has to read as
               billing, not as a third trust signal beside the verification
-              tier and the vouch ladder. See schema.prisma's membershipPlan
+              level and the vouch level. See schema.prisma's membershipTier
               comment. */}
           <span className="w-fit rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
             {plan}
@@ -136,11 +136,11 @@ function UpgradePrompt({ gate }) {
             Not now
           </Button>
           <Button
-            render={<Link to="/#pricing" />}
+            render={<Link to="/app/plan" />}
             nativeButton={false}
             onClick={() => gate.setOpen(false)}
           >
-            See plans
+            See tiers
           </Button>
         </DialogFooter>
       </DialogContent>

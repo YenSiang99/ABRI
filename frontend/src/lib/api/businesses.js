@@ -2,10 +2,12 @@ import { apiFetch } from "./client";
 
 // Mirrors backend/src/routes/businesses.js.
 
-function fetchBusinesses({ search, tier } = {}) {
+function fetchBusinesses({ search, verificationLevel } = {}) {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
-  if (tier) params.set("tier", tier);
+  // Key must match GET /businesses exactly: an unrecognised param there is
+  // NO FILTER, not a 400, so a mismatch fails silently and wide.
+  if (verificationLevel) params.set("verificationLevel", verificationLevel);
   const qs = params.toString();
   return apiFetch(`/businesses${qs ? `?${qs}` : ""}`).then((data) => data.businesses);
 }

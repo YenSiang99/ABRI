@@ -1,9 +1,10 @@
+import { VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/verificationLevels";
 // Extracted out of lib/store/businesses.js (the mock store) so real
 // backend-wired components (VouchDialog, BusinessProfile) don't have to
 // import tier-gating logic from the mock. Mirrors
-// backend/src/routes/vouches.js's VOUCHABLE_TIERS exactly — a business
+// backend/src/routes/vouches.js's VOUCHABLE_VERIFICATION_LEVELS exactly — a business
 // must be SSM-verified (T2+) to give or receive a vouch.
-const VOUCHABLE_TIERS = new Set(["T2", "T3", "T4"]);
+// Imported rather than re-declared — mirrors the server's single source.
 
 // The viewer's existing outgoing vouch to `targetId`, or null. Reads
 // `vouchedFor` off the logged-in business (see backend lib/accountView.js),
@@ -24,7 +25,7 @@ function isVouchable(target, viewerBusiness) {
   return (
     Boolean(target) &&
     target.id !== viewerBusiness?.id &&
-    VOUCHABLE_TIERS.has(target.tier) &&
+    VOUCHABLE_VERIFICATION_LEVELS.has(target.verificationLevel) &&
     !existingVouchTo(viewerBusiness, target.id)
   );
 }
@@ -64,7 +65,7 @@ const canFlag = (vouch) =>
 const canRevise = (vouch) => isMyTurn(vouch) && vouch.role === "giver";
 
 export {
-  VOUCHABLE_TIERS,
+  VOUCHABLE_VERIFICATION_LEVELS,
   isVouchable,
   existingVouchTo,
   revisionCapFor,

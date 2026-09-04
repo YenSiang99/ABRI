@@ -2,9 +2,12 @@ import { Button } from "@/components/ui/button";
 import { VerificationIcon } from "@/components/badge/VerificationIcon";
 import { cn } from "@/lib/utils";
 
-const TIERS = [
+// Three MARKS, not levels — see components/badge/VerificationIcon.jsx.
+// Note this section deliberately blends the two earned axes into one ramp:
+// card 1 is a verification level, cards 2 and 3 are vouch levels.
+const MARKS = [
   {
-    tier: "verified",
+    mark: "verified",
     heading: "SSM-Verified",
     description:
       "The company legally exists and is active, and a real, authorised person stands behind it.",
@@ -12,7 +15,7 @@ const TIERS = [
     featured: true,
   },
   {
-    tier: "trusted",
+    mark: "trusted",
     heading: "Trusted Business",
     description:
       "Vouched for by verified peers — ten businesses have staked their own name on this one.",
@@ -20,13 +23,17 @@ const TIERS = [
     featured: false,
   },
   {
-    tier: null,
+    mark: null,
     heading: "Network Leader",
     description:
       "The highest status — reserved for members who give the most back to the network.",
     earn: "Earned: 25 received · 10 given",
     featured: false,
-    soon: true,
+    // `soon` dropped Aug 2026: this rung was unreachable for months — the
+    // label map carried five and vouchLevelFor() could only ever return four
+    // — so the flag was honest. It is implemented now, at the threshold this
+    // card already advertised.
+    soon: false,
   },
 ];
 
@@ -66,7 +73,7 @@ function TrustBand() {
         </div>
 
         <div className="mb-18 grid grid-cols-1 gap-5 md:grid-cols-3">
-          {TIERS.map((t) => (
+          {MARKS.map((t) => (
             <div
               key={t.heading}
               className={cn(
@@ -76,7 +83,7 @@ function TrustBand() {
               )}
             >
               <h3 className="mb-2.5 flex items-center gap-2 text-[16.5px] font-extrabold text-ink dark:text-foreground">
-                {t.tier && <VerificationIcon tier={t.tier} size="small" />}
+                {t.mark && <VerificationIcon mark={t.mark} size="small" />}
                 {t.heading}
                 {t.soon && (
                   <span className="ml-auto rounded-full border border-dashed border-grey-300 px-2 py-[3px] font-mono text-[10px] tracking-[0.08em] text-grey-500 uppercase dark:border-border dark:text-muted-foreground">
@@ -106,7 +113,7 @@ function TrustBand() {
                   key={item.bold}
                   className="grid grid-cols-[24px_1fr] gap-3 text-[15.5px] text-grey-600 dark:text-muted-foreground"
                 >
-                  <VerificationIcon tier="verified" size="small" />
+                  <VerificationIcon mark="verified" size="small" />
                   <span>
                     <b className="text-ink dark:text-foreground">{item.bold}</b>
                     {item.rest}
@@ -122,7 +129,7 @@ function TrustBand() {
               realities.”
             </p>
             <div className="mt-3.5 flex items-center gap-2.5">
-              <VerificationIcon tier="verified" size="small" />
+              <VerificationIcon mark="verified" size="small" />
               <div>
                 <div className="text-[13.5px] font-bold text-ink dark:text-foreground">
                   Nimbus IT Consulting

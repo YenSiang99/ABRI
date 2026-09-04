@@ -26,14 +26,14 @@ function revokeSsm(businessId) {
   return apiFetch(`/admin/businesses/${businessId}/revoke-ssm`, { method: "POST" });
 }
 
-// Sets the membership plan by hand — the only way to fulfil a sale until
+// Sets the membership tier by hand — the only way to fulfil a sale until
 // there's a payment page. `expiresAt` is an ISO date string or null; the
 // backend stores it but nothing acts on it yet, so an expired date does
 // not downgrade anyone.
-function setBusinessPlan(businessId, { plan, expiresAt } = {}) {
-  return apiFetch(`/admin/businesses/${businessId}/plan`, {
+function setBusinessMembershipTier(businessId, { membershipTier, expiresAt } = {}) {
+  return apiFetch(`/admin/businesses/${businessId}/membership-tier`, {
     method: "POST",
-    body: { plan, expiresAt: expiresAt || null },
+    body: { membershipTier, expiresAt: expiresAt || null },
   }).then((data) => data.business);
 }
 
@@ -73,7 +73,7 @@ export {
   revokeAdminClaim,
   verifySsm,
   revokeSsm,
-  setBusinessPlan,
+  setBusinessMembershipTier,
   fetchVouchReviews,
   decideVouchReview,
   resolveVouchFlag,

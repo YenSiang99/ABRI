@@ -1,5 +1,6 @@
 import { prisma } from "../prisma.js";
 import { createActivityEvent } from "./activityEvents.js";
+import { UNCLAIMED } from "./verificationLevels.js";
 
 // Everything about connections that has to behave identically outside an
 // HTTP request lives here rather than in routes/connections.js, because
@@ -25,7 +26,7 @@ const CONNECTION_BUSINESS_SELECT = {
   name: true,
   category: true,
   location: true,
-  tier: true,
+  verificationLevel: true,
 };
 
 // One include for every connection read. Lives next to serializeConnection
@@ -99,14 +100,14 @@ async function consumePendingConnections(accountId) {
 
   const queued = await prisma.pendingConnection.findMany({
     where: { accountId },
-    include: { business: { select: { id: true, tier: true } } },
+    include: { business: { select: { id: true, verificationLevel: true } } },
   });
   if (queued.length === 0) return;
 
   // Filtered out here rather than inside the transaction so the write stays
   // as short as possible.
   const targets = queued.filter(
-    (row) => row.businessId !== account.businessId && row.business.tier !== "T0",
+    (row) => row.businessId !== account.businessId && row.business.verificationLevel !== UNCLAIMED,
   );
 
   await prisma.$transaction(async (tx) => {

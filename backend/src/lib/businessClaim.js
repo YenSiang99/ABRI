@@ -1,9 +1,10 @@
 import { prisma } from "../prisma.js";
 import { CATEGORY_SERVICES } from "./categoryServices.js";
 import { uniqueBusinessId } from "./slug.js";
+import { CLAIMED, UNCLAIMED } from "./verificationLevels.js";
 
 // Resolves the Business a claim is being submitted against — an existing
-// listing, or a brand new one. Deliberately does NOT touch tier or set any
+// listing, or a brand new one. Deliberately does NOT touch the verification level or set any
 // claim status on the business — those live on the Account making the
 // claim (see schema.prisma), since several accounts can be mid-claim on
 // the same business at once. Also does NOT overwrite an existing
@@ -43,7 +44,7 @@ async function findOrCreateClaimTarget({ businessId, businessName, category, loc
 
 // How many businesses the founding-100 program admits — each gets the
 // permanent isFoundingMember flag plus a complimentary "plus" plan (see
-// schema.prisma's Business.membershipPlan / isFoundingMember comments).
+// schema.prisma's Business.membershipTier / isFoundingMember comments).
 const FOUNDING_MEMBER_LIMIT = 100;
 
 // Approves one account's claim on a business and rejects every other
@@ -67,7 +68,7 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
   // flag in this codebase, e.g. Account.isAdmin, is otherwise a manual DB
   // flip). Known minor edge case, not worth engineering around at
   // N=100–600: if a founding business's claim is later revoked (which
-  // resets tier to T0 but doesn't touch the plan) and re-claimed after 100
+  // resets the level to L0 but doesn't touch the tier) and re-claimed after 100
   // other businesses have since been approved, re-running this check on
   // re-approval would put it back on "free" — acceptable given
   // revokeApprovedClaim is already framed as a full unwind. The founding
@@ -78,9 +79,9 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
   const business = await prisma.business.update({
     where: { id: businessId },
     data: {
-      tier: "T1",
-      membershipPlan: isFounding ? "plus" : "free",
-      planStartedAt: new Date(),
+      verificationLevel: CLAIMED,
+      membershipTier: isFounding ? "plus" : "free",
+      membershipTierStartedAt: new Date(),
       // Set only on the founding branch — never written as `false`. Once a
       // business has been recognised as founding, no later approval can
       // take it back, which is exactly what the old plan-encoded version
@@ -96,7 +97,7 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
 
 // Undoes an already-approved claim entirely — the admin's equivalent of
 // "this approval was a mistake." Unlike revoke-ssm (which steps a business
-// back exactly one tier, T2 -> T1), this always lands on T0: the account
+// back exactly one level, L2 -> L1), this always lands on L0: the account
 // making the claim is being deleted outright, so there's no intermediate
 // claim state left to fall back to.
 //
@@ -109,13 +110,13 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
 // Assumes exactly one approved account per business at a time (true today
 // — see approveClaimAndRejectRivals). If a future team-members feature
 // allows multiple approved accounts per business, this needs to stop
-// dropping the whole business's tier unconditionally.
+// dropping the whole business's verification level unconditionally.
 async function revokeApprovedClaim({ accountId, businessId }) {
   await prisma.account.delete({ where: { id: accountId } });
 
   const business = await prisma.business.update({
     where: { id: businessId },
-    data: { tier: "T0" },
+    data: { verificationLevel: UNCLAIMED },
   });
 
   return { business };

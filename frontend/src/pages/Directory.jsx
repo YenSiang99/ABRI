@@ -4,18 +4,18 @@ import { cn } from "@/lib/utils";
 
 import { fetchBusinesses } from "@/lib/api/businesses";
 import { BusinessCard } from "@/components/business/BusinessCard";
-import { TIER_FILTERS } from "@/lib/directoryFilter";
+import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 
 function Directory() {
   const [query, setQuery] = useState("");
-  const [tierFilter, setTierFilter] = useState("all");
+  const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
 
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      fetchBusinesses({ search: query.trim(), tier: tierFilter === "all" ? undefined : tierFilter })
+      fetchBusinesses({ search: query.trim(), verificationLevel: verificationLevelFilter === "all" ? undefined : verificationLevelFilter })
         .then((results) => {
           if (cancelled) return;
           setBusinesses(results);
@@ -30,7 +30,7 @@ function Directory() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, tierFilter]);
+  }, [query, verificationLevelFilter]);
 
   const q = query.trim();
 
@@ -59,14 +59,14 @@ function Directory() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {TIER_FILTERS.map((filter) => (
+        {VERIFICATION_LEVEL_FILTERS.map((filter) => (
           <button
             key={filter.value}
             type="button"
-            onClick={() => setTierFilter(filter.value)}
+            onClick={() => setVerificationLevelFilter(filter.value)}
             className={cn(
               "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-              tierFilter === filter.value
+              verificationLevelFilter === filter.value
                 ? "border-ink bg-ink text-yellow dark:border-grey-700 dark:bg-grey-700"
                 : "border-grey-300 text-grey-600 hover:bg-surface-2 dark:border-border dark:text-muted-foreground dark:hover:bg-muted",
             )}
