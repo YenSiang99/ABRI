@@ -15,6 +15,7 @@ import {
   Flag,
   Inbox,
   Users,
+  Eye,
   ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ const WORKSPACE_ITEMS = [
       // Requests first: it's the only one of the three with work in it.
       { title: "Requests", url: "/app/network/requests", icon: Inbox },
       { title: "Connections", url: "/app/network/connections", icon: Users },
+      { title: "Following", url: "/app/network/following", icon: Eye },
     ],
   },
   { title: "Directory", url: "/app/directory", icon: Search },

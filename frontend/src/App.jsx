@@ -17,6 +17,7 @@ import { Profile } from "@/pages/app/Profile";
 import { Vouches } from "@/pages/app/Vouches";
 import { NetworkRequests } from "@/pages/app/network/NetworkRequests";
 import { NetworkConnections } from "@/pages/app/network/NetworkConnections";
+import { NetworkFollowing } from "@/pages/app/network/NetworkFollowing";
 import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Verify } from "@/pages/app/Verify";
 import { Plan } from "@/pages/app/Plan";
@@ -61,6 +62,7 @@ function App() {
             <Route path="network" element={<Navigate to="/app/network/connections" replace />} />
             <Route path="network/requests" element={<NetworkRequests />} />
             <Route path="network/connections" element={<NetworkConnections />} />
+            <Route path="network/following" element={<NetworkFollowing />} />
             <Route path="directory" element={<AppDirectory />} />
             <Route path="business/:id" element={<BusinessProfile inApp />} />
             <Route path="verify" element={<Verify />} />

@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin, Building2, Radio, Clock } from "lucide-react";
 import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
+import { useFollows } from "@/context/FollowsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,6 +62,7 @@ function BusinessProfile({ inApp = false }) {
   const backLink = useBackLink(inApp);
   const { business: actingBusiness } = useAuth();
   const { connectionStateWith, connect, disconnect } = useConnections();
+  const { isFollowing, follow, unfollow } = useFollows();
   const [vouchOpen, setVouchOpen] = useState(false);
   // Controlled rather than defaultValue, so ?tab=vouches is a link target.
   // Same shape Vouches.jsx uses: unknown values fall back, and the default
@@ -78,6 +80,7 @@ function BusinessProfile({ inApp = false }) {
   const [error, setError] = useState(null);
   const [loadedId, setLoadedId] = useState(null);
   const [connecting, setConnecting] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +172,25 @@ function BusinessProfile({ inApp = false }) {
     setConnecting(false);
     if (result.ok) toast(`Withdrew your request to ${business.name}`);
     else toast.error(result.error);
+  }
+
+  async function handleFollowToggle() {
+    setFollowBusy(true);
+    const wasFollowing = isFollowing(business.id);
+    const result = wasFollowing ? await unfollow(business.id) : await follow(business);
+    setFollowBusy(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    // Says out loud that they aren't told. Following looks like a social
+    // action and isn't one; a member who assumes otherwise has been misled by
+    // the button.
+    toast(
+      wasFollowing
+        ? `Unfollowed ${business.name}`
+        : `Following ${business.name} — they aren't notified`,
+    );
   }
 
   if (status === "loading") {
@@ -271,6 +293,20 @@ function BusinessProfile({ inApp = false }) {
                       {connecting ? "Sending…" : "Connect"}
                     </Button>
                   ))}
+                {/* Always offered alongside Connect, never instead of it, and
+                    never gated by plan. Following is the thing a member can
+                    always do about a business they aren't going to connect
+                    with — no approval, nobody told. */}
+                {canRelate && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleFollowToggle}
+                    disabled={followBusy}
+                  >
+                    {isFollowing(business.id) ? "Following" : "Follow"}
+                  </Button>
+                )}
                 {canVouch && (
                   <Button size="sm" variant="outline" onClick={vouchGate.guard(() => setVouchOpen(true))}>
                     Vouch
