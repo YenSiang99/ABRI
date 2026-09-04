@@ -1,0 +1,122 @@
+# The prod job. Manual only — this is the "Build Now" button, and it never
+# builds. It promotes an image the dev job already built and dev already ran,
+# so what reaches abri.asia is the exact artifact you tested, not a rebuild
+# that happens to share a commit.
+name: Deploy prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit SHA, tag or branch to promote (default: main)"
+        required: false
+        default: main
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  IMAGE_PREFIX: ghcr.io/yensiang99/abri
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so a short SHA or an older tag resolves.
+          fetch-depth: 0
+
+      - name: Resolve the commit
+        id: resolve
+        run: |
+          SHA=$(git rev-parse "${{ inputs.ref }}^{commit}")
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Promoting $SHA"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Record the current prod digests
+        id: previous
+        run: |
+          # Captured before anything moves, so the rollback below has somewhere
+          # to go. Empty on the very first prod deploy, which the rollback
+          # step handles by skipping.
+          for c in backend frontend; do
+            D=$(docker buildx imagetools inspect "$IMAGE_PREFIX-$c:prod" --format '{{.Manifest.Digest}}' 2>/dev/null || true)
+            echo "$c=$D" >> "$GITHUB_OUTPUT"
+            echo "previous $c: ${D:-<none>}"
+          done
+
+      - name: Retag as :prod
+        run: |
+          # A registry-side retag: no rebuild, no layer transfer, and it cannot
+          # produce bytes that differ from what dev ran.
+          for c in backend frontend; do
+            docker buildx imagetools create \
+              --tag "$IMAGE_PREFIX-$c:prod" \
+              "$IMAGE_PREFIX-$c:sha-${{ steps.resolve.outputs.sha }}"
+          done
+
+      - name: Set up SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Sync the compose file
+        run: |
+          scp -i ~/.ssh/deploy_key deploy/docker-compose.yml \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/srv/abri/deploy/docker-compose.yml"
+
+      - name: Pull and restart prod
+        run: |
+          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'REMOTE'
+          set -euo pipefail
+          cd /srv/abri/deploy
+          docker compose pull backend-prod frontend-prod
+          docker compose up -d backend-prod frontend-prod
+          docker image prune -f
+          REMOTE
+
+      - name: Smoke check
+        id: smoke
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 10 https://abri.asia/api/health/db | grep -q '"status":"ok"'; then
+              echo "prod is healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::abri.asia did not report healthy within 150s"
+          exit 1
+
+      - name: Roll back
+        if: failure() && steps.smoke.outcome == 'failure' && steps.previous.outputs.backend != ''
+        run: |
+          # Points :prod back at the digests recorded above and redeploys. Note
+          # what this does NOT undo: `prisma migrate deploy` has already run, and
+          # migrations don't reverse. This recovers a bad image, not a bad
+          # migration — for that, restore from a database backup.
+          docker buildx imagetools create --tag "$IMAGE_PREFIX-backend:prod" \
+            "$IMAGE_PREFIX-backend@${{ steps.previous.outputs.backend }}"
+          docker buildx imagetools create --tag "$IMAGE_PREFIX-frontend:prod" \
+            "$IMAGE_PREFIX-frontend@${{ steps.previous.outputs.frontend }}"
+          ssh -i ~/.ssh/deploy_key "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'REMOTE'
+          set -euo pipefail
+          cd /srv/abri/deploy
+          docker compose pull backend-prod frontend-prod
+          docker compose up -d backend-prod frontend-prod
+          REMOTE
+          echo "::warning::Rolled prod back to the previous images"

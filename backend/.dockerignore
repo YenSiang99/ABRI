@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log*
+
+# Secrets are injected at runtime from /etc/abri/*.env on the host, never baked
+# into an image — an image is pushed to a registry, a .env must not follow it.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

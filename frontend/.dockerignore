@@ -1,0 +1,16 @@
+node_modules
+dist
+npm-debug.log*
+
+# .env points VITE_API_URL at localhost:4000 for `npm run dev`. Left in the build
+# context it would be one Vite precedence rule away from being baked into a
+# deployed bundle. .env.production ("/api") is the one the image needs.
+.env
+.env.local
+.env.*.local
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

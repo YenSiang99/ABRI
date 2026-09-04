@@ -1,0 +1,40 @@
+# Postgres for local development, replacing the Neon database backend/README.md
+# used to send you to. Only the database runs in a container — you still run the
+# frontend and backend with `npm run dev` on your machine, so edits reload
+# instantly.
+#
+#   docker compose -f deploy/docker-compose.local.yml up -d
+#
+# Then in backend/.env:
+#   DATABASE_URL="postgresql://abri:abri@localhost:5432/abri"
+#   DIRECT_URL="postgresql://abri:abri@localhost:5432/abri"
+#
+# Both point at the same string: there's no PgBouncer here, so the pooled and
+# direct URLs Prisma wants are one and the same. The credentials are trivial on
+# purpose — this listens on 127.0.0.1 only and holds nothing but seed data.
+
+name: abri-local
+
+services:
+  postgres:
+    # Pinned to the version running on the EC2 host, so a migration that applies
+    # here applies there.
+    image: postgres:16-alpine
+    container_name: abri-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: abri
+      POSTGRES_PASSWORD: abri
+      POSTGRES_DB: abri
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - abri-local-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U abri -d abri"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  abri-local-pgdata:

@@ -1,0 +1,85 @@
+# The whole ABRI runtime on the EC2 host: dev and prod side by side, each with
+# its own frontend and backend container.
+#
+# Postgres is deliberately NOT here. It runs natively on the host under
+# postgresql.service, which means the live prod database survives every image
+# pull, every rebuild, and is never one `docker compose down -v` away from being
+# deleted. The containers reach it over the Docker bridge instead.
+#
+# Nothing publishes to 0.0.0.0 either: the host's nginx is the only public
+# listener and it proxies to these loopback ports. See /etc/nginx/conf.d/abri.conf.
+#
+#   docker compose -f /srv/abri/deploy/docker-compose.yml pull backend-dev
+#   docker compose -f /srv/abri/deploy/docker-compose.yml up -d backend-dev
+
+name: abri
+
+x-backend: &backend
+  restart: unless-stopped
+  # Resolves to the docker0 gateway, so the connection strings in /etc/abri/*.env
+  # can name a stable host instead of hardcoding 172.17.0.1 — which isn't
+  # guaranteed across daemon restarts or a custom bridge subnet.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # 913 MiB on this box, shared with Postgres, nginx and the other environment.
+  # The cap is what stops one runaway request from taking the host down and
+  # dragging the other environment with it; the heap ceiling makes V8 collect
+  # rather than grow into the limit and get OOM-killed.
+  mem_limit: 256m
+  environment:
+    NODE_OPTIONS: "--max-old-space-size=192"
+  healthcheck:
+    # /health deliberately, not /health/db: this answers "is the process
+    # serving", and a Postgres blip shouldn't cycle an otherwise healthy container.
+    test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    # Generous, because the entrypoint runs `prisma migrate deploy` before the
+    # server binds — a real migration can take longer than one interval.
+    start_period: 60s
+
+x-frontend: &frontend
+  restart: unless-stopped
+  mem_limit: 32m
+  healthcheck:
+    test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+
+services:
+  # --- production: https://abri.asia -------------------------------------
+  backend-prod:
+    <<: *backend
+    image: ghcr.io/yensiang99/abri-backend:prod
+    container_name: abri-backend-prod
+    # Secrets live outside the repo so a deploy can never clobber them and an
+    # image can never carry them — the same reasoning already written into the
+    # abri.service unit this replaces.
+    env_file: /etc/abri/prod.env
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  frontend-prod:
+    <<: *frontend
+    image: ghcr.io/yensiang99/abri-frontend:prod
+    container_name: abri-frontend-prod
+    ports:
+      - "127.0.0.1:8080:80"
+
+  # --- development: https://dev.abri.asia ---------------------------------
+  backend-dev:
+    <<: *backend
+    image: ghcr.io/yensiang99/abri-backend:dev
+    container_name: abri-backend-dev
+    env_file: /etc/abri/dev.env
+    ports:
+      - "127.0.0.1:4001:4000"
+
+  frontend-dev:
+    <<: *frontend
+    image: ghcr.io/yensiang99/abri-frontend:dev
+    container_name: abri-frontend-dev
+    ports:
+      - "127.0.0.1:8081:80"
