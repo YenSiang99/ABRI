@@ -6,6 +6,7 @@ import {
   markOneActivityRead,
 } from "@/lib/api/activity";
 import { fetchVouchRequests } from "@/lib/api/vouches";
+import { fetchMyAsks } from "@/lib/api/asks";
 import { useAuth } from "./AuthContext";
 
 // The two numbers the sidebar puts on nav items: unread activity, and vouches
@@ -41,8 +42,15 @@ function NotificationsProvider({ children }) {
       fetchVouchRequests()
         .then((vouches) => vouches.filter((v) => v.waitingOn === "you").length)
         .catch(() => 0),
-    ]).then(([unread, vouchActions]) => {
-      if (!cancelled) setLoaded({ businessId, unread, vouchActions });
+      // Answers waiting on YOUR decision, on asks YOU posted. Deliberately
+      // not a count of asks you could answer: that would be a tally of work
+      // nobody has asked you for, which is the same reason there is no badge
+      // on the Sent connection requests tab.
+      fetchMyAsks()
+        .then((asks) => asks.filter((a) => a.status === "open" && a.answerCount > 0).length)
+        .catch(() => 0),
+    ]).then(([unread, vouchActions, askActions]) => {
+      if (!cancelled) setLoaded({ businessId, unread, vouchActions, askActions });
     });
 
     return () => {
@@ -58,6 +66,7 @@ function NotificationsProvider({ children }) {
   const isCurrent = Boolean(businessId) && loaded.businessId === businessId;
   const unreadCount = isCurrent ? loaded.unread : 0;
   const vouchActionCount = isCurrent ? loaded.vouchActions : 0;
+  const askActionCount = isCurrent ? loaded.askActions : 0;
 
   // Opening a notification clears that one. Decrements rather than refetching
   // because the click is usually a navigation away from the dashboard — the
@@ -111,9 +120,23 @@ function NotificationsProvider({ children }) {
     }
   }, []);
 
+  // Called by AskDetail after an accept or a close, for the same reason
+  // refreshVouchActions refetches rather than decrementing: accepting one
+  // answer settles the whole ask, and an expiry swept on read can settle
+  // others between loads.
+  const refreshAskActions = useCallback(async () => {
+    try {
+      const asks = await fetchMyAsks();
+      const askActions = asks.filter((a) => a.status === "open" && a.answerCount > 0).length;
+      setLoaded((current) => ({ ...current, askActions }));
+    } catch {
+      // Leave the badge as-is, same reasoning as above.
+    }
+  }, []);
+
   return (
     <NotificationsContext.Provider
-      value={{ unreadCount, vouchActionCount, markOneRead, markAllRead, refreshVouchActions }}
+      value={{ unreadCount, vouchActionCount, askActionCount, markOneRead, markAllRead, refreshVouchActions, refreshAskActions }}
     >
       {children}
     </NotificationsContext.Provider>

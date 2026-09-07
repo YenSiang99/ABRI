@@ -16,7 +16,19 @@ import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
-import { UNCLAIMED } from "../lib/verificationLevels.js";
+import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
+import { rateLimit } from "../middleware/rateLimit.js";
+import { vouchersInNetworkFor } from "../lib/networkOverlap.js";
+import { recordChecks } from "../lib/businessCheck.js";
+import {
+  LOOKUP_LIMIT,
+  MIN_QUERY_LENGTH,
+  lookupWhere,
+  matchReasonFor,
+  normalizeSsm,
+  rankMatches,
+  standingFor,
+} from "../lib/businessLookup.js";
 
 const router = Router();
 
@@ -36,29 +48,99 @@ async function resolveConnectTarget(connectTargetId, claimedBusinessId) {
   return target.id;
 }
 
+// The VIEWER's own business row, or null.
+//
+// optionalAuth puts an Account on the request, and an Account carries no
+// membershipTier — the tier lives on the Business. Every viewer-side gate
+// therefore needs this one extra read, and it only happens for a logged-in
+// caller: an anonymous request never touches the database for it.
+//
+// Returns null rather than throwing for an account with no business (an admin
+// legitimately has none), so callers can treat "no viewer business" and "not
+// logged in" as the same thing — which for these gates they are.
+async function loadViewerBusiness(req) {
+  if (!req.account?.businessId) return null;
+  return prisma.business.findUnique({
+    where: { id: req.account.businessId },
+    select: { id: true, membershipTier: true },
+  });
+}
+
+// The vouch numbers, or nothing.
+//
+// THE ONE RUNG BETWEEN A STRANGER AND A MEMBER, and it is deliberately the
+// only thing on that rung. An anonymous visitor still gets the verification
+// level everywhere — that is the honest answer to "are they real", it is the
+// whole promise of the check-a-business screen, and "verification cannot be
+// bought" means it is never for sale or for trade. What a free account buys
+// is the DEPTH: how many peers have staked their reputation on this business.
+//
+// Absent keys, never zeros. A withheld count and a genuine zero must not
+// render the same — BusinessCard has three strings for three states, and a
+// zeroed-out withheld count would show "No vouches yet" about a business with
+// forty. Same rule the contact gate follows: the key is missing, not masked.
+//
+// Shared by both routes so the directory and the lookup cannot disagree about
+// what a stranger is worth showing.
+function vouchFieldsFor(counts, viewer) {
+  if (!viewer) return {};
+  return {
+    vouchCount: counts.vouchesReceived,
+    vouchLevel: vouchLevelFor({
+      received: counts.vouchesReceived,
+      given: counts.vouchesGiven,
+    }),
+  };
+}
+
+// Directory paging. A page size a browse screen can render, and a hard cap so
+// a caller cannot ask for the whole table by setting limit=100000 — which is
+// what this route did on every request before it had one.
+const DIRECTORY_PAGE_SIZE = 24;
+const DIRECTORY_MAX_PAGE_SIZE = 50;
+
+// The directory: browse, filter, act.
+//
+// optionalAuth is NEW, and so is paging. This route used to have no auth
+// middleware at all and no take/skip/cursor, which meant one unauthenticated
+// request returned the entire member list — 34 rows of 16 fields today, and
+// the whole trust graph in a single call at any size worth having. It is the
+// asset the product sells, and it was a `curl` away.
+//
+// It now matches registration numbers and domains too, via the same builder
+// the lookup uses. See lib/businessLookup.js for why that clause is shared
+// now when this file previously argued it must not be: a logged-in member had
+// ended up with two search boxes, and one box has to answer both questions.
 router.get(
   "/",
+  optionalAuth,
   asyncHandler(async (req, res) => {
     const { search, verificationLevel } = req.query;
-    const businesses = await prisma.business.findMany({
-      where: {
-        // NOTE: an unrecognised query key is simply NO FILTER here, not a
-        // 400 — so a client and server that disagree about this param name
-        // fail silently and wide. That is not hypothetical: Register.jsx
-        // filters on UNCLAIMED to find claimable listings, and a dropped
-        // filter there offers already-claimed businesses for claiming.
-        // Renaming this param means renaming lib/api/businesses.js in the
-        // same commit.
-        ...(verificationLevel ? { verificationLevel } : {}),
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { category: { contains: search, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
+
+    // Clamped, not honoured. A limit is a courtesy to the client; the cap is
+    // the thing that actually bounds the response.
+    const limit = Math.min(
+      Number(req.query.limit) || DIRECTORY_PAGE_SIZE,
+      DIRECTORY_MAX_PAGE_SIZE,
+    );
+    const page = Math.max(Number(req.query.page) || 1, 1);
+
+    const where = {
+      // NOTE: an unrecognised query key is simply NO FILTER here, not a
+      // 400 — so a client and server that disagree about this param name
+      // fail silently and wide. That is not hypothetical: Register.jsx
+      // filters on UNCLAIMED to find claimable listings, and a dropped
+      // filter there offers already-claimed businesses for claiming.
+      // Renaming this param means renaming lib/api/businesses.js in the
+      // same commit.
+      ...(verificationLevel ? { verificationLevel } : {}),
+      // includeCategory: browsing "Accounting" must return every accountant.
+      // That is the one thing this route matches on and the lookup does not.
+      ...(search ? lookupWhere(search, { includeCategory: true }) : {}),
+    };
+
+    const rows = await prisma.business.findMany({
+      where,
       include: {
         _count: {
           select: {
@@ -71,24 +153,41 @@ router.get(
         },
       },
       orderBy: { name: "asc" },
+      skip: (page - 1) * limit,
+      // Over-fetch by one to learn whether there is a next page, rather than
+      // running a second count query against the same predicate.
+      take: limit + 1,
     });
+
+    const hasMore = rows.length > limit;
+    const businesses = hasMore ? rows.slice(0, limit) : rows;
+
+    // Plus, and asked about the VIEWER's own business rather than the ones
+    // being listed — the first gate in this file that runs that direction.
+    // See the "viewer-side gates" block in lib/entitlements.js for why that
+    // is allowed here when line 55 of the checklist forbids it for contact
+    // details: this adds something a stranger never had, rather than taking
+    // away something a seller paid to publish.
+    //
+    // ONE query for the whole page, not one per card. Fifty cards asking
+    // separately is fifty round trips on a screen that has to feel instant.
+    const viewer = await loadViewerBusiness(req);
+    const overlap =
+      viewer && can(viewer, "networkOverlap")
+        ? await vouchersInNetworkFor(businesses.map((b) => b.id), viewer.id)
+        : new Map();
+
     res.json({
-      // vouchLevel alongside vouchCount — components like VouchBadge assume
-      // every business object carries both (see
-      // components/badge/VouchBadge.jsx, which indexes an icon map by
-      // vouchLevel; it now falls back rather than throwing, but shipping the
-      // field is still the contract).
-      // Contact details are stripped UNCONDITIONALLY here, which is why this
-      // route needs no optionalAuth and no contactLocked flag: it has no
-      // viewer-dependent behaviour at all, and identical output for everyone
-      // is the assertion that keeps it that way.
+      // Contact details are stripped UNCONDITIONALLY here, and that survived
+      // the ladder deliberately.
       //
-      // Two reasons. BusinessCard.jsx renders name/category/location/level/
-      // vouchCount and has nowhere to put a phone number, so nothing here
-      // would read them. And shipping every listing's phone number to every
-      // session would be the best scraping surface in the app, built to serve
-      // a card that doesn't display it — which is the precise thing the
-      // logged-in half of the gate exists to prevent.
+      // "Members see more" could have meant putting phone numbers on
+      // directory cards, and it must not: BusinessCard.jsx renders
+      // name/category/location/level/vouches and has nowhere to put a phone
+      // number, so shipping one would send every listing's contact details to
+      // every session to serve a card that does not display them. That is the
+      // best scraping surface in the app, built for nothing. Contact stays on
+      // the profile route, where it is rendered and already gated.
       //
       // The trade-off, stated so it can be revisited deliberately: a future
       // "call" button on directory cards is a change to THIS route, and that
@@ -96,12 +195,148 @@ router.get(
       // past the single profile route it occupies today.
       businesses: businesses.map(({ _count, ...business }) => ({
         ...publicBusinessView(business),
-        vouchCount: _count.vouchesReceived,
-        vouchLevel: vouchLevelFor({
-          received: _count.vouchesReceived,
-          given: _count.vouchesGiven,
-        }),
+        // Absent for an anonymous caller — see vouchFieldsFor.
+        ...vouchFieldsFor(_count, req.account),
+        // Why this row came back. Cheap here, and it is what lets the in-app
+        // directory tell "your registration number matched" from "the name
+        // contains what you typed" — the distinction that used to require a
+        // second screen.
+        ...(search ? { matchReason: matchReasonFor(business, search) } : {}),
+        // Absent unless there IS an overlap, so a Plus member browsing
+        // strangers gets no empty arrays and the client can render on
+        // presence. A Free member never gets the key at all.
+        ...(overlap.has(business.id) ? { vouchersInYourNetwork: overlap.get(business.id) } : {}),
       })),
+      page,
+      hasMore,
+    });
+  }),
+);
+
+// ─── Check a business ───────────────────────────────────────────────────────
+//
+// "Is this business real, verified, and vouched for?" — one pasted string in,
+// a short ranked list out. See lib/businessLookup.js for why this is a
+// separate route from the directory search above rather than a wider OR.
+//
+// DECLARED ABOVE GET /:id, AND IT HAS TO BE. Express matches in order, so
+// with these swapped every request for /businesses/lookup would arrive at the
+// :id handler as a business whose id is the literal string "lookup" and
+// answer 404. The same collision routes/follows.js documents between GET
+// /followers and DELETE /:businessId — it is only safe there because the two
+// use different verbs, which is not true here.
+//
+// PUBLIC, and that is the feature rather than an oversight. The invite this
+// screen produces is an unsolicited message with a link in it, which is
+// exactly the shape of a scam — a trust network whose invite cannot be
+// verified without first joining is self-defeating. So the recipient can
+// check the sender before acting.
+//
+// It exposes nothing GET /businesses did not already: that route is
+// unauthenticated, unpaginated, and has always returned ssm, domain, website
+// and address for every row. What this adds is a better question, not a wider
+// answer — and the one thing it does add over that route, contact details for
+// a logged-in member, is decided by contactVisibility exactly as the profile
+// route decides it.
+//
+// THE COPY RULE, restated here because this is the route that would break it:
+// no result on this endpoint is EVER a claim about the real world. ABRI has
+// no registry access. An empty match list means "no record on ABRI" and the
+// client must not render it as anything stronger.
+router.get(
+  "/lookup",
+  optionalAuth,
+  rateLimit({
+    // Generous for a person, tight for a script. A member checking a
+    // counterparty runs one or two of these and reads the answer; thirty in a
+    // minute from one address is an enumeration of the directory.
+    windowMs: 60 * 1000,
+    max: 30,
+    message: "Too many lookups. Wait a minute and try again.",
+  }),
+  asyncHandler(async (req, res) => {
+    const query = String(req.query.q ?? "").trim();
+
+    // A short query is answered, not rejected: the client types into this
+    // field character by character, and a 400 mid-word would render as an
+    // error under the box the member is still using. An empty match list is
+    // the same shape the real miss has, so the UI needs no third state.
+    if (query.length < MIN_QUERY_LENGTH) {
+      return res.json({ query, matches: [] });
+    }
+
+    const viewer = await loadViewerBusiness(req);
+    const businesses = await prisma.business.findMany({
+      where: lookupWhere(query),
+      include: {
+        _count: {
+          select: {
+            vouchesReceived: { where: { status: "published" } },
+            vouchesGiven: { where: { status: "published" } },
+          },
+        },
+      },
+      // Over-fetch, then rank, then slice — NOT `take: LOOKUP_LIMIT`.
+      //
+      // Capping in the query would make the limit a correctness cliff rather
+      // than a presentation one: Postgres returns rows in whatever order it
+      // likes, so a query matching one business by its registration number
+      // and nine by name could return the nine and drop the one. Pasting a
+      // number and being told "no record" because other businesses share a
+      // word is the single worst thing this screen could do.
+      //
+      // A small multiple is enough to make that unreachable in practice while
+      // still bounding the work on a public route.
+      take: LOOKUP_LIMIT * 4,
+    });
+
+    const ranked = rankMatches(businesses, query).slice(0, LOOKUP_LIMIT);
+
+    const overlap =
+      viewer && can(viewer, "networkOverlap")
+        ? await vouchersInNetworkFor(ranked.map((m) => m.business.id), viewer.id)
+        : new Map();
+
+    // Pro's check history, written here because this is the moment a member
+    // actually looked at a counterparty. Only for a member who can read it
+    // back — see lib/businessCheck.js on why logging a Free member's searches
+    // to sell them the log later is the wrong trade.
+    //
+    // Awaited so a failure surfaces rather than becoming an unhandled
+    // rejection, but it writes nothing that the response depends on.
+    if (viewer && can(viewer, "checkHistory")) {
+      await recordChecks(viewer.id, ranked.map((m) => m.business));
+    }
+
+    res.json({
+      query,
+      matches: ranked.map(({ business, reason }) => {
+        const { _count, ...row } = business;
+        // Per row, off the RAW record, for the reason GET /:id states twice:
+        // publicBusinessView strips membershipTier, so a gate computed after
+        // it sees every business as free and withholds from everyone.
+        const contact = contactVisibility(row, req.account);
+        return {
+          ...publicBusinessView(row, { showContact: contact.visible }),
+          // Why this row came back, so the card can say "the registration
+          // number matched" rather than presenting a loose name match with
+          // the same confidence.
+          matchReason: reason,
+          // "listed" or "unclaimed" — resolved server-side so no client
+          // re-derives it from verificationLevel and gets the L0 case wrong.
+          standing: standingFor(row),
+          // Absent for an anonymous caller, exactly as on the directory —
+          // one helper so the two surfaces cannot disagree about what a
+          // stranger is worth showing. The verification level above is NOT
+          // gated and never will be: it is the answer this screen promises.
+          ...vouchFieldsFor(_count, req.account),
+          contactLocked: !contact.visible,
+          contactLockedReason: contact.reason,
+          // Plus. Absent when there is no overlap or the viewer is below
+          // Plus, so the client renders on presence rather than on a count.
+          ...(overlap.has(row.id) ? { vouchersInYourNetwork: overlap.get(row.id) } : {}),
+        };
+      }),
     });
   }),
 );
@@ -129,6 +364,37 @@ router.get(
             fromBusiness: { select: { id: true, name: true, category: true, verificationLevel: true } },
             currentRevision: { select: { comment: true } },
           },
+        },
+        // Accepted answers naming this business — the Recommendations tab.
+        //
+        // Filtered to "accepted" here, defensively, for the same reason
+        // vouchesReceived is filtered to "published": an offered answer is a
+        // suggestion nobody agreed to, and an under_review one is frozen.
+        //
+        // `answeredByBusinessId: { not: id }` is what keeps self-nomination
+        // off this tab. Every row in this relation already has
+        // recommendedBusinessId equal to this business, so "the author is
+        // this business" IS "they nominated themselves" — no field
+        // comparison needed. Letting one through would turn the tab into
+        // exactly the self-promotion surface the answer model was shaped to
+        // prevent.
+        recommendationsReceived: {
+          where: {
+            status: "accepted",
+            answeredByBusinessId: { not: req.params.id },
+          },
+          include: {
+            answeredByBusiness: { select: { id: true, name: true, category: true, verificationLevel: true } },
+            ask: {
+              select: {
+                id: true,
+                title: true,
+                category: true,
+                askedByBusiness: { select: { id: true, name: true } },
+              },
+            },
+          },
+          orderBy: { acceptedAt: "desc" },
         },
       },
     });
@@ -187,6 +453,40 @@ router.get(
               testimonial: currentRevision?.comment ?? null,
             }))
           : [],
+        // NOT plan-gated, unlike testimonials right above, and that is a
+        // decision rather than an omission. Three reasons:
+        //   - Testimonials are Plus's headline asset. A recommendation is a
+        //     different asset with a different author, and pricing it here
+        //     would be a second paywall on the same page.
+        //   - Withholding it punishes the RECOMMENDER, whose work would
+        //     vanish because of somebody else's billing status.
+        //   - It never feeds vouchCount or vouchLevelFor(), so a downgrade has
+        //     nothing to take away — which is the entire justification the
+        //     testimonials gate rests on.
+        //
+        // The count ships for T0 listings TOO, even though the tab that
+        // would display them is absent on an unclaimed profile. That is the
+        // whole growth loop: the claim CTA reads "3 members have recommended
+        // this business", names withheld, and claiming is what reveals them.
+        recommendationCount: business.recommendationsReceived.length,
+        // Withheld on an UNCLAIMED listing, keys absent rather than nulled —
+        // the same shape testimonials use when they're withheld.
+        //
+        // The count is the pull ("3 members have recommended this business")
+        // and the names are what claiming reveals. The profile page renders no
+        // tabs for a T0 so nothing would have displayed them anyway, but
+        // shipping them in the payload would have made "claim your listing to
+        // see who" false for anyone who opened the network tab.
+        recommendationsReceived:
+          business.verificationLevel === UNCLAIMED
+            ? []
+            : business.recommendationsReceived.map((r) => ({
+                id: r.id,
+                comment: r.comment,
+                acceptedAt: r.acceptedAt,
+                answeredBy: r.answeredByBusiness,
+                ask: r.ask,
+              })),
       },
     });
   }),
@@ -355,6 +655,93 @@ router.patch(
   }),
 );
 
+// Submit an SSM registration number for review — the step
+// ABRI-feature-checklist.md §2 records as missing ("the status screen exists;
+// there's no way to submit and no admin queue"). Until this existed, L2 was a
+// badge an admin flipped by hand with no number behind it, and Business.ssm
+// was null on every row in the database.
+//
+// A SEPARATE ROUTE RATHER THAN LIFTING `ssm` OUT OF PROTECTED_FIELDS. It stays
+// protected in lib/contactFields.js, so PATCH /me still cannot touch it. The
+// difference matters: description and services are the owner's to rewrite at
+// will, and a registration number is a claim an admin has ruled on. Making it
+// editable through the same door would let a business get verified on one
+// number and quietly display another.
+//
+// PENDING IS DERIVED, NOT STORED. There is no ssmStatus column:
+//
+//   ssm == null && level L1  — nothing submitted
+//   ssm != null && level L1  — submitted, waiting on an admin
+//   level L2                 — approved; the number is what was verified
+//
+// A status column would be a second copy of a fact verificationLevel already
+// carries, and the disagreeing case — "approved" beside L1 — is precisely the
+// one that would show a badge nobody granted. Same call
+// isRecommendationPublished makes in lib/asks.js.
+router.post(
+  "/me/ssm",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) {
+      return res.status(403).json({ error: "Your account isn't attached to a business yet." });
+    }
+    // The same load-bearing check PATCH /me carries — see its comment. A
+    // pending claimant has a businessId and does not own the business.
+    if (req.account.claimStatus !== "approved") {
+      return res.status(403).json({ error: "Your claim on this business hasn't been approved yet." });
+    }
+
+    const business = await prisma.business.findUnique({ where: { id: req.account.businessId } });
+    if (!business) {
+      return res.status(403).json({ error: "Your account isn't attached to a business yet." });
+    }
+
+    // L1 only, in both directions. An L0 has no owner and cannot reach this
+    // route anyway; an L2-and-above has already been verified against a
+    // number, and letting them overwrite it is the exact hole the
+    // PROTECTED_FIELDS note above describes. Correcting a wrong number after
+    // approval is an admin action (revoke, then resubmit), because somebody
+    // has to look at the new one.
+    if (business.verificationLevel !== CLAIMED) {
+      return res.status(400).json({
+        error:
+          business.verificationLevel === UNCLAIMED
+            ? "Claim this business before submitting its registration number."
+            : "This business is already verified. Ask an admin to change its registration number.",
+      });
+    }
+
+    const ssm = String(req.body?.ssm ?? "").trim();
+    // Length bounds only — NO FORMAT CHECK, and that is deliberate. SSM
+    // numbers exist in at least three shapes (the 12-digit post-2016 form,
+    // the old "1234567-A", and letterheads carrying both), this column has
+    // never had a format contract, and a regex here would reject real numbers
+    // in order to enforce a rule invented in this file. An admin reads the
+    // number against the register; that IS the validation. See normalizeSsm
+    // in lib/businessLookup.js, which handles the shapes rather than judging
+    // them.
+    if (ssm.length < 4 || ssm.length > 60) {
+      return res.status(400).json({ error: "Enter the registration number as it appears on your SSM documents." });
+    }
+
+    // BOTH columns, always. ssmNormalized is what the lookup matches on and
+    // `ssm` is what an admin reads; a write that sets one without the other
+    // is a business that cannot be found by its own number. normalizeSsm is
+    // the single definition of that key — see the ssmNormalized comment in
+    // schema.prisma.
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { ssm, ssmNormalized: normalizeSsm(ssm) },
+    });
+
+    // No activity event. Nothing happened TO this member that they don't
+    // already know — they pressed the button — and lib/activityEvents.js's
+    // rule is that events go to the party who didn't act. The approval and
+    // the rejection both fire one, because those arrive from somebody else.
+    res.json(await loadAccountView(req.account.id));
+  }),
+);
+
 // Scope note: this only covers submission. It always ends in one of two
 // states — a token waiting to be opened (domain match), or a pending
 // account waiting on an admin (no domain match) — never an immediate
@@ -383,9 +770,9 @@ router.post(
     }
     // Both are closed lists (lib/businessVocab.js), and this is the only route
     // that writes them. Checked on the server rather than trusted from the
-    // form: the directory filters and groups on these two columns by exact
-    // equality, so a value that isn't in the list is a business nothing can
-    // ever match, and nothing about that failure is visible to them.
+    // form, because the Asks board routes work by joining these two columns on
+    // equality — a value that isn't in the list is a business no ask can ever
+    // reach, and nothing about that failure is visible to them.
     if (!isValidCategory(category.trim())) {
       return res.status(400).json({ error: "Pick a category from the list." });
     }

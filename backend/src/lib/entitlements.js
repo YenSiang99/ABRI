@@ -94,6 +94,66 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // Pro feature arrives, it gets its own entry under its own name.
   nfcCard: "plus",
 
+  // What Pro buys on the Asks board, and the ONLY thing it buys there: being
+  // TOLD an ask matches what you do. Server-enforced — GET /asks/alerts
+  // answers 402 below Pro.
+  //
+  // Posting an ask is gated by T2, which is verification and cannot be bought
+  // (ABRI-feature-checklist.md §6); answering is gated by nothing at all.
+  // Neither is a plan question, so neither appears in this registry, and
+  // routes/asks.js contains no can() call for either.
+  //
+  // Read the LIMIT of this gate before relying on it. What it withholds is a
+  // COUNT the member can recompute in one click by opening the board, which
+  // they are always allowed to do. It sells TIMING, not access — push versus
+  // pull — and it must never grow into hiding asks from anyone: the moment a
+  // Free member cannot SEE an ask, the board stops being a network and
+  // becomes a lead list, which is the thing §6's "never build a marketplace"
+  // rules out.
+  //
+  // It is also, as of this change, Pro's first delivered feature — §3 of the
+  // checklist recorded that Pro had none.
+  askAlerts: "pro",
+
+  // ─── The viewer-side gates ───────────────────────────────────────────────
+  //
+  // Everything above this line asks about the business being LOOKED AT — is
+  // its owner paying enough for its testimonials or its phone number to be
+  // published. These three ask about the business doing the LOOKING, and that
+  // difference is the whole reason they can exist at all.
+  //
+  // ABRI-feature-checklist.md line 55 rules out the obvious way to make a
+  // paid tier feel worth it: "the viewer's plan is deliberately not part of
+  // the gate… charging the buyer for the privilege of contacting a paying
+  // seller paywalls that seller's own leads away from them. Don't
+  // reintroduce a viewer-side gate without revisiting that."
+  //
+  // Revisited, and the line still holds — for FACTS ABOUT THE SELLER. None of
+  // these three withhold one. They withhold things that do not exist for a
+  // non-member at all:
+  //
+  //   networkOverlap — a comparison of the VIEWER's connections against the
+  //                    business's vouchers. A stranger has no network, so
+  //                    there is nothing being taken from them.
+  //   the other two   — work ABRI does FOR the viewer over time.
+  //
+  // The test to apply before adding a fourth: if a Free member could have got
+  // this by asking the business directly, gating it is charging the buyer and
+  // it does not belong here.
+
+  // "2 of the businesses vouching for them are in your network." Plus, and
+  // the reason the check-a-business screen is worth opening twice.
+  networkOverlap: "plus",
+
+  // Tell me when this business gets claimed, verified, or loses it. The
+  // feature routes/follows.js already named as the better version of
+  // following an unclaimed listing.
+  watchBusinesses: "pro",
+
+  // The member's own log of what they checked and when. NOT a record of who
+  // checked THEM — see the BusinessCheck comment in schema.prisma.
+  checkHistory: "pro",
+
 };
 
 function can(business, feature) {

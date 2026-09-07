@@ -42,6 +42,27 @@ import { FEATURE_MIN_MEMBERSHIP_TIER, membershipTierAllows, membershipTierLabel 
 // part of Plus" is the title's job; the description's job is why anyone
 // wants it.
 const UPGRADE_COPY = {
+  // The viewer-side gates. Every other entry here sells something that makes
+  // OTHER people trust you; these sell tools for judging other people.
+  // Worded from what the member gets, not from what is withheld — because
+  // nothing is: each one adds something that does not exist for a stranger.
+  // See the "viewer-side gates" block in backend/src/lib/entitlements.js.
+  networkOverlap: {
+    title: "Seeing who you both know is part of Plus",
+    description:
+      "When you check a business, Plus shows which of the members vouching for them are already in your network. A badge says a document was checked; this says somebody you trust has worked with them.",
+  },
+  watchBusinesses: {
+    title: "Watching a business is part of Pro",
+    description:
+      "We'll tell you the moment their verification changes — including when an unclaimed listing finally gets claimed. They're never told you're watching.",
+  },
+  checkHistory: {
+    title: "Check history is part of Pro",
+    description:
+      "Keep a record of every business you've checked and what their standing was at the time, so you can show what you knew when you decided.",
+  },
+
   giveVouch: {
     title: "Vouching is part of Plus",
     description:

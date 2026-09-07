@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  Radio,
+  History,
   UserCircle,
   Handshake,
   Compass,
@@ -17,6 +19,8 @@ import {
   Users,
   Eye,
   ChevronDown,
+  ClipboardList,
+  MessageSquareWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -37,6 +41,23 @@ import { CLAIMED } from "@/lib/verificationLevels";
 // paying for the nesting now, while there are only three.
 const WORKSPACE_ITEMS = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
+  // Second, directly under Dashboard, because it is the thing to open when
+  // you have no particular errand — the others all answer a question you
+  // arrived with.
+  //
+  // Top-level rather than a child of Network, and the distinction is the one
+  // that block's comment already draws: Network holds RELATIONSHIPS (who I
+  // know), and this is the whole membership's activity, most of it from
+  // businesses the reader has never met.
+  //
+  // No lockWhenPending and no lockFeature. A pending L1 can read it and a
+  // Free member can read all of it — see backend/src/routes/feed.js for why
+  // gating this one would be self-defeating.
+  //
+  // And no NavBadge, deliberately. The badge doctrine in this file is that a
+  // count means somebody is owed something; a feed owes nobody anything, and
+  // a number on it would be nagging a member about other people's news.
+  { title: "Feed", url: "/app/feed", icon: Radio },
   { title: "My Profile", url: "/app/profile", icon: UserCircle },
   { title: "Vouches", url: "/app/vouches", icon: Handshake, lockWhenPending: true },
   {
@@ -50,7 +71,23 @@ const WORKSPACE_ITEMS = [
       { title: "Following", url: "/app/network/following", icon: Eye },
     ],
   },
+  // Beside Directory, not under Network, and the distinction is the one that
+  // block's comment draws: Network holds RELATIONSHIPS (who I know), and this
+  // holds WORK (what somebody needs). Top-level because it is the one place
+  // in the app where a stranger's need reaches you without either of you
+  // having connected first — which is exactly not a relationship view.
+  //
+  // No lockWhenPending. A T1 business can't POST an ask (that needs T2) but
+  // can read the board and answer everything on it, so locking the item would
+  // shut a page that genuinely works for them — the opposite of the badge
+  // rule stated below.
+  { title: "Asks", url: "/app/asks", icon: ClipboardList },
   { title: "Directory", url: "/app/directory", icon: Search },
+  // Pro. Sits under Directory because that is where checks are made — a
+  // record belongs beside the thing it records. lockFeature keeps the row
+  // visible with a padlock rather than hiding it: a member who never learns
+  // the feature exists cannot buy it.
+  { title: "Check history", url: "/app/checks", icon: History, lockFeature: "checkHistory" },
 ];
 
 // The admin's two queues are siblings, and the sidebar is where that has to
@@ -60,6 +97,14 @@ const WORKSPACE_ITEMS = [
 const ADMIN_ITEMS = [
   { title: "Claims review", url: "/app/admin", icon: ClipboardCheck },
   { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
+  // A third sibling queue, and it belongs here for the reason the comment
+  // above gives about vouch review: a queue reachable only from a link on
+  // another admin page reads as part of that page's job.
+  { title: "Ask review", url: "/app/admin/ask-reviews", icon: MessageSquareWarning },
+  // A fourth queue, and the one that makes L2 real: until it existed an
+  // admin granted SSM-Verified from the claims screen with no number in front
+  // of them. See pages/admin/AdminSsmReviews.jsx.
+  { title: "SSM review", url: "/app/admin/ssm-reviews", icon: ShieldCheck },
 ];
 
 // Two independent reasons an item can be shut, so two fields rather than
@@ -187,6 +232,7 @@ function SidebarNav({
   locked,
   unreadCount,
   vouchActionCount,
+  askActionCount,
   incomingCount,
   onSignOut,
 }) {
@@ -272,6 +318,13 @@ function SidebarNav({
                         count would be advertising work that isn't there. */}
                     {item.url === "/app/vouches" && !locked && (
                       <NavBadge count={vouchActionCount} label="waiting on you" />
+                    )}
+                    {/* Answers waiting on YOUR decision, on asks YOU posted —
+                        never a count of asks you could answer, which would be
+                        a tally of work nobody asked you for. No `locked`
+                        term: the Asks page is open to every tier. */}
+                    {item.url === "/app/asks" && (
+                      <NavBadge count={askActionCount} label="answers to decide" />
                     )}
                   </NavRow>
                 ),
@@ -381,7 +434,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount } = useNotifications();
+  const { unreadCount, vouchActionCount, askActionCount } = useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
   // contexts, matching how the other two counts arrive.
@@ -418,6 +471,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           locked={locked}
           unreadCount={unreadCount}
           vouchActionCount={vouchActionCount}
+          askActionCount={askActionCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
         />
@@ -443,6 +497,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               locked={locked}
               unreadCount={unreadCount}
               vouchActionCount={vouchActionCount}
+              askActionCount={askActionCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}
             />

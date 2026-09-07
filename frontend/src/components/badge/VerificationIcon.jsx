@@ -3,9 +3,10 @@
 // never come off a Business row.
 //
 // The prop is `mark`, not `level`, because it was called `tier` until Aug 2026
-// — which made it a FOURTH unrelated meaning of that word, alongside the
-// verification level, the membership tier and the vouch ladder. Splitting it
-// out is what let the other three become unambiguous.
+// — which made it a FIFTH unrelated meaning of that word, alongside the
+// verification level, the membership tier, the vouch ladder and the asks
+// board's match strength. Splitting it out is what let the other four become
+// unambiguous.
 //
 // Never use mark="verified" as a generic tick. That yellow is the SSM-verified
 // colour, and it turns any surface it lands on into a trust claim — which is

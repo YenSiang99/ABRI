@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { BUSINESS_CATEGORIES, BUSINESS_LOCATIONS } from "@/lib/businessVocab";
 import { UNCLAIMED } from "@/lib/verificationLevels";
 
+
+
 const EMPTY_FORM = {
   businessId: null,
   businessName: "",
@@ -42,8 +44,14 @@ function Register() {
   // router state) because the manual-review path can finish days later, in
   // a different tab, after clicking the emailed confirmation link.
   const connectTarget = searchParams.get("connect");
+  // A name carried from an invite. The check-a-business screen produces a
+  // link for a business ABRI has NO row for, so unlike ?business= there is
+  // nothing to look up — the name is all anybody has, and without this the
+  // recipient lands on a search box and types their own company name to be
+  // told, correctly, that no unclaimed listing matches it.
+  const invitedName = searchParams.get("name");
   const [connectBusinessInfo, setConnectBusinessInfo] = useState(null);
-  const baseForm = { ...EMPTY_FORM, connectTarget };
+  const baseForm = { ...EMPTY_FORM, connectTarget, businessName: invitedName ?? "" };
 
   const [step, setStep] = useState("search");
   const [submittedName, setSubmittedName] = useState("");
@@ -77,6 +85,15 @@ function Register() {
       cancelled = true;
     };
   }, [preselectedId]);
+
+  // An invite names a business ABRI has never seen, so searching for it would
+  // always come back empty. Straight to `details` with the name filled in —
+  // the same jump ?business= makes, minus the lookup, and businessId stays
+  // null so this goes through findOrCreateClaimTarget's create branch.
+  useEffect(() => {
+    if (!invitedName || preselectedId) return;
+    setStep("details");
+  }, [invitedName, preselectedId]);
 
   useEffect(() => {
     if (!connectTarget) return;
@@ -376,11 +393,10 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
 
         <div>
           <label className={labelClass}>Location</label>
-          {/* A select, not a text input. Everything that groups or matches
-              businesses compares this column exactly, so "PJ" and
-              "Petaling  Jaya" are businesses nothing can ever match — and
-              they'd never find out. The list is in lib/businessVocab.js,
-              mirrored from the server, which rejects anything else. */}
+          {/* A select, not a text input. The Asks board reaches a business by
+              joining on this column exactly, so "PJ" and "Petaling  Jaya" are
+              businesses no ask can ever route to — and they'd never find out.
+              The list is in lib/businessVocab.js, mirrored from the server. */}
           <select
             value={form.location}
             onChange={(e) => onChange("location", e.target.value)}

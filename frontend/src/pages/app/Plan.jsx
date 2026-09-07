@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 // The lower tiers get no button. A Free member does not need an affordance
 // for "downgrade to nothing", and offering one on a Pro member's screen
 // invites a support ticket the product can't service — there is no billing
-// flow behind any of this yet. `to` matches the public table's CTAs, which
+// flow behind any of this yet. `to` matches the public cards' CTAs, which
 // are also the only destinations that exist.
 function ctaFor(tier, currentTier) {
   const i = MEMBERSHIP_TIER_ORDER.indexOf(tier);
@@ -116,14 +116,15 @@ function TierCard({ tier, currentTier }) {
             <li key={f.label} className="flex items-start gap-2 text-xs text-muted-foreground">
               {/* A plain lucide tick. NOT VerificationIcon — its yellow is
                   the SSM-verified colour, and using it here would make every
-                  paid row read as a trust claim. Same rule the public table
-                  follows in MembershipTierComparison.jsx's FeatureCell. */}
+                  paid row read as a trust claim. Same rule the public
+                  pricing cards follow in MembershipTierComparison.jsx. */}
               <Check className="mt-px h-3.5 w-3.5 flex-none text-foreground" aria-hidden />
               <span>
                 <span className="text-foreground">{f.label}</span>
-                {/* A colon, not a dash. A label may itself contain an em
-                    dash, and joining with another one reads as a third
-                    clause rather than as the value. */}
+                {/* A colon, not a dash. Two of these labels already contain
+                    an em dash ("Asks board — post and answer"), and joining
+                    with another one produced "post and answer — SSM-verified",
+                    which reads as a third clause rather than as the value. */}
                 {f.detail && <span className="text-muted-foreground">: {f.detail}</span>}
               </span>
             </li>

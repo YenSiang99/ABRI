@@ -53,6 +53,106 @@ const ACTIVITY_MESSAGES = {
     "An admin reviewed the flagged vouch and sent it back to be edited.",
   vouch_review_cancelled: () => "An admin cancelled the flagged vouch after reviewing it.",
 
+  // ─── SSM verification ────────────────────────────────────────────────────
+  // Both carry no actor: an admin ruled on these, and staff never appear as
+  // an actor in a member-facing feed. Same call ask_expired makes.
+  //
+  // The rejection names the NEXT ACTION rather than the fault, because it
+  // cannot name the fault: this table has no detail column, so every message
+  // here is generated from the type alone and the admin's reasoning has
+  // nowhere to travel. See the comment on POST /admin/businesses/:id/
+  // reject-ssm. "Check it against your documents and submit again" is true
+  // whatever the reason was, which is what makes it safe to say blind.
+  ssm_verified: () =>
+    "Your SSM registration number was verified — you're now SSM-Verified.",
+  ssm_rejected: () =>
+    "Your SSM registration number wasn't accepted. Check it against your SSM documents and submit it again.",
+
+  // ─── Watched businesses ──────────────────────────────────────────────────
+  //
+  // Pro. The point of a watch is that the member does NOT have to come back
+  // and look, so these fire the moment the level moves rather than lazily on
+  // read — see notifyWatchers in lib/businessWatch.js.
+  //
+  // Four messages rather than one, because the direction of travel changes
+  // what the reader should do. "They're verified now" invites you to proceed;
+  // "they're no longer verified" is the one that should stop you, and a single
+  // "their verification changed" would bury it. actorBusinessId is null on all
+  // four: an admin moved these, and staff never appear as an actor.
+  //
+  // The actor name is unused, so the business is named in the LINK rather than
+  // the sentence — this table has no subject id (see lib/activityLinks.js), so
+  // naming it here would mean a copy that can go stale.
+  watched_business_claimed: () =>
+    "A business you're watching has been claimed by its owner.",
+  watched_business_verified: () =>
+    "A business you're watching is now verified.",
+  watched_business_downgraded: () =>
+    "A business you're watching has lost a verification level. Worth a look before you deal with them.",
+  watched_business_unclaimed: () =>
+    "A business you're watching is unclaimed again — its owner's claim was revoked.",
+
+  // ─── Asks ────────────────────────────────────────────────────────────────
+  // Two answer events rather than one with a branch, and the reason is that
+  // this map takes only an actor name: "recommended someone" and "offered
+  // their own services" are the whole anti-self-promotion mechanism, and a
+  // mechanism that is visible on the ask page but invisible in the
+  // notification is one the asker meets twice and reads two different ways.
+  // Separate types is the right shape anyway — it makes the two countable
+  // apart later without reading back through AskAnswer.
+  ask_answered: (actorName) => `${actorName} recommended a business for your ask.`,
+  ask_self_offered: (actorName) => `${actorName} offered their own services on your ask.`,
+
+  ask_answer_accepted: (actorName) => `${actorName} accepted your answer on their ask.`,
+
+  // The only event here that goes to somebody who was neither the actor nor
+  // the addressee of the action. It has to: an accepted answer puts a
+  // recommendation on this business's PUBLIC page, and finding out your own
+  // profile changed by happening to look at it is not acceptable.
+  //
+  // Never fired for a self-nomination — the recommended business IS the
+  // actor there, and telling someone what they just did is the noise the
+  // "only the party who didn't press the button" rule exists to prevent.
+  // Never fired at accept time when the target is T0 either: there is no
+  // owner yet and nothing is visible. It fires at claim approval instead,
+  // as recommendations_waiting below.
+  ask_recommendation_received: (actorName) =>
+    `${actorName} recommended you when answering an ask — it's on your profile now.`,
+
+  // Fired once when a business claims a listing that was recommended while
+  // it was still unclaimed. ONE summary event, not one per recommendation:
+  // ACTIVITY_KEEP_PER_BUSINESS caps a feed at 50, so a business recommended
+  // twenty times would arrive to a feed containing nothing else.
+  recommendations_waiting: () =>
+    "Members recommended you before you claimed this business. They're on your profile now.",
+
+  // No actor: nobody closed this, it lapsed. Names a next step, which is what
+  // makes an event about something nobody did worth sending at all. "30 days"
+  // mirrors ASK_EXPIRY_DAYS in lib/askExpiry.js; it can't be imported (that
+  // module imports this one), so change both together.
+  ask_expired: () =>
+    "Your ask closed after 30 days. Post a new one if you still need it.",
+
+  // Frozen-content events. Both carry actorBusinessId null, a deliberate
+  // divergence from vouch_flagged, which does name the flagger: on a vouch
+  // the flagger is the counterparty, already party to it and already known;
+  // on a board the reporter can be any member, and naming them is an
+  // invitation to take it up with them directly. Like vouch_flagged these
+  // name no next step, because there isn't one — but the reader still needs
+  // to know why their post stopped working.
+  ask_flagged: () => "Your ask was reported and is on hold while an admin reviews it.",
+  ask_answer_flagged: () =>
+    "Your answer was reported and is on hold while an admin reviews it.",
+
+  // Admin decisions on a reported ask or answer. No actor, for the same
+  // reason the vouch_review_* events have none.
+  ask_review_restored: () =>
+    "An admin reviewed the report on your ask — it's open again.",
+  ask_review_closed: () => "An admin closed your ask after reviewing a report.",
+  ask_answer_review_restored: () =>
+    "An admin reviewed the report on your answer — it's back in front of the asker.",
+  ask_answer_review_removed: () =>
+    "An admin removed your answer after reviewing a report.",
 };
 
 function messageFor(type, actorName) {

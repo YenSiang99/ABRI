@@ -13,7 +13,9 @@
     "db:status": "sh scripts/local-db.sh status",
     "prisma:seed": "prisma db seed",
     "admin:grant": "node scripts/grant-admin.js",
-    "tier:set": "node scripts/set-membership-tier.js"
+    "tier:set": "node scripts/set-membership-tier.js",
+    "test": "node tests/run-all.mjs",
+    "test:one": "node"
   },
   "keywords": [],
   "author": "",

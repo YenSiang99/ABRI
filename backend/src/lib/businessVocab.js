@@ -5,13 +5,13 @@
 // no Prisma enums anywhere), so this module is what actually constrains them —
 // the same role CONNECTION_SOURCES plays in lib/connections.js.
 //
-// Why they have to be closed, when they were free text until now: anything
-// that groups or matches businesses does so by comparing these two columns on
-// equality. A business that typed "PJ", "Petaling jaya" or "petaling  jaya"
-// is a business nothing will ever match, and it fails silently — they simply
-// never appear where they should. Category was already a <select> on the
-// register form; location was an <input> with a placeholder, which is the
-// whole bug.
+// Why they have to be closed, when they were free text until now: the Asks
+// board routes an ask to the businesses who can answer it by joining
+// Ask.matchCategory/matchLocation against these two columns on equality. A
+// business that typed "PJ", "Petaling jaya" or "petaling  jaya" is a business
+// no ask will ever reach, and it fails silently — they simply never hear about
+// work they could have done. Category was already a <select> on the register
+// form; location was an <input> with a placeholder, which is the whole bug.
 //
 // No backfill was needed to introduce this: all 22 seeded rows already used
 // exactly these values. It gates new writes only.
@@ -31,9 +31,9 @@ const BUSINESS_CATEGORIES = [
 //
 // This list GROWS, and that is planned rather than a smell: the corridor SSM
 // import will land 15-30 real Klang Valley localities. When it does, the thing
-// to add alongside them is a locality -> region grouping, so a match can mean
-// "same region" as well as "same locality" — six values make an exact
-// category+location match plausible, thirty do not.
+// to add alongside them is a locality -> region grouping, so matchTierFor in
+// lib/asks.js can match "same region" between "same locality" and "same trade"
+// — six values make an exact category+location match plausible, thirty do not.
 //
 // What must NOT happen instead is loosening the join to substring or fuzzy
 // matching. That converts a closed list back into free text by the back door

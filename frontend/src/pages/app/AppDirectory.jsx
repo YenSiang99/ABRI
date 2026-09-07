@@ -1,16 +1,31 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { fetchBusinesses } from "@/lib/api/businesses";
+import { fetchBusinessPage } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 import { BusinessCard } from "@/components/business/BusinessCard";
+import { NoRecordPanel } from "@/components/business/InviteToClaim";
+import { NetworkOverlap } from "@/components/business/NetworkOverlap";
+import { WatchButton } from "@/components/business/WatchButton";
+import { fetchWatches } from "@/lib/api/watches";
+import { Button } from "@/components/ui/button";
+import { MATCH_COPY } from "@/lib/matchCopy";
 import { toast } from "@/lib/toast";
 import { UNCLAIMED } from "@/lib/verificationLevels";
 
+// The member's ONE search box.
+//
+// It absorbed /app/check in Sep 2026. That screen matched registration
+// numbers and domains, said why a row matched, and had an honest "no record"
+// state with an invite; this one browsed by name and category and dead-ended
+// on a miss. Two boxes for one person in one session, and nothing to tell
+// them which to use — so this one learned the other's tricks and the other
+// was deleted. The public /check survives, because a stranger who cannot log
+// in still needs a door.
 function AppDirectory() {
   const { business } = useAuth();
   const { connectionStateWith, connect } = useConnections();
@@ -18,29 +33,61 @@ function AppDirectory() {
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Which businesses this member watches, so a card can say "Watching".
+  // Below Pro the request 402s and the set stays empty — which renders the
+  // unwatched state, correctly, because they have none.
+  const [watchedIds, setWatchedIds] = useState(new Set());
+  const refreshWatches = useCallback(async () => {
+    try {
+      const rows = await fetchWatches();
+      setWatchedIds(new Set(rows.map((w) => w.business.id)));
+    } catch {
+      setWatchedIds(new Set());
+    }
+  }, []);
+  useEffect(() => {
+    refreshWatches();
+  }, [refreshWatches]);
   // Which row's Connect button is mid-flight, so it can show progress and
   // refuse a second click.
   const [connectingId, setConnectingId] = useState(null);
 
+  // Two entry points into one request, so "Load more" appends where a new
+  // search replaces. The `cancelled` flag is what stops a slow early response
+  // landing after a fast later one and answering a question the member has
+  // finished typing.
+  const load = useCallback(
+    async (page) => {
+      const filter = verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
+      const data = await fetchBusinessPage({ search: query.trim(), verificationLevel: filter, page });
+      // Your own business is never a search result — you cannot connect to,
+      // follow or vouch for yourself, so every action on the card would be
+      // dead. Filtered here rather than server-side because the same route
+      // serves logged-out callers, who have no "own business".
+      const rows = data.businesses.filter((b) => b.id !== business.id);
+      setBusinesses((prev) => (page > 1 ? [...prev, ...rows] : rows));
+      setHasMore(data.hasMore);
+      setPage(data.page);
+    },
+    [query, verificationLevelFilter, business.id],
+  );
+
   useEffect(() => {
     let cancelled = false;
+    setStatus("loading");
     const timer = setTimeout(() => {
-      fetchBusinesses({ search: query.trim(), verificationLevel: verificationLevelFilter === "all" ? undefined : verificationLevelFilter })
-        .then((results) => {
-          if (cancelled) return;
-          setBusinesses(results.filter((b) => b.id !== business.id));
-          setStatus("ready");
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setStatus("error");
-        });
+      load(1)
+        .then(() => !cancelled && setStatus("ready"))
+        .catch(() => !cancelled && setStatus("error"));
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, verificationLevelFilter, business.id]);
+  }, [load]);
 
   // Sends a request, or accepts one already addressed to this member — the
   // server settles that inside POST /connections, so there is one handler
@@ -76,8 +123,8 @@ function AppDirectory() {
           Directory
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Search other businesses on ABRI, view their profiles, and send a connection request to
-          the ones you know.
+          Search by name or category to browse — or paste an SSM registration number or a website
+          to check one specific business.
         </p>
       </div>
 
@@ -87,7 +134,7 @@ function AppDirectory() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or category"
+          placeholder="Name, category, SSM number, or website"
           className="w-full rounded-lg border border-border bg-background py-2 pr-3 pl-9 text-sm text-foreground outline-none focus:border-ring"
         />
       </div>
@@ -121,23 +168,71 @@ function AppDirectory() {
           Something went wrong loading the directory. Please try again.
         </div>
       ) : businesses.length > 0 ? (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {businesses.map((b) => (
-            <BusinessCard
-              key={b.id}
-              business={b}
-              basePath="/app/business"
-              showActions
-              connectable={b.verificationLevel !== UNCLAIMED}
-              connectionState={connectionStateWith(b.id).state}
-              connecting={connectingId === b.id}
-              onConnect={handleConnect}
-            />
-          ))}
+        <>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {businesses.map((b) => (
+              <div key={b.id}>
+                {/* Only when the member actually typed something, and only
+                    above the card it explains. On an unfiltered browse every
+                    row would carry "matched on name", which is noise. */}
+                {b.matchReason && (
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {MATCH_COPY[b.matchReason] ?? MATCH_COPY.name}
+                  </p>
+                )}
+                <BusinessCard
+                  business={b}
+                  basePath="/app/business"
+                  showActions
+                  connectable={b.verificationLevel !== UNCLAIMED}
+                  connectionState={connectionStateWith(b.id).state}
+                  connecting={connectingId === b.id}
+                  onConnect={handleConnect}
+                />
+                {/* Plus, and silent when there is no overlap. */}
+                <NetworkOverlap vouchers={b.vouchersInYourNetwork} basePath="/app/business" />
+                {/* Pro. Outside the card because BusinessCard is a <Link> —
+                    a button nested in it would navigate as well as fire. */}
+                <div className="mt-2">
+                  <WatchButton
+                    business={b}
+                    watching={watchedIds.has(b.id)}
+                    onChanged={refreshWatches}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {hasMore && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="outline"
+                disabled={loadingMore}
+                onClick={() => {
+                  setLoadingMore(true);
+                  load(page + 1).finally(() => setLoadingMore(false));
+                }}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
+        </>
+      ) : status === "loading" ? (
+        <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
+          Loading businesses…
         </div>
+      ) : query.trim() ? (
+        // The honest miss, lifted from the deleted /app/check. A member who
+        // pasted a counterparty's name and got nothing has NOT been told that
+        // business is fake — ABRI has no registry access and can only speak
+        // for its own members. The old copy here was "No businesses match
+        // your search", which is fine for browsing and wrong for checking;
+        // this box now does both, so it needs the careful sentence.
+        <NoRecordPanel query={query.trim()} />
       ) : (
         <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-          {status === "loading" ? "Loading businesses…" : "No businesses match your search."}
+          No businesses match those filters.
         </div>
       )}
     </div>

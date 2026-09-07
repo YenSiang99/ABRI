@@ -10,6 +10,7 @@ import {
   Circle,
   Award,
   Clock,
+  ClipboardList,
 } from "lucide-react";
 import { StatCard } from "@/components/app/StatCard";
 import { AppBusinessCard } from "@/components/app/AppBusinessCard";
@@ -19,6 +20,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { verificationLevelLabel, vouchLevelLabel } from "@/lib/trustLabels";
 import { fetchBusinesses } from "@/lib/api/businesses";
+import { fetchMyAsks, fetchAnsweredAsks, fetchAskAlerts } from "@/lib/api/asks";
+import { membershipTierAllows } from "@/lib/membershipTiers";
+import { LockedFeature } from "@/components/app/LockedFeature";
+import { VouchDialog } from "@/components/app/VouchDialog";
+import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyActivity } from "@/lib/api/activity";
 import { isVouchable } from "@/lib/vouchRules";
@@ -105,14 +111,28 @@ function ActivityRow({ event, onOpen }) {
 }
 
 function Dashboard() {
-  const { account, business } = useAuth();
+  const { account, business, refreshAccount } = useAuth();
   const { markOneRead, markAllRead } = useNotifications();
   const pending = business.verificationLevel === CLAIMED;
   const nextLevel = nextVerificationLevel(account, business);
 
   const [suggested, setSuggested] = useState([]);
+  // One dialog for the whole suggestion grid, re-pointed per card — the
+  // arrangement pages/app/feed/Feed.jsx uses, and the reason AppBusinessCard
+  // takes an onVouch callback rather than owning a dialog each.
+  //
+  // These cards used to carry a Vouch button that fired a toast and nothing
+  // else: it told a member they had vouched for somebody when no request had
+  // been made. Now it opens the real dialog through the same gate every other
+  // vouch affordance uses.
+  const vouchGate = useUpgradeGate("giveVouch");
+  const [vouchTarget, setVouchTarget] = useState(null);
+  const openVouch = vouchGate.guard((target) => setVouchTarget(target));
   const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
   const [needsYouCount, setNeedsYouCount] = useState(0);
+  const [asksNeedingYou, setAsksNeedingYou] = useState(0);
+  const [askAlerts, setAskAlerts] = useState(null);
+  const [recommendationsGiven, setRecommendationsGiven] = useState(0);
   const [activity, setActivity] = useState([]);
 
   // Derived from the feed rather than the context's unreadCount, which
@@ -134,11 +154,25 @@ function Dashboard() {
     setActivity((current) => current.map((a) => (a.read ? a : { ...a, read: true })));
   }
 
-  useEffect(() => {
-    if (pending) return;
+  // Extracted so a successful vouch can re-run it: isVouchable reads
+  // `vouchedFor` off the session business, so a business just vouched for
+  // must drop out of the suggestions rather than sit there offering a second
+  // vouch the server would refuse with a 409.
+  function loadSuggestions() {
     fetchBusinesses()
       .then((all) => setSuggested(all.filter((b) => isVouchable(b, business)).slice(0, 3)))
       .catch(() => {});
+  }
+
+  async function handleVouched() {
+    setVouchTarget(null);
+    await refreshAccount();
+    loadSuggestions();
+  }
+
+  useEffect(() => {
+    if (pending) return;
+    loadSuggestions();
     fetchVouchesGiven()
       // Published only. This used to count the raw list, so declined
       // vouches inflated the "Vouches given" stat — a number meant to
@@ -151,6 +185,42 @@ function Dashboard() {
     fetchMyActivity()
       .then(setActivity)
       .catch(() => {});
+    // Open asks of yours that have answers waiting on a decision. This is the
+    // more important of the two ask prompts: it is what turns answers into
+    // ACCEPTED answers, which is the only thing that makes answering worth
+    // anyone's time.
+    fetchMyAsks()
+      .then((asks) =>
+        setAsksNeedingYou(asks.filter((a) => a.status === "open" && a.answerCount > 0).length))
+      .catch(() => {});
+    // Guarded client-side so a member below Pro never fires a request the
+    // server will answer 402 — the useUpgradeGate doctrine: the client check
+    // is the UX, the server is the enforcement.
+    // The give-first number, and the ONLY reporting surface for the rule that
+    // only recommending SOMEBODY ELSE counts. A self-nomination is a
+    // legitimate answer and it is not a contribution to anyone but yourself,
+    // so it is excluded here — which is what stops this stat becoming a
+    // scoreboard you can climb by pitching yourself.
+    //
+    // Note the asymmetry with recommendations RECEIVED, which deliberately
+    // gets no stat card and no badge: received is a trust signal and would
+    // read as a fourth one beside the verification level, the vouch level
+    // and the membership tier. Given is a
+    // contribution signal, and sits beside "Vouches given" where it belongs.
+    fetchAnsweredAsks()
+      .then((asks) =>
+        setRecommendationsGiven(
+          asks.filter((a) => {
+            const mine = a.answers?.[0];
+            return mine?.status === "accepted" && !mine.isSelfNomination;
+          }).length,
+        ))
+      .catch(() => {});
+    if (membershipTierAllows(business?.membershipTier, "askAlerts")) {
+      fetchAskAlerts()
+        .then(setAskAlerts)
+        .catch(() => {});
+    }
     // `business` rather than `business.id`: the suggestion filter now reads
     // its `vouchedFor` list too, so a business you've just vouched for has
     // to drop out of the suggestions on the next refreshAccount(). Identity
@@ -230,7 +300,74 @@ function Dashboard() {
         </Link>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Ungated, and deliberately above the Pro one. Answers sitting
+          undecided are work the member already owes somebody — nothing about
+          that is a paid feature. */}
+      {!pending && asksNeedingYou > 0 && (
+        <Link
+          to="/app/asks?tab=mine"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
+        >
+          <div className="flex items-start gap-3">
+            <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+            <div>
+              <div className="text-sm font-semibold text-foreground">
+                {asksNeedingYou === 1
+                  ? "An ask of yours has answers waiting"
+                  : `${asksNeedingYou} of your asks have answers waiting`}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Accept one and it becomes a recommendation on their profile.
+              </p>
+            </div>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
+
+      {/* The routed alert — Pro's first delivered feature. What it sells is
+          TIMING: the same asks are on the board for every member, one filter
+          away. Nothing is hidden, so "never hide a gated affordance" holds;
+          this is push versus pull. */}
+      {!pending && askAlerts?.count > 0 && (
+        <Link
+          to="/app/asks?matches=category"
+          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
+        >
+          <div className="flex items-start gap-3">
+            <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+            <div>
+              <div className="text-sm font-semibold text-foreground">
+                {askAlerts.count === 1
+                  ? "1 ask matches what you do"
+                  : `${askAlerts.count} asks match what you do`}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {askAlerts.top[0].title} — {askAlerts.top[0].slotsLeft}{" "}
+                {askAlerts.top[0].slotsLeft === 1 ? "slot" : "slots"} left.
+              </p>
+            </div>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      )}
+
+      {/* LockedFeature rather than UpgradePrompt: this is a whole PANEL that
+          is shut, which is that component's stated job, and nothing here is a
+          button to press. No UPGRADE_COPY entry either — following the
+          nfcCard precedent, nothing opens a dialog for this gate, so a second
+          copy of the pitch would be exactly the drift that map prevents. */}
+      {!pending && !membershipTierAllows(business?.membershipTier, "askAlerts") && (
+        <div className="mt-4">
+          <LockedFeature
+            title="Asks that match what you do"
+            description="Members post asks — 'looking for a corporate secretary in KL'. Pro tells you the moment one lands in your category and area, while there are still slots to answer it. The board itself is already open to you."
+            requiredMembershipTier="pro"
+          />
+        </div>
+      )}
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Vouches received"
           value={pending ? "—" : business.vouches.length}
@@ -242,6 +379,12 @@ function Dashboard() {
           value={pending ? "—" : vouchesGivenCount}
           hint={pending ? "Unlocks after SSM verification" : "Give-first: keep going"}
           icon={TrendingUp}
+        />
+        <StatCard
+          label="Recommendations given"
+          value={recommendationsGiven}
+          hint="Answers of yours an asker accepted"
+          icon={ClipboardList}
         />
         <StatCard
           label="Profile views (7d)"
@@ -386,11 +529,21 @@ function Dashboard() {
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {suggested.map((b) => (
-              <AppBusinessCard key={b.id} business={b} />
+              <AppBusinessCard key={b.id} business={b} onVouch={openVouch} />
             ))}
           </div>
         </div>
       )}
+
+      {/* Both render nothing until opened, so they sit at the page root
+          rather than inside a card. */}
+      <VouchDialog
+        open={Boolean(vouchTarget)}
+        onOpenChange={(next) => !next && setVouchTarget(null)}
+        targetBusiness={vouchTarget}
+        onSuccess={handleVouched}
+      />
+      <UpgradePrompt gate={vouchGate} />
     </div>
   );
 }

@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowUpRight, Building2, MapPin, Radio, Users } from "lucide-react";
+import { ArrowLeft, Radio, Users } from "lucide-react";
 
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_NFC_SCAN } from "@/lib/connectionSources";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { VerificationBadge } from "@/components/badge/VerificationBadge";
-import { ContactDetails } from "@/components/business/ContactDetails";
+import { BusinessPanel } from "@/components/business/BusinessPanel";
 import { UNCLAIMED } from "@/lib/verificationLevels";
 
 function BackLink() {
@@ -23,66 +22,10 @@ function BackLink() {
   );
 }
 
-function CardPanel({ business, children }) {
-  const location = useLocation();
-  return (
-    <div className="mt-6 rounded-3xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-ink text-2xl font-semibold text-yellow dark:bg-foreground dark:text-background">
-            {business.name.charAt(0)}
-          </div>
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Radio className="h-3.5 w-3.5" /> Tapped a card
-              </span>
-            </div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink dark:text-foreground md:text-3xl">
-              {business.name}
-            </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-grey-600 dark:text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-4 w-4" /> {business.category}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" /> {business.location}
-              </span>
-            </div>
-            <div className="mt-3">
-              <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
-            </div>
-          </div>
-        </div>
-        <Link
-          to={`/business/${business.id}`}
-          state={{ from: location, label: "Back to tapped card" }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-grey-300 px-3.5 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
-        >
-          View business profile <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-      {/* Inside CardPanel rather than in each of the six branches below, so
-          the product rule — verification status renders BEFORE contact
-          details on every tap — is structural instead of a convention
-          repeated six times and broken on the seventh.
-
-          T0 is suppressed rather than locked: an unclaimed listing has no
-          owner, and the "isn't on ABRI yet" panel below already says so.
-          A lock there would imply there is something to unlock. */}
-      {business.verificationLevel !== UNCLAIMED && (
-        <div className="mt-6">
-          <ContactDetails
-            business={business}
-            contactLocked={business.contactLocked}
-            contactLockedReason={business.contactLockedReason}
-          />
-        </div>
-      )}
-      {children}
-    </div>
-  );
-}
+// The panel's header is shared with the check-a-business screen, so how the
+// reader arrived is passed in rather than assumed. See
+// components/business/BusinessPanel.jsx.
+const TAP_EYEBROW = { label: "Tapped a card", icon: Radio, backLabel: "Back to tapped card" };
 
 function CardTap() {
   const { businessId } = useParams();
@@ -207,7 +150,7 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="text-sm font-bold text-ink dark:text-foreground">
               This business isn't on ABRI yet.
@@ -224,7 +167,7 @@ function CardTap() {
               Claim this business
             </Button>
           </div>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -233,11 +176,11 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <p className="mt-6 text-[14px] text-grey-600 dark:text-muted-foreground">
             That's your own card — nothing to connect here.
           </p>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -249,7 +192,7 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="text-sm font-bold text-ink dark:text-foreground">
               Nothing to connect from yet
@@ -259,7 +202,7 @@ function CardTap() {
               yet. Once your claim is approved, tap this card again.
             </p>
           </div>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -268,7 +211,7 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="text-sm font-bold text-ink dark:text-foreground">
               Couldn't connect with {business.name}
@@ -282,7 +225,7 @@ function CardTap() {
               Try again
             </Button>
           </div>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -296,7 +239,7 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="inline-flex items-center gap-2 text-sm font-bold text-ink dark:text-foreground">
               <Users className="h-4 w-4" />
@@ -318,7 +261,7 @@ function CardTap() {
               View your network
             </Button>
           </div>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -330,14 +273,14 @@ function CardTap() {
     return (
       <div className="mx-auto max-w-[640px] px-6 py-16">
         <BackLink />
-        <CardPanel business={business}>
+        <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
           <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
             <p className="inline-flex items-center gap-2 text-sm font-bold text-ink dark:text-foreground">
               <Users className="h-4 w-4" />
               Adding {business.name} to your network…
             </p>
           </div>
-        </CardPanel>
+        </BusinessPanel>
       </div>
     );
   }
@@ -351,7 +294,7 @@ function CardTap() {
   return (
     <div className="mx-auto max-w-[640px] px-6 py-16">
       <BackLink />
-      <CardPanel business={business}>
+      <BusinessPanel business={business} eyebrow={TAP_EYEBROW}>
         <p className="mt-6 text-[14px] text-grey-600 dark:text-muted-foreground">
           Log in or register on ABRI to add {business.name} to your network — and be added to
           theirs — and to see their contact details.
@@ -368,7 +311,7 @@ function CardTap() {
             Register to connect
           </Button>
         </div>
-      </CardPanel>
+      </BusinessPanel>
     </div>
   );
 }

@@ -45,6 +45,34 @@ function VouchCard({ vouch }) {
   );
 }
 
+// Deliberately NOT shaped like VouchCard above.
+//
+// A vouch is two-party and unconditional: one business staking its own
+// reputation on another, in italics behind the yellow left rule that is the
+// vouch's visual signature. A recommendation is three-party and answers a
+// specific question — X told Y about this business when Y asked for something.
+//
+// So: no yellow rule, no italics, and all three parties named. If the two
+// rendered alike they would be read as the same claim, and the weaker one
+// would quietly borrow the stronger one's credibility.
+function RecommendationCard({ recommendation }) {
+  const { answeredBy, ask } = recommendation;
+  return (
+    <div className="rounded-2xl border border-grey-200 bg-white p-5 dark:border-border dark:bg-card">
+      <div className="text-sm text-ink dark:text-foreground">
+        <span className="font-semibold">{answeredBy.name}</span> recommended them when{" "}
+        <span className="font-semibold">{ask.askedByBusiness.name}</span> asked for something.
+      </div>
+      <div className="mt-1 text-xs text-grey-500 dark:text-muted-foreground">
+        {ask.title} · {recommendation.acceptedAt ? new Date(recommendation.acceptedAt).toLocaleDateString() : null}
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-grey-600 dark:text-muted-foreground">
+        {recommendation.comment}
+      </p>
+    </div>
+  );
+}
+
 // Arriving via a Link that set state={{ from, label }} (the NFC tap page,
 // the Network tab) returns you there instead of always dropping back to
 // the directory — a bookmark or direct visit has no such state, so it
@@ -64,11 +92,12 @@ function BusinessProfile({ inApp = false }) {
   const { connectionStateWith, connect, disconnect } = useConnections();
   const { isFollowing, follow, unfollow } = useFollows();
   const [vouchOpen, setVouchOpen] = useState(false);
-  // Controlled rather than defaultValue, so ?tab=vouches is a link target.
-  // Same shape Vouches.jsx uses: unknown values fall back, and the default
-  // tab omits the param entirely.
+  // Controlled rather than defaultValue, so ?tab=recommendations is a link
+  // target — which is where the ask_recommendation_received activity event
+  // points. Same shape Vouches.jsx uses: unknown values fall back, and the
+  // default tab omits the param entirely.
   const [tabParams, setTabParams] = useSearchParams();
-  const PROFILE_TABS = ["overview", "vouches", "card"];
+  const PROFILE_TABS = ["overview", "vouches", "recommendations", "card"];
   const tab = PROFILE_TABS.includes(tabParams.get("tab")) ? tabParams.get("tab") : "overview";
   const setTab = (value) => {
     const next = new URLSearchParams(tabParams);
@@ -228,6 +257,10 @@ function BusinessProfile({ inApp = false }) {
   // that has twelve.
   const { services, vouchesReceived, ssm, vouchCount, testimonialsLocked } = business;
   const { contactLocked, contactLockedReason } = business;
+  // Defaulted, because this profile is also rendered from the NFC tap page
+  // and by the app-side route, and an older cached payload has neither key.
+  const recommendationCount = business.recommendationCount ?? 0;
+  const recommendations = business.recommendationsReceived ?? [];
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -317,12 +350,29 @@ function BusinessProfile({ inApp = false }) {
           </div>
 
           {isUnclaimed && (
-            <Button
-              render={<Link to={`/register?business=${business.id}`} />}
-              nativeButton={false}
-            >
-              Claim your business
-            </Button>
+            <div className="text-right">
+              {/* The growth loop, and its only piece of UI. Members can
+                  recommend an unclaimed listing — the recommendation is real
+                  and waiting, it just has nowhere to render until this
+                  business claims. Naming the COUNT and withholding the NAMES
+                  is the whole pull; the outbound invite that would push it
+                  needs a messaging pipe that doesn't exist yet. */}
+              {recommendationCount > 0 && (
+                <p className="mb-2 max-w-64 text-sm text-grey-600 dark:text-muted-foreground">
+                  <span className="font-semibold text-ink dark:text-foreground">
+                    {recommendationCount}{" "}
+                    {recommendationCount === 1 ? "member has" : "members have"}
+                  </span>{" "}
+                  recommended this business. Claim your listing to see who, and why.
+                </p>
+              )}
+              <Button
+                render={<Link to={`/register?business=${business.id}`} />}
+                nativeButton={false}
+              >
+                Claim your business
+              </Button>
+            </div>
           )}
         </div>
 
@@ -387,6 +437,15 @@ function BusinessProfile({ inApp = false }) {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="vouches">
               Vouches ({isPendingVerification ? 0 : vouchCount})
+            </TabsTrigger>
+            {/* Always AFTER Vouches, never first and never the default. A
+                recommendation is the lighter of the two signals and the tab
+                order is where that has to be visible. It gets no cell in the
+                stat grid above and no badge anywhere — that grid is the trust
+                grid, and a fourth number in it would read as a fourth trust
+                signal. */}
+            <TabsTrigger value="recommendations">
+              Recommendations ({recommendationCount})
             </TabsTrigger>
             <TabsTrigger value="card">NFC Card</TabsTrigger>
           </TabsList>
@@ -453,6 +512,24 @@ function BusinessProfile({ inApp = false }) {
               vouchesReceived.map((v) => <VouchCard key={v.id} vouch={v} />)
             ) : (
               <p className="text-sm text-grey-500 dark:text-muted-foreground">No vouches yet.</p>
+            )}
+          </TabsContent>
+
+          {/* Not plan-gated, unlike the vouches tab above. Withholding this
+              would punish the RECOMMENDER, whose work would vanish because of
+              somebody else's billing — and it feeds neither vouchCount nor
+              the vouch level, so a downgrade has nothing to take away. */}
+          <TabsContent value="recommendations" className="mt-6 grid gap-4 md:grid-cols-2">
+            {recommendations.length > 0 ? (
+              recommendations.map((r) => <RecommendationCard key={r.id} recommendation={r} />)
+            ) : (
+              // Says the difference out loud, because this is the one place a
+              // reader might otherwise conclude the two words mean the same.
+              <p className="text-sm text-grey-500 md:col-span-2 dark:text-muted-foreground">
+                No recommendations yet. Recommendations come from members answering someone's ask —
+                they're not vouches. A vouch is a peer staking their own reputation on this
+                business; a recommendation is a peer pointing someone towards them.
+              </p>
             )}
           </TabsContent>
 

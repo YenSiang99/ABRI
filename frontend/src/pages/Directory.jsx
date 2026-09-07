@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { fetchBusinesses } from "@/lib/api/businesses";
+import { fetchBusinessPage } from "@/lib/api/businesses";
+import { Button } from "@/components/ui/button";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 
@@ -11,26 +12,37 @@ function Directory() {
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Paged since Sep 2026. This route used to return every matching row on
+  // every request, unauthenticated — the whole member list in one call, which
+  // is the asset the product sells.
+  const load = useCallback(
+    async (page) => {
+      const filter = verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
+      const data = await fetchBusinessPage({ search: query.trim(), verificationLevel: filter, page });
+      setBusinesses((prev) => (page > 1 ? [...prev, ...data.businesses] : data.businesses));
+      setHasMore(data.hasMore);
+      setPage(data.page);
+    },
+    [query, verificationLevelFilter],
+  );
 
   useEffect(() => {
     let cancelled = false;
+    setStatus("loading");
     const timer = setTimeout(() => {
-      fetchBusinesses({ search: query.trim(), verificationLevel: verificationLevelFilter === "all" ? undefined : verificationLevelFilter })
-        .then((results) => {
-          if (cancelled) return;
-          setBusinesses(results);
-          setStatus("ready");
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setStatus("error");
-        });
+      load(1)
+        .then(() => !cancelled && setStatus("ready"))
+        .catch(() => !cancelled && setStatus("error"));
     }, 300);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, verificationLevelFilter]);
+  }, [load]);
 
   const q = query.trim();
 
@@ -87,11 +99,27 @@ function Directory() {
           Something went wrong loading the directory. Please try again.
         </div>
       ) : businesses.length > 0 ? (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {businesses.map((business) => (
-            <BusinessCard key={business.id} business={business} />
-          ))}
-        </div>
+        <>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {businesses.map((business) => (
+              <BusinessCard key={business.id} business={business} />
+            ))}
+          </div>
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <Button
+                variant="outline"
+                disabled={loadingMore}
+                onClick={() => {
+                  setLoadingMore(true);
+                  load(page + 1).finally(() => setLoadingMore(false));
+                }}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="mt-16 text-center text-grey-500 dark:text-muted-foreground">
           {status === "loading"

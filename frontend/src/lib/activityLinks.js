@@ -16,6 +16,30 @@ const GIVEN_TAB_TYPES = new Set(["vouch_published", "vouch_cancelled", "vouch_ex
 // request is work, and work goes to the page that can clear it.
 const SETTLED_CONNECTION_TYPES = new Set(["connection_added", "connection_accepted"]);
 
+// Ask events, split by who owns the work: asker-side events go to the list of
+// asks this business posted, answerer-side ones to the list it answered.
+//
+// None of these deep-link to the ask itself, and that is structural rather
+// than an oversight: ActivityEvent carries a type and an actor and nothing
+// else — there is no subject id on the row — which is the same reason the
+// vouch events land on a tab. Adding a nullable subjectId would fix all seven
+// event families at once and belongs in its own change, not smuggled into a
+// feature.
+const ASK_ASKER_TYPES = new Set([
+  "ask_answered",
+  "ask_self_offered",
+  "ask_expired",
+  "ask_flagged",
+  "ask_review_restored",
+  "ask_review_closed",
+]);
+const ASK_ANSWERER_TYPES = new Set([
+  "ask_answer_accepted",
+  "ask_answer_flagged",
+  "ask_answer_review_restored",
+  "ask_answer_review_removed",
+]);
+
 function activityLink(event) {
   if (SETTLED_CONNECTION_TYPES.has(event.type)) {
     // The profile of whoever connected, since the message names them. Falls
@@ -29,6 +53,15 @@ function activityLink(event) {
   // the reader to a profile would make them find their way to the accept
   // button themselves, which is the trip this link exists to save.
   if (event.type === "connection_requested") return "/app/network/requests";
+
+  if (ASK_ASKER_TYPES.has(event.type)) return "/app/asks?tab=mine";
+  if (ASK_ANSWERER_TYPES.has(event.type)) return "/app/asks?tab=answered";
+
+  // The one that leaves the Asks section entirely, because the thing it names
+  // is on the member's own profile, not on the board.
+  if (event.type === "ask_recommendation_received" || event.type === "recommendations_waiting") {
+    return "/app/profile?tab=recommendations";
+  }
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
 

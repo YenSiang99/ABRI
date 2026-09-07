@@ -39,12 +39,31 @@ model Business {
   // migrations/20260831120000_rename_axes_tier_level. The union lives in
   // lib/verificationLevels.js — this schema has no Prisma enums, so that
   // module is the only thing constraining this column, and a value outside
-  // it fails every Set.has gate silently: no vouching, no badge icon, and
-  // nothing in the logs.
+  // it fails every Set.has gate silently: no vouching, no ask posting, no
+  // badge icon, and nothing in the logs.
   verificationLevel String   @default("L0")
   description       String?
   services          String[] @default([])
   ssm               String?
+  // The same number with every separator removed and upper-cased, and the
+  // only thing GET /businesses/lookup matches on.
+  //
+  // A SECOND COLUMN RATHER THAN NORMALIZING `ssm` IN PLACE, because the two
+  // have different readers. An admin ruling on a submission needs the number
+  // as it appears on the document; a lookup needs one canonical key. One
+  // registration number is written at least three ways — "202301234567
+  // (1234567-A)" on a letterhead, "2023 0123 4567" by hand, "1234567-A" in
+  // the pre-2016 format — and Prisma cannot strip punctuation from a column
+  // inside a `where`, so the normalization has to happen on write or not at
+  // all.
+  //
+  // Derived, and therefore capable of drifting from `ssm` — the one risk this
+  // schema otherwise refuses. It is contained by there being exactly two
+  // writers (POST /businesses/me/ssm and findOrCreateClaimTarget), both of
+  // which go through normalizeSsm in lib/businessLookup.js. A third writer
+  // that sets `ssm` alone is a business that cannot be found by its own
+  // number, so set them together or not at all.
+  ssmNormalized     String?
   // Canonical email domain, set at seed/import time — used to auto-approve
   // a claim when the claimant's email matches it. Never claimant-editable.
   domain            String?
@@ -147,6 +166,46 @@ model Business {
   vouchRevisions       VouchRevision[]      @relation("VouchRevisionAuthor")
   vouchActionsAsActor  VouchAction[]        @relation("VouchActionActor")
 
+  // Asks. Note recommendationsReceived is the ONE relation here that can
+  // point at a T0 listing — see AskAnswer.recommendedBusinessId for why the
+  // board departs from "unclaimed businesses are refused everything".
+  asksPosted              Ask[]       @relation("AskAuthor")
+  askAnswersGiven         AskAnswer[] @relation("AskAnswerAuthor")
+  recommendationsReceived AskAnswer[] @relation("AskAnswerRecommended")
+  askFlagsRaised          AskFlag[]   @relation("AskFlagRaisedBy")
+  askFlagsAgainst         AskFlag[]   @relation("AskFlagAgainst")
+
+  // The network feed. Two relations for the same reason ActivityEvent needs
+  // two: an event is ABOUT one business and was DONE BY another, and the feed
+  // renders both ends as separate links.
+  networkEvents        NetworkEvent[] @relation("NetworkEventSubject")
+  networkEventsAsActor NetworkEvent[] @relation("NetworkEventActor")
+
+  // The two Pro tools on the check-a-business screen. Both are one-way and
+  // keyed to the WATCHER/CHECKER, never to the business being looked at —
+  // see each model for why that direction is load-bearing.
+  watching    BusinessWatch[] @relation("WatchWatcher")
+  watchedBy   BusinessWatch[] @relation("WatchTarget")
+  checksMade  BusinessCheck[] @relation("CheckBy")
+  checksAbout BusinessCheck[] @relation("CheckTarget")
+
+  // The first indexes this model has ever carried, added with the
+  // check-a-business lookup (GET /businesses/lookup) that queries both.
+  //
+  // Both serve EQUALITY on a normalized value — a pasted registration number
+  // or a bare hostname, cleaned up by lib/businessLookup.js before it reaches
+  // Postgres. `ssmNormalized` is queried with both `contains` and `equals`
+  // (against each token of the pasted string), so a btree earns its place
+  // once the column is populated.
+  //
+  // Deliberately NO index for the name search, here or on the directory's.
+  // Name is matched with `contains` + insensitive, i.e. ILIKE '%x%', which no
+  // btree can serve — it would need a pg_trgm GIN index and a Postgres
+  // extension. A sequential scan is the right answer well past the corridor's
+  // firm count; the moment to revisit is a name search that has become slow,
+  // not a table that has become large.
+  @@index([ssmNormalized])
+  @@index([domain])
 }
 
 model Account {
@@ -184,6 +243,7 @@ model Account {
   // the reports it ruled on. Empty for every non-admin account.
   vouchActionsAsAdmin VouchAction[]        @relation("VouchActionAdminActor")
   vouchFlagsResolved  VouchFlag[]          @relation("VouchFlagResolver")
+  askFlagsResolved    AskFlag[]            @relation("AskFlagResolver")
 }
 
 // The vouch feature is three tables, and which one a piece of text lives in
@@ -269,9 +329,12 @@ model Vouch {
   toBusinessId String
   toBusiness   Business @relation("VouchTarget", fields: [toBusinessId], references: [id])
 
-  revisions VouchRevision[] @relation("VouchRevisions")
-  actions   VouchAction[]
-  flags     VouchFlag[]
+  revisions     VouchRevision[] @relation("VouchRevisions")
+  actions       VouchAction[]
+  flags         VouchFlag[]
+  // Back-relation only. The feed points AT a vouch rather than copying its
+  // text, so a revised or withdrawn testimonial is never stale in two places.
+  networkEvents NetworkEvent[]
 
   // One vouch per (voucher, target) pair — the mock store didn't enforce
   // this, but letting the same business vouch for another unlimited times
@@ -452,6 +515,187 @@ model ActivityEvent {
   @@index([businessId, readAt])
 }
 
+// The network feed: what the whole membership can see happening, as opposed
+// to ActivityEvent above, which is one business's private notification inbox.
+//
+// Two tables rather than one, and the difference is the audience. An
+// ActivityEvent has a RECIPIENT (businessId) and is fanned out per person, is
+// capped at 50 a head, and carries a read flag. A NetworkEvent has no
+// recipient at all — it is written once and read by everyone — so it needs
+// none of those three things. Adding a `public` boolean to ActivityEvent
+// instead would have made every fan-out write decide a visibility question it
+// has no business answering, and would have put the 50-row prune in front of
+// a feed that must not lose history.
+//
+// WHY THIS EXISTS AT ALL, given "derived, never a column": because two of the
+// four types cannot be derived. Business.verificationLevel is current state
+// with no history anywhere, so "claimed their listing" and "became
+// SSM-Verified" have no timestamp to read. The rule this schema states is
+// that SUMMARIES (vouchCount, follower counts) are never stored because they
+// drift from the rows they summarise. This table stores no counts and no
+// copies of text — it records that a thing happened at a time, which
+// summarises nothing. Same category as Ask.expiresAt.
+// "Tell me when this business gets claimed, or verified, or loses it."
+//
+// The feature routes/follows.js already named as the better version of
+// following an unclaimed listing: "'Tell me when this gets claimed' is a
+// better feature and the reason to revisit that line." This is it.
+//
+// A WATCH IS NOT A FOLLOW, and the two must not be merged. A follow is about
+// a relationship — you want to see what they do — and is refused for an
+// unclaimed listing because there is nobody there to watch. A watch is about
+// a FACT changing, and an unclaimed listing is the most useful thing to point
+// it at: the whole point is being told the moment somebody claims it.
+//
+// Like a follow, it is UNANNOUNCED and one-way. The watched business is never
+// told, cannot see its watchers, and there is no count anywhere. The reasoning
+// is the one in the Follow model: both reads come off the same index, and only
+// one of them is reversible once a number is on a page.
+model BusinessWatch {
+  id String @id @default(cuid())
+
+  watcherId String
+  watcher   Business @relation("WatchWatcher", fields: [watcherId], references: [id])
+
+  watchedId String
+  watched   Business @relation("WatchTarget", fields: [watchedId], references: [id])
+
+  // What the level was when the watch was set, so the notifier can say what
+  // CHANGED rather than only what it is now. "Meridian is now SSM-Verified"
+  // is a different message from "Meridian is no longer SSM-Verified", and
+  // without this the watcher would have to be told the same sentence for both.
+  //
+  // Rewritten each time the watcher is notified, so a business that moves
+  // twice produces two accurate messages rather than one and then a wrong one.
+  lastSeenLevel String
+
+  createdAt DateTime @default(now())
+
+  // One watch per pair. Watching twice is the same state as watching once,
+  // so POST is idempotent against this rather than erroring.
+  @@unique([watcherId, watchedId])
+  // The notifier's read: everyone watching the business that just changed.
+  @@index([watchedId])
+}
+
+// One member's record of a business they checked, and when.
+//
+// THE DIRECTION IS THE WHOLE DESIGN. This table can answer "what have I
+// checked?" and must never be able to answer "who has been checking me?".
+// The second question is the one that makes a trust directory into
+// surveillance: a business that could see it was being investigated would
+// learn something about a counterparty's private diligence, and members would
+// stop checking.
+//
+// Enforced the way listFollowers enforces the same rule — every read is keyed
+// off the SESSION, never off a business id in a path. There is no route that
+// takes a targetId, and adding one would undo this model.
+//
+// WRITTEN ONLY FOR MEMBERS WHO CAN READ IT BACK (Pro). Logging a Free
+// member's lookups to sell them the history later would be collecting data to
+// create a need for it; the honest version is that history starts when you
+// start paying for it, and is empty before that.
+model BusinessCheck {
+  id String @id @default(cuid())
+
+  checkedById String
+  checkedBy   Business @relation("CheckBy", fields: [checkedById], references: [id])
+
+  checkedId String
+  checked   Business @relation("CheckTarget", fields: [checkedId], references: [id])
+
+  // What the business's verification level was AT THE TIME. The point of a
+  // check history is that it is a record of what you were told when you made
+  // a decision — a log that re-read the level live would rewrite history
+  // every time the business changed, which is exactly the property that makes
+  // it worthless as a compliance record.
+  levelAtCheck String
+
+  createdAt DateTime @default(now())
+
+  // The member's own history, newest first.
+  @@index([checkedById, createdAt])
+  // Dedupe: checking the same business twice in a day updates the existing
+  // row rather than filling the log with one member's repeated typing.
+  @@index([checkedById, checkedId])
+}
+
+model NetworkEvent {
+  id String @id @default(cuid())
+
+  // "vouch_published"          — a testimonial went live on a profile
+  // "recommendation_published" — an asker accepted somebody else's answer
+  // "business_claimed"         — an L0 listing became a member (L0 -> L1)
+  // "business_verified"        — SSM verification granted (L1 -> L2)
+  //
+  // String, not a Prisma enum — this schema has none. NETWORK_EVENT_TYPES in
+  // lib/networkEvents.js is the only thing constraining it.
+  //
+  // "vouch_published" deliberately shares a name with the ActivityEvent type:
+  // it is the same real-world event written for two different audiences, and
+  // giving the network copy a second name would hide that.
+  type String
+
+  // Who the event is ABOUT. Always set — the vouch's receiver, the recommended
+  // business, the business that claimed or got verified.
+  subjectBusinessId String
+  subjectBusiness   Business @relation("NetworkEventSubject", fields: [subjectBusinessId], references: [id])
+
+  // Who DID it. Null when nobody did: a claim approval and an SSM verification
+  // are an admin's move, and naming an admin account here would put staff into
+  // a members' feed. Same call ActivityEvent makes with actorBusinessId on
+  // ask_expired.
+  actorBusinessId String?
+  actorBusiness   Business? @relation("NetworkEventActor", fields: [actorBusinessId], references: [id])
+
+  // POINTERS, never copies — exactly the shape Vouch.currentRevisionId uses,
+  // and for the same reason its comment gives: a denormalized copy of the
+  // testimonial is where history goes to die. The feed joins through these for
+  // the text, so an edited or withdrawn one changes here with no second write.
+  //
+  // Exactly one is set on the two content types; both are null on the two
+  // level types. Nullable rather than a polymorphic subjectId + subjectType
+  // pair, which would be two columns that can disagree about what they point
+  // at, with no foreign key on either.
+  //
+  // Cascade on delete, unlike every Business key in this schema. A pointer has
+  // nothing to unwind: delete the vouch or the answer and the announcement is
+  // about something that no longer exists. It is also required rather than
+  // merely tidy — routes/asks.js deletes an AskAnswer outright as the
+  // compensating step when one loses the maxAnswers race, and a RESTRICT here
+  // would let the feed wedge that path.
+  vouchId     String?
+  vouch       Vouch?     @relation(fields: [vouchId], references: [id], onDelete: Cascade)
+  askAnswerId String?
+  askAnswer   AskAnswer? @relation(fields: [askAnswerId], references: [id], onDelete: Cascade)
+
+  // The level REACHED, for the two level types. Stored because it is a fact
+  // about the PAST, and Business.verificationLevel can no longer answer it
+  // once the level moves again. It is also what makes the event self-revoking:
+  // the feed requires the subject to still BE at this level, so a revoked SSM
+  // verification drops its own announcement out of the feed with no
+  // compensating write. Values from lib/verificationLevels.js.
+  toVerificationLevel String?
+
+  createdAt DateTime @default(now())
+
+  // The feed's only ordering. Paired with id in the ORDER BY so the cursor is
+  // total — two events written inside the same millisecond (a claim approval
+  // writes one while publishing held recommendations writes others) would
+  // otherwise be able to swap places between two pages and hand the reader a
+  // duplicate.
+  @@index([createdAt, id])
+  // Both ends of the "Following" scope, which filters on actor OR subject.
+  // Also FK hygiene, the reason Connection carries @@index([requestedById]):
+  // Postgres does not index a foreign key for you, and the RESTRICT check on
+  // a Business delete is otherwise a sequential scan.
+  @@index([actorBusinessId])
+  @@index([subjectBusinessId])
+  // Serves the backfill's idempotence check and nothing else on the hot path.
+  @@index([vouchId])
+  @@index([askAnswerId])
+}
+
 // A mutual edge — connecting via a tap (or in-app connect) links both
 // sides, so it's stored once per pair rather than as two directed rows.
 // The app layer must always store the lexicographically smaller business
@@ -611,4 +855,273 @@ model EmailVerificationToken {
   consumed     Boolean  @default(false)
   createdAt    DateTime @default(now())
   expiresAt    DateTime
+}
+
+// A demand-only post: one business states a requirement, other businesses
+// answer it by naming somebody who can meet it.
+//
+// Demand only, and that is the design rather than a first cut. An "offer"
+// post is cheap to write (it is an advertisement) and an ask is expensive
+// (it admits a need), so on one board offers outnumber asks within weeks and
+// the asks stop being findable. Partnership and Collaboration are two of the
+// seven CATEGORIES below, which is what keeps "let's work together" on this
+// board without opening it to broadcast. Offers already have a home: the
+// business's own profile and services[].
+//
+// Three anti-spam mechanisms, and none of them is a paywall or admin work:
+//   1. T2 to post   — ASK_POSTING_TIERS in lib/asks.js. Verification cannot
+//                     be bought (ABRI-feature-checklist.md §6), so this is
+//                     the one gate money can't open, and it makes the board
+//                     a reason to get verified rather than a reason to pay.
+//   2. maxAnswers   — a cap on the ANSWER side, not the ask side. Nextdoor
+//                     and Alignable don't cap asks; LinkedIn caps proposals
+//                     at 5; Thumbtack charges pros per response. Everyone
+//                     constrains the answering end, because on a demand
+//                     board demand is the scarce thing and supply is what
+//                     arrives as spam.
+//   3. one answer per business per ask — the @@unique on AskAnswer.
+// There is deliberately NO cap on how many asks a business may post. The
+// brakes are T2 being revocable (POST /admin/businesses/:id/revoke-ssm) and
+// the 30-day expiry below, not a number in this file.
+model Ask {
+  id String @id @default(cuid())
+
+  askedByBusinessId String
+  askedByBusiness   Business @relation("AskAuthor", fields: [askedByBusinessId], references: [id])
+
+  // "Customer requirement" | "Supplier requirement" | "Partnership" |
+  // "Distribution" | "Export" | "Service requirement" | "Collaboration"
+  // — ABRI-feature-checklist.md §7, which says of itself "this is the only
+  // copy". String rather than an enum because this schema has no Prisma
+  // enums anywhere; the set is enforced in exactly one JS module
+  // (ASK_CATEGORIES in lib/asks.js), the same way CONNECTION_SOURCES
+  // constrains Connection.source.
+  category String
+
+  // The ROUTING keys, and the reason this board works at 22 businesses where
+  // a scrolling feed would not: an ask is not broadcast, it is addressed to
+  // a kind of business in a place, and reaches them as a work prompt on
+  // their dashboard.
+  //
+  // Deliberately drawn from the SAME closed vocabularies as Business
+  // .category and Business.location (lib/businessVocab.js) rather than new
+  // ones — routing is an equality join against those two columns, and a
+  // second vocabulary would need mapping onto the first at every read.
+  //
+  // §7's "Looking for" / "Can offer" tag lists are NOT built. When they are,
+  // they arrive as their own String[] columns beside these two and a widened
+  // matchTierFor — no migration of anything already written here.
+  matchCategory String
+  matchLocation String
+
+  // One line, shown everywhere. `detail` is the body and is optional: an ask
+  // reading "Looking for a corporate secretary in KL" is already complete,
+  // and requiring a paragraph is how a board fills up with padding.
+  title  String
+  detail String?
+
+  // "open"         — accepting answers, subject to maxAnswers; the asker may
+  //                  accept one
+  // "answered"     — the asker accepted an answer. Terminal.
+  // "closed"       — terminal with no accepted answer: the asker closed it
+  //                  early, or 30 days lapsed (see lib/askExpiry.js)
+  // "under_review" — frozen by a flag; an admin's move, and the one status
+  //                  the expiry doesn't touch — same reasoning as
+  //                  under_review on a Vouch: the parties can't clear the
+  //                  admin's queue, so they shouldn't be timed out by it.
+  status String @default("open")
+
+  // How many answers this ask takes before it stops accepting them.
+  // Per-row rather than a global constant, for the same reason
+  // Vouch.maxRevisions is: a specific ask can be widened later without a
+  // migration, and the client reads the cap off the ask instead of keeping a
+  // constant that can drift from the server's.
+  //
+  // 6 because at current density a category holds five or six businesses, so
+  // the cap binds on VOLUME and never on eligibility — everyone in your line
+  // of work can answer, exactly once — and six answers still fit on one
+  // screen for the asker to compare without pagination.
+  maxAnswers Int @default(6)
+
+  // The deadline, stored rather than derived from createdAt + a constant.
+  // Three reasons: the lazy check is a comparison rather than arithmetic;
+  // the UI can render "closes in 12 days" without a second copy of the 30 in
+  // the client; and an admin returning a frozen ask to "open" RESTARTS it
+  // here, so the parties don't lose the days they spent in a queue they
+  // couldn't clear. That last one is what rules out reading createdAt.
+  //
+  // Not a derived count. The rule this schema states is that vouchCount,
+  // vouchLevel and follower counts are never columns because they can drift from
+  // the rows they summarise; a per-row deadline summarises nothing.
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  // Set when the ask reaches "answered" or "closed". Distinguishes settled
+  // from in-flight without enumerating status values — same job closedAt
+  // does on Vouch.
+  closedAt  DateTime?
+
+  answers AskAnswer[]
+  flags   AskFlag[]
+
+  // FK hygiene, the reason Connection carries @@index([requestedById]):
+  // Postgres does not index a foreign key for you, and the RESTRICT check on
+  // a Business delete is otherwise a sequential scan. Doubles as GET
+  // /asks/mine.
+  @@index([askedByBusinessId])
+  // The routing read (open asks in my category) and the board's default
+  // filter, in one index. The only composite here worth its write cost.
+  //
+  // Deliberately NO index on expiresAt: nothing queries by it. The expiry is
+  // lazy and reads the column off rows already loaded, exactly as
+  // lib/vouchExpiry.js reads Vouch.lastActionAt, which is likewise unindexed.
+  @@index([status, matchCategory])
+}
+
+// One business's answer to one ask, and the model that carries the whole
+// anti-self-promotion mechanism — in two columns rather than a flag:
+//
+//   answeredByBusinessId  — who wrote it
+//   recommendedBusinessId — who they named
+//
+// Self-nomination is exactly `recommendedBusinessId == answeredByBusinessId`.
+// It is ALLOWED and it is LABELLED DIFFERENTLY: "recommended X" and "offered
+// their own services" are separate strings in the UI, separate activity event
+// types (ask_answered vs ask_self_offered), and only the first counts toward
+// a give-first statistic or produces a public Recommendation. Blocking
+// self-nomination outright would be absurd in a cluster this size — if
+// somebody needs an accountant and you are the accountant, you should be able
+// to say so. Labelling it is what keeps that honest.
+//
+// There is deliberately no `kind` column saying which it is. A third column
+// restating what two foreign keys already say is a denormalization that can
+// disagree with them, and the disagreeing case — a row marked
+// "recommendation" whose two ids are equal — is precisely the one that would
+// let self-promotion out onto somebody else's profile.
+model AskAnswer {
+  id    String @id @default(cuid())
+  askId String
+  ask   Ask    @relation(fields: [askId], references: [id])
+
+  answeredByBusinessId String
+  answeredByBusiness   Business @relation("AskAnswerAuthor", fields: [answeredByBusinessId], references: [id])
+
+  // Must be a real Business row, never free text: the payoff of an accepted
+  // answer is a Recommendation on a profile, and a profile is something only
+  // a Business has — an off-directory name would be an unverifiable string
+  // in a product whose whole claim is that its names are checked.
+  //
+  // MAY be T0, and this is the one place the board departs from "an
+  // unclaimed listing is refused every relational action" (POST /connections,
+  // POST /follows). Two reasons it is different here: an answer is addressed
+  // to the ASKER, not to the business named, so recommending an unclaimed
+  // listing does nothing TO an absent owner; and once the corridor SSM import
+  // lands, the most useful answer will routinely be a business that hasn't
+  // claimed yet, so refusing would make most real answers illegal.
+  //
+  // It needs no "held" or "published" column. BusinessProfile.jsx wraps the
+  // whole tab block in {!isUnclaimed && ...}, so a T0 profile has no
+  // Recommendations tab to render into — the recommendation is simply
+  // invisible until the claim flips the business to T1, at which point it is
+  // already there. Publication is derived: recommendedBusiness.verificationLevel != "L0".
+  recommendedBusinessId String
+  recommendedBusiness   Business @relation("AskAnswerRecommended", fields: [recommendedBusinessId], references: [id])
+
+  // Required. An answer that names a business and says nothing about why is
+  // a name-drop, and a board of name-drops is what the directory already is.
+  comment String
+
+  // "offered"      — live, in front of the asker
+  // "accepted"     — the asker picked it. The ONLY status that publishes
+  //                  anything (see the Recommendations tab).
+  // "withdrawn"    — the answerer took it back. Terminal, but the row is
+  //                  reusable: a fresh answer on the same ask resets THIS row
+  //                  in place rather than deleting and recreating, exactly as
+  //                  a cancelled Vouch is reused, which is what keeps the
+  //                  @@unique below meaning "one answer per business per ask,
+  //                  ever".
+  // "under_review" — frozen by a flag; an admin's move
+  // "removed"      — an admin killed it. Terminal AND NOT reusable — see
+  //                  ANSWER_CAP_STATUSES in lib/asks.js. The asymmetry with
+  //                  "withdrawn" is deliberate: withdrawing frees your slot
+  //                  back to you, being removed frees it to everybody else.
+  status String @default("offered")
+
+  createdAt  DateTime  @default(now())
+  acceptedAt DateTime?
+
+  flags         AskFlag[]
+  // Back-relation only — see the note on Vouch.networkEvents.
+  networkEvents NetworkEvent[]
+
+  // The anti-piling-on rule, enforced by the database rather than by a check
+  // every caller has to remember. Note what it does NOT constrain: two
+  // different businesses recommending the SAME business on one ask is left
+  // legal, because two independent recommendations are a signal, not spam.
+  @@unique([askId, answeredByBusinessId])
+  // The Recommendations tab: where recommendedBusinessId = X, status =
+  // "accepted". A lookup by a column that leads no other index, so this one
+  // earns its place — and it is FK hygiene at the same time.
+  @@index([recommendedBusinessId, status])
+  // FK hygiene, plus GET /asks/answered. askId needs no index of its own:
+  // the @@unique above already leads with it.
+  @@index([answeredByBusinessId])
+}
+
+// A report an admin is meant to read.
+//
+// A separate table from VouchFlag rather than a generalisation of it, and
+// that is a considered call: making VouchFlag.vouchId nullable would break
+// the one thing that model asserts (every row is about a vouch), leave
+// @@index([vouchId]) half empty, and make the queue's "anything still frozen"
+// clause branch on which target column is set. Two tables of the same shape
+// is cheaper honesty than one table with a hole in it. If a THIRD flaggable
+// thing ever appears, that is the moment to generalise.
+//
+// One table for both targets here, though, because they share a queue and a
+// verdict. askId is ALWAYS set, including on an answer report, so the queue
+// can show the ask a reported answer sits under in one join; answerId null
+// means the report is about the ask itself.
+model AskFlag {
+  id    String @id @default(cuid())
+  askId String
+  ask   Ask    @relation(fields: [askId], references: [id])
+
+  // Null => the report is about the ask. Set => about that answer.
+  answerId String?
+  answer   AskAnswer? @relation(fields: [answerId], references: [id])
+
+  raisedByBusinessId String
+  raisedByBusiness   Business @relation("AskFlagRaisedBy", fields: [raisedByBusinessId], references: [id])
+
+  // Derived at the route, never taken from the body: the asker for an ask
+  // report, the ANSWERER for an answer report. Never the recommended
+  // business — they did nothing.
+  againstBusinessId String
+  againstBusiness   Business @relation("AskFlagAgainst", fields: [againstBusinessId], references: [id])
+
+  // Against an ask:    "spam" | "not_a_real_ask" | "abusive_content" | "other"
+  // Against an answer: "self_promotion" | "irrelevant" | "abusive_content" | "other"
+  // Enforced by ASK_FLAG_REASONS / ANSWER_FLAG_REASONS in lib/asks.js.
+  reason String
+  note   String?
+
+  // Separate status and outcome, for the reason VouchFlag states: "an admin
+  // looked at this" and "an admin agreed with it" are different facts, and
+  // only the second is worth counting. This is the column that makes a
+  // repeat frivolous reporter visible, which is the only real defence
+  // against flag-griefing on a board anyone can report on.
+  status              String    @default("open") // "open" | "reviewed"
+  outcome             String? // "upheld" | "dismissed"
+  resolvedAt          DateTime?
+  resolvedByAccountId String?
+  resolvedByAccount   Account?  @relation("AskFlagResolver", fields: [resolvedByAccountId], references: [id])
+  createdAt           DateTime  @default(now())
+
+  // Matches VouchFlag's single index, and for the same reason: every read of
+  // this table is "the reports on this ask". There is deliberately no unique
+  // constraint expressing "one report per business per target" — Postgres
+  // treats NULLs as distinct, so a unique on (askId, answerId,
+  // raisedByBusinessId) would not stop two ask-level reports from the same
+  // business. The dedupe is a findFirst in the route.
+  @@index([askId])
 }

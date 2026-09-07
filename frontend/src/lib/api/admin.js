@@ -40,6 +40,23 @@ function setBusinessMembershipTier(businessId, { membershipTier, expiresAt } = {
 // Every vouch an admin has been asked to look at, each with its full
 // timeline and the reports raised against it. `status: "all"` also returns
 // ones whose reports have already been marked reviewed.
+// The SSM review queue: businesses that submitted a registration number and
+// are still L1. That pair IS the pending state — there is no status column —
+// so this list and the member's own screen can never disagree about who is
+// waiting. See POST /businesses/me/ssm.
+function fetchSsmReviews() {
+  return apiFetch("/admin/ssm-reviews").then((data) => data.businesses);
+}
+
+// Turn down a submitted number. CLEARS it rather than flagging it, so the
+// business returns to "nothing submitted" and can send a corrected one
+// through the same door. Takes no note: ActivityEvent has no detail column,
+// so a reason typed here would be discarded before it reached the member —
+// see the route's comment.
+function rejectSsm(businessId) {
+  return apiFetch(`/admin/businesses/${businessId}/reject-ssm`, { method: "POST" });
+}
+
 function fetchVouchReviews({ status } = {}) {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return apiFetch(`/admin/vouch-reviews${query}`).then((data) => data.reviews);
@@ -66,7 +83,40 @@ function resolveVouchFlag(id, { outcome, note } = {}) {
   }).then((data) => data.flag);
 }
 
+// The Asks queue. Two decide routes rather than one, because an ask and an
+// answer are different things with different exits — restore/close for an
+// ask, restore/remove for an answer. `outcome` is never sent: the server
+// derives it from the decision, so an admin cannot record "closed it, but the
+// report was fine".
+function fetchAskReviews({ status } = {}) {
+  const qs = status ? `?status=${status}` : "";
+  return apiFetch(`/admin/ask-reviews${qs}`).then((data) => data.reviews);
+}
+
+function decideAskReview(askId, { decision, note } = {}) {
+  return apiFetch(`/admin/ask-reviews/asks/${askId}/decide`, {
+    method: "POST",
+    body: { decision, note },
+  });
+}
+
+function decideAnswerReview(answerId, { decision, note } = {}) {
+  return apiFetch(`/admin/ask-reviews/answers/${answerId}/decide`, {
+    method: "POST",
+    body: { decision, note },
+  });
+}
+
+// Only for reports that froze nothing. One whose target is still frozen is
+// refused — it has to go through the decision above, so the ruling and the
+// content move together.
+function resolveAskFlag(id, { outcome } = {}) {
+  return apiFetch(`/admin/ask-flags/${id}/resolve`, { method: "POST", body: { outcome } });
+}
+
 export {
+  fetchSsmReviews,
+  rejectSsm,
   fetchAdminClaims,
   approveAdminClaim,
   rejectAdminClaim,
@@ -77,4 +127,8 @@ export {
   fetchVouchReviews,
   decideVouchReview,
   resolveVouchFlag,
+  fetchAskReviews,
+  decideAskReview,
+  decideAnswerReview,
+  resolveAskFlag,
 };

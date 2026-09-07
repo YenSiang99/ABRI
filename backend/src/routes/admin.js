@@ -9,9 +9,12 @@ import {
 } from "../lib/businessClaim.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { ASK_EXPIRY_DAYS } from "../lib/askExpiry.js";
 import { sendVerificationEmail } from "../lib/mailer.js";
 import { serializeVouch, VOUCH_INCLUDE, BUSINESS_SELECT } from "../lib/vouchTurn.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
+import { createNetworkEvent } from "../lib/networkEvents.js";
+import { notifyWatchers } from "../lib/businessWatch.js";
 import { MEMBERSHIP_TIER_RANK } from "../lib/entitlements.js";
 import { CLAIMED, SSM_VERIFIED } from "../lib/verificationLevels.js";
 
@@ -138,6 +141,44 @@ router.post(
 );
 
 // SSM
+
+// The review queue. Businesses that submitted a registration number and are
+// still waiting on a decision.
+//
+// The filter IS the derived pending state from POST /businesses/me/ssm —
+// `ssm != null && level L1` — rather than a status column, so this queue and
+// the member's own screen can never disagree about who is waiting. Oldest
+// first: a queue sorted newest-first starves the person who has waited
+// longest, which is the one thing a review queue must not do.
+router.get(
+  "/ssm-reviews",
+  asyncHandler(async (req, res) => {
+    const businesses = await prisma.business.findMany({
+      where: { verificationLevel: CLAIMED, ssm: { not: null } },
+      select: {
+        id: true,
+        name: true,
+        category: true,
+        location: true,
+        verificationLevel: true,
+        ssm: true,
+        domain: true,
+        website: true,
+        updatedAt: true,
+        // Who to contact about it. The claim owner, not every account —
+        // several can hold pending claims on one business, and only the
+        // approved one is the person who submitted this.
+        accounts: {
+          where: { claimStatus: "approved" },
+          select: { id: true, name: true, email: true, phone: true, role: true },
+        },
+      },
+      orderBy: { updatedAt: "asc" },
+    });
+    res.json({ businesses });
+  }),
+);
+
 router.post(
   "/businesses/:id/verify-ssm",
   asyncHandler(async (req, res) => {
@@ -155,7 +196,82 @@ router.post(
       where: { id: business.id },
       data: { verificationLevel: SSM_VERIFIED },
     });
+    // Announced to the network. No matching write in revoke-ssm below, and
+    // that absence is the design: the feed only shows a level announcement
+    // while the business is still at or above the level it announced, so
+    // dropping back to L1 retracts this row by itself. An ordinary promotion
+    // to L3 does not, which is the case a plain equality check would get
+    // backwards — see verificationLevelsAtOrAbove.
+    //
+    // actorBusinessId null: this is an admin's decision, and staff never
+    // appear in a members' feed.
+    await createNetworkEvent(prisma, {
+      type: "business_verified",
+      subjectBusinessId: business.id,
+    });
+    // And the member is TOLD. Until the submission flow existed this route
+    // moved a badge and said nothing, which was survivable when an admin was
+    // flipping a flag for someone they had just spoken to — and is not, now
+    // that a member submits a number and waits. actorBusinessId null: an
+    // admin did this, and staff are not members.
+    await createActivityEvent(prisma, {
+      businessId: business.id,
+      actorBusinessId: null,
+      type: "ssm_verified",
+    });
+    // Everyone who asked to be told. Fired here rather than lazily on read
+    // because the whole point of a watch is not having to come back and look.
+    await notifyWatchers(business.id, { fromLevel: CLAIMED, toLevel: SSM_VERIFIED });
     res.json({ business: updated });
+  }),
+);
+
+// Turn down a submitted number.
+//
+// CLEARS `ssm` rather than setting a "rejected" flag, and that is what makes
+// the derived state hold: the business goes back to "nothing submitted", the
+// member can submit a corrected number through the same door, and it leaves
+// this queue. A rejected marker would need clearing on resubmit anyway, and
+// the case where it wasn't is a business stuck looking refused forever.
+//
+// NO NOTE IS COLLECTED, and that is a deliberate difference from the vouch
+// and ask decisions in this file, which both require one.
+//
+// Those write their note onto a Flag row that exists to hold it. There is no
+// equivalent row here — the submission is two columns on Business — and
+// ActivityEvent has no detail field: its text is generated server-side from
+// the `type` alone (see ACTIVITY_MESSAGES). So a reason typed here would be
+// required of the admin, discarded on write, and never reach the member.
+// Asking for input that goes nowhere is worse than not asking.
+//
+// The message therefore has to be self-sufficient, and it is: it names the
+// next action rather than the fault. If a per-decision reason turns out to
+// matter, the change is a nullable detail column on ActivityEvent, which
+// would fix this for the seven other event families at once — the same
+// cross-cutting note lib/activityLinks.js makes about the missing subjectId.
+router.post(
+  "/businesses/:id/reject-ssm",
+  asyncHandler(async (req, res) => {
+    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    if (!business || business.verificationLevel !== CLAIMED || !business.ssm) {
+      return res.status(400).json({ error: "No submitted registration number to rule on." });
+    }
+
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { ssm: null },
+    });
+    // No NetworkEvent. The network is never told that somebody FAILED a
+    // check — the feed carries third-party positive acts only, and a
+    // rejection is neither positive nor anybody else's business. The member
+    // is told; nobody else is.
+    await createActivityEvent(prisma, {
+      businessId: business.id,
+      actorBusinessId: null,
+      type: "ssm_rejected",
+    });
+
+    res.json({ ok: true });
   }),
 );
 
@@ -174,6 +290,10 @@ router.post(
       where: { id: business.id },
       data: { verificationLevel: CLAIMED },
     });
+    // The direction that matters most to a watcher: somebody they were about
+    // to deal with just lost a level. notifyWatchers picks the wording from
+    // the direction, so this is the one that reads as a warning.
+    await notifyWatchers(business.id, { fromLevel: SSM_VERIFIED, toLevel: CLAIMED });
     res.json({ business: updated });
   }),
 );
@@ -507,6 +627,285 @@ router.post(
       },
     });
     res.json({ flag: updated });
+  }),
+);
+
+// ─── Asks: the reporting queue ──────────────────────────────────────────────
+// Same shape as the vouch queue above, and the differences are the interesting
+// part: two freezable targets rather than one (an ask, or a single answer
+// under it), and no action-log table — an ask has no negotiation to
+// reconstruct, so the AskFlag row IS the record.
+
+const ASK_REVIEW_INCLUDE = {
+  askedByBusiness: { select: { id: true, name: true, category: true, location: true, verificationLevel: true } },
+  answers: {
+    include: {
+      answeredByBusiness: { select: { id: true, name: true } },
+      recommendedBusiness: { select: { id: true, name: true } },
+    },
+  },
+  flags: {
+    include: {
+      raisedByBusiness: { select: { id: true, name: true } },
+      againstBusiness: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  },
+};
+
+function serializeAskReview(ask) {
+  const frozenAnswers = ask.answers.filter((a) => a.status === "under_review");
+  return {
+    id: ask.id,
+    title: ask.title,
+    detail: ask.detail,
+    category: ask.category,
+    status: ask.status,
+    createdAt: ask.createdAt,
+    askedBy: ask.askedByBusiness,
+    // Two separate frozen states, because they have different exits.
+    askFrozen: ask.status === "under_review",
+    frozenAnswers: frozenAnswers.map((a) => ({
+      id: a.id,
+      comment: a.comment,
+      status: a.status,
+      answeredBy: a.answeredByBusiness,
+      recommended: a.recommendedBusiness,
+      isSelfNomination: a.recommendedBusinessId === a.answeredByBusinessId,
+    })),
+    flags: ask.flags.map((f) => ({
+      id: f.id,
+      answerId: f.answerId,
+      reason: f.reason,
+      note: f.note,
+      status: f.status,
+      outcome: f.outcome,
+      createdAt: f.createdAt,
+      raisedBy: f.raisedByBusiness,
+      against: f.againstBusiness,
+    })),
+  };
+}
+
+router.get(
+  "/ask-reviews",
+  asyncHandler(async (req, res) => {
+    // Default view is the work: open reports, plus anything still frozen even
+    // if its flags have all been marked reviewed. That second and third clause
+    // exist for the reason the vouch queue's does — frozen content must never
+    // quietly drop off the queue while it is still frozen for the members.
+    const openOnly = req.query.status !== "all";
+    const where = {
+      OR: [
+        { status: "under_review" },
+        { answers: { some: { status: "under_review" } } },
+        { flags: { some: openOnly ? { status: "open" } : {} } },
+      ],
+    };
+
+    const asks = await prisma.ask.findMany({ where, include: ASK_REVIEW_INCLUDE });
+    const reviews = asks.map(serializeAskReview).sort((a, b) => {
+      const aFrozen = a.askFrozen || a.frozenAnswers.length > 0;
+      const bFrozen = b.askFrozen || b.frozenAnswers.length > 0;
+      if (aFrozen !== bFrozen) return aFrozen ? -1 : 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    res.json({ reviews });
+  }),
+);
+
+// `outcome` is DERIVED from the decision, never passed in — the same rule the
+// vouch DECISIONS map states. Restoring says the report didn't stand up;
+// closing or removing says it did. Letting an admin set status and verdict
+// independently would allow combinations that mean nothing and make the
+// upheld-flag count unreadable later.
+//
+// No `action` field, unlike the vouch map: that one names a VouchAction row,
+// and asks have no action log.
+const ASK_DECISIONS = {
+  restore: { status: "open", outcome: "dismissed", noteRequired: false, event: "ask_review_restored" },
+  close: { status: "closed", outcome: "upheld", noteRequired: true, event: "ask_review_closed" },
+};
+
+const ANSWER_DECISIONS = {
+  restore: { status: "offered", outcome: "dismissed", noteRequired: false, event: "ask_answer_review_restored" },
+  remove: { status: "removed", outcome: "upheld", noteRequired: true, event: "ask_answer_review_removed" },
+};
+
+router.post(
+  "/ask-reviews/asks/:id/decide",
+  asyncHandler(async (req, res) => {
+    const decision = ASK_DECISIONS[req.body?.decision];
+    if (!decision) {
+      return res.status(400).json({
+        error: `Unknown decision. Expected one of: ${Object.keys(ASK_DECISIONS).join(", ")}.`,
+      });
+    }
+
+    const ask = await prisma.ask.findUnique({ where: { id: req.params.id } });
+    if (!ask) return res.status(404).json({ error: "Ask not found." });
+    if (ask.status !== "under_review") {
+      return res.status(400).json({ error: "This ask isn't under review." });
+    }
+
+    const note = req.body?.note?.trim() || null;
+    if (decision.noteRequired && !note) {
+      return res.status(400).json({ error: "Add a note saying why you're closing it." });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ask.update({
+        where: { id: ask.id },
+        data: {
+          status: decision.status,
+          // Restarting the deadline on a restore, for the same reason the
+          // vouch decision restarts lastActionAt: the days an ask spent in a
+          // queue nobody but an admin could clear are not the asker's to lose.
+          ...(decision.status === "open"
+            ? { expiresAt: new Date(Date.now() + ASK_EXPIRY_DAYS * 24 * 60 * 60 * 1000) }
+            : { closedAt: new Date() }),
+        },
+      });
+
+      await tx.askFlag.updateMany({
+        where: { askId: ask.id, answerId: null, status: "open" },
+        data: {
+          status: "reviewed",
+          outcome: decision.outcome,
+          resolvedAt: new Date(),
+          resolvedByAccountId: req.account.id,
+        },
+      });
+    });
+
+    await createActivityEvent(prisma, {
+      businessId: ask.askedByBusinessId,
+      actorBusinessId: null,
+      type: decision.event,
+    });
+
+    res.json({ ok: true });
+  }),
+);
+
+router.post(
+  "/ask-reviews/answers/:id/decide",
+  asyncHandler(async (req, res) => {
+    const decision = ANSWER_DECISIONS[req.body?.decision];
+    if (!decision) {
+      return res.status(400).json({
+        error: `Unknown decision. Expected one of: ${Object.keys(ANSWER_DECISIONS).join(", ")}.`,
+      });
+    }
+
+    const answer = await prisma.askAnswer.findUnique({
+      where: { id: req.params.id },
+      include: { ask: true },
+    });
+    if (!answer) return res.status(404).json({ error: "Answer not found." });
+    if (answer.status !== "under_review") {
+      return res.status(400).json({ error: "This answer isn't under review." });
+    }
+
+    const note = req.body?.note?.trim() || null;
+    if (decision.noteRequired && !note) {
+      return res.status(400).json({ error: "Add a note saying why you're removing it." });
+    }
+
+    // Was this the ask's accepted answer before it got frozen? If an admin
+    // removes it, the ask cannot stay "answered" with no standing accepted
+    // answer — that would be a lie in the data.
+    const wasAccepted = Boolean(answer.acceptedAt) && answer.ask.status === "answered";
+
+    await prisma.$transaction(async (tx) => {
+      await tx.askAnswer.update({
+        where: { id: answer.id },
+        data: {
+          status: decision.status,
+          // A removed answer keeps acceptedAt (it is a record of what
+          // happened) but stops being published, because publication reads
+          // the STATUS. A restored one goes back to "offered", which means
+          // the asker has to choose it again — an admin unfreezing content
+          // is not the same as an asker endorsing it.
+          ...(decision.status === "offered" ? { acceptedAt: null } : {}),
+        },
+      });
+
+      if (decision.status === "removed" && wasAccepted) {
+        await tx.ask.update({
+          where: { id: answer.askId },
+          data: { status: "closed", closedAt: new Date() },
+        });
+      }
+      if (decision.status === "offered" && wasAccepted) {
+        // The ask went back to open when its accepted answer was frozen; put
+        // it back in front of the asker to decide again.
+        await tx.ask.update({
+          where: { id: answer.askId },
+          data: { status: "open", closedAt: null },
+        });
+      }
+
+      await tx.askFlag.updateMany({
+        where: { answerId: answer.id, status: "open" },
+        data: {
+          status: "reviewed",
+          outcome: decision.outcome,
+          resolvedAt: new Date(),
+          resolvedByAccountId: req.account.id,
+        },
+      });
+    });
+
+    await createActivityEvent(prisma, {
+      businessId: answer.answeredByBusinessId,
+      actorBusinessId: null,
+      type: decision.event,
+    });
+
+    res.json({ ok: true });
+  }),
+);
+
+// Tracking-only reports — ones raised against a settled ask, where nothing was
+// frozen. Same shape as POST /admin/vouch-flags/:id/resolve, including its
+// refusal to touch a flag whose target is still frozen: that one has to go
+// through the decision route, so the ruling and the content move together.
+router.post(
+  "/ask-flags/:id/resolve",
+  asyncHandler(async (req, res) => {
+    const outcome = req.body?.outcome;
+    if (!["upheld", "dismissed"].includes(outcome)) {
+      return res.status(400).json({ error: "Outcome must be 'upheld' or 'dismissed'." });
+    }
+
+    const flag = await prisma.askFlag.findUnique({
+      where: { id: req.params.id },
+      include: { ask: true, answer: true },
+    });
+    if (!flag) return res.status(404).json({ error: "Report not found." });
+    if (flag.status !== "open") return res.status(400).json({ error: "That report is already resolved." });
+
+    const targetFrozen = flag.answerId
+      ? flag.answer?.status === "under_review"
+      : flag.ask.status === "under_review";
+    if (targetFrozen) {
+      return res.status(400).json({
+        error: "That report froze something — resolve it through the review decision instead.",
+      });
+    }
+
+    await prisma.askFlag.update({
+      where: { id: flag.id },
+      data: {
+        status: "reviewed",
+        outcome,
+        resolvedAt: new Date(),
+        resolvedByAccountId: req.account.id,
+      },
+    });
+    res.json({ ok: true });
   }),
 );
 

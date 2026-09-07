@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { vouchCapFor, vouchCapWindowStart } from "../lib/vouchCap.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
+import { createNetworkEvent } from "../lib/networkEvents.js";
 import { applyExpiryIfNeeded } from "../lib/vouchExpiry.js";
 import { hasTurn, roleFor, serializeVouch, VOUCH_INCLUDE } from "../lib/vouchTurn.js";
 import { can } from "../lib/entitlements.js";
@@ -331,6 +332,20 @@ router.post(
         businessId: vouch.fromBusinessId,
         actorBusinessId: business.id,
         type: "vouch_published",
+      });
+      // The same event, told to the network rather than to the giver. Inside
+      // the same transaction as the status change on purpose: a testimonial
+      // that is live on a profile but absent from the feed, or the reverse,
+      // is the one inconsistency anyone would notice.
+      //
+      // The feed carries no copy of the text — it points at this vouch and
+      // reads currentRevision through it, so a later revision needs no second
+      // write here and a flag retracts it with none either.
+      await createNetworkEvent(tx, {
+        type: "vouch_published",
+        subjectBusinessId: vouch.toBusinessId,
+        actorBusinessId: vouch.fromBusinessId,
+        vouchId: vouch.id,
       });
     });
 

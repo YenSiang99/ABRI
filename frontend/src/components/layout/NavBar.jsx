@@ -10,6 +10,10 @@ const NAV_LINKS = [
   { href: "/#trust", label: "The badge" },
   { href: "/#pricing", label: "Membership" },
   { to: "/directory", label: "Directory" },
+  // Named for what it does, never "scam check". The blueprint's principle #8
+  // is that this is discovered rather than sold — it is the quiet feature, so
+  // it sits in the nav as a plain utility rather than leading with fear.
+  { to: "/check", label: "Check a business" },
 ];
 
 function NavBar() {

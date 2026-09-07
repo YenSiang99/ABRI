@@ -1,4 +1,5 @@
 import { prisma } from "../prisma.js";
+import { VOUCHABLE_VERIFICATION_LEVELS } from "./verificationLevels.js";
 import { serializeAccount } from "./serialize.js";
 import { vouchLevelFor } from "./vouchLevel.js";
 
@@ -81,9 +82,76 @@ function omitContactFields(business) {
 // strips membershipTier, so can() asked about this function's output would
 // deny everything and every business would silently look free. Same trap the
 // testimonials gate in routes/businesses.js already warns about.
+// The explicit public allowlist, and the reason this file stopped using omits
+// alone.
+//
+// omitContactFields' own comment set the trigger: "If a THIRD private group
+// ever appears, stop and switch this file to an explicit public allowlist
+// rather than adding a third omit — at three groups the 'do nothing' default
+// stops being a convenience and starts being the reason something leaked."
+//
+// The third group arrived with the registration number. `ssmNormalized` is an
+// internal lookup key that must never leave the server, and `ssm` itself is
+// conditional on something neither existing omit could express — see below.
+// So the default flipped: a new column is now PRIVATE until it is named here,
+// which is the direction that fails safe.
+//
+// The two omits are kept rather than deleted. They still state WHY each group
+// is private, and serializeBusiness (the owner's own view) applies neither —
+// so the allowlist and the omits together are what make "public" and "mine"
+// two different shapes rather than one shape with holes in it.
+const PUBLIC_BUSINESS_FIELDS = [
+  "id",
+  "name",
+  "category",
+  "location",
+  "verificationLevel",
+  "description",
+  "services",
+  // Where to find them. Public on every plan — a business nobody can find the
+  // door of doesn't upgrade, it leaves.
+  "domain",
+  "website",
+  "address",
+  "openingHours",
+  "createdAt",
+  "updatedAt",
+];
+
+// Whether the registration number may be published.
+//
+// ONLY ONCE SOMEBODY HAS CHECKED IT. `ssm` is typed by the member at claim or
+// through POST /businesses/me/ssm, and until an admin rules on it, it is an
+// unverified assertion. Publishing it under a "Claimed" badge would put a
+// number ABRI has not checked on a page whose entire purpose is that ABRI
+// checks things — a false registration number attached to a real company
+// name, published by us.
+//
+// At L2 and above the opposite is true: the number IS the evidence behind the
+// badge, an admin matched it against the register, and Malaysian companies
+// are required to display it anyway. So it becomes public exactly when it
+// stops being a claim and starts being a finding.
+//
+// The owner and admins see it at every level, via serializeBusiness and the
+// admin routes — neither goes through this function.
+function ssmIsPublic(business) {
+  return VOUCHABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
+}
+
 function publicBusinessView(business, { showContact = false } = {}) {
-  const stripped = omitBillingFields(business);
-  return showContact ? stripped : omitContactFields(stripped);
+  const view = {};
+  for (const key of PUBLIC_BUSINESS_FIELDS) {
+    if (key in business) view[key] = business[key];
+  }
+  if (ssmIsPublic(business)) view.ssm = business.ssm;
+  if (showContact) {
+    // Named here rather than spread from the raw row, so the contact group
+    // is as explicit as everything else above it.
+    for (const key of ["phone", "whatsapp", "email"]) {
+      if (key in business) view[key] = business[key];
+    }
+  }
+  return view;
 }
 
 // The OWNER's own view. Deliberately does NOT go through publicBusinessView:

@@ -56,6 +56,31 @@ const membershipTierPriceNote = {
 const MEMBERSHIP_TIER_FEATURES = [
   { label: "Listed in the directory", free: true, plus: true, pro: true, enterprise: true },
   { label: "SSM-verified badge", free: false, plus: true, pro: true, enterprise: true },
+  // ─── The check-a-business screen, Sep 2026 ───────────────────────────────
+  //
+  // These five were missing from this table for a while after they shipped,
+  // which is the failure mode this file exists to prevent in the other
+  // direction: the table is usually accused of promising more than the
+  // product has, and here it was quietly delivering more than it sold.
+  //
+  // The first two are true in all four columns ON PURPOSE, the same way the
+  // asks row is. Checking a business is open to everyone including logged-out
+  // visitors — an invite that cannot be verified without joining is
+  // self-defeating — and the feed is open to every member. Four ticks says
+  // "not gated", which is a thing worth saying on a pricing page.
+  { label: "Check a business — by name, SSM number or website", free: true, plus: true, pro: true, enterprise: true },
+  { label: "Trust feed — vouches and verifications as they happen", free: true, plus: true, pro: true, enterprise: true },
+  // ENFORCED, by `networkOverlap` — and the only row here that gates on the
+  // VIEWER's plan rather than the subject's. It is allowed to because it
+  // withholds nothing the seller published: it compares the reader's own
+  // connections against the business's vouchers, and a stranger has no
+  // connections to compare. See the viewer-side gates block in
+  // backend/src/lib/entitlements.js before adding a second one.
+  { label: "See which of their vouchers you already know", free: false, plus: true, pro: true, enterprise: true },
+  // ENFORCED, by `watchBusinesses`. Pro's second delivered row.
+  { label: "Watch a business for verification changes", free: false, plus: false, pro: true, enterprise: true },
+  // ENFORCED, by `checkHistory`.
+  { label: "Your record of who you checked, and when", free: false, plus: false, pro: true, enterprise: true },
   // Free, and nothing anywhere gates it: PATCH /businesses/me asks only for
   // an approved claim. This row said `false` until Aug 2026, which made the
   // table the only thing in the product claiming otherwise. Editing your own
@@ -109,7 +134,24 @@ const MEMBERSHIP_TIER_FEATURES = [
   { label: "Your contact details visible to members", free: false, plus: true, pro: true, enterprise: true },
   { label: "Profile view alerts + weekly summary", free: false, plus: true, pro: true, enterprise: true },
   { label: "Search ranking", free: "Standard", plus: "Higher", pro: "Top", enterprise: "Top" },
-  { label: "Requests board", free: "Read only", plus: "Read only", pro: "Post + reply", enterprise: "Private" },
+  // ENFORCED — by VERIFICATION, not by plan, and the only row in this table
+  // that says so. Posting an ask needs T2 (SSM-verified), which no plan can
+  // buy (§6: "verification cannot be bought"); answering needs nothing at all.
+  // Every cell is therefore the same, and the row exists to say that out loud.
+  //
+  // The version this replaced read "Post + reply" under Pro alone, which
+  // promised a paywall this feature deliberately doesn't have, and "Private"
+  // under Enterprise, which described an unbuilt white-label item. Four ticks
+  // would have been worse than four strings: a tick reads as "included on
+  // Free", which over-promises to a member who isn't verified yet.
+  { label: "Asks board — post and answer", free: "SSM-verified", plus: "SSM-verified", pro: "SSM-verified", enterprise: "SSM-verified" },
+  // ENFORCED, by `askAlerts` in backend/src/lib/entitlements.js — GET
+  // /asks/alerts answers 402 below Pro. What Pro buys is being TOLD an ask
+  // matches what you do, not the ability to act on one: the same asks are on
+  // the board for everyone, one filter away. Push versus pull.
+  //
+  // Pro's first row in this table that isn't a promise.
+  { label: "Told when an ask matches you", free: false, plus: false, pro: true, enterprise: true },
   // Nothing behind this yet — no route, no screen, no data. It used to read
   // "Referral tracker + introductions"; the introductions half was removed
   // in Aug 2026 (the screen was mock data end to end) and the referral
@@ -133,8 +175,9 @@ const MEMBERSHIP_TIER_FEATURES = [
 //   quantities — appear on every tier that raises them ("20 / mo" then
 //                "40 / mo"), and drop off where they don't ("Top" under Pro
 //                stays "Top" under Enterprise, so Enterprise doesn't claim it).
-//   constants  — never appear as a delta at all: a row that reads the same
-//                in every column is not something any tier is buying.
+//   constants  — never appear as a delta at all. The asks row is the same
+//                string in all four columns on purpose (verification gates it,
+//                not billing), so no card can imply you're buying it.
 //
 // `free` is the base case: its own truthy rows, since there is no tier below.
 //
@@ -166,6 +209,16 @@ function membershipTierUpgrades(t) {
 // data that is false for every plan. That is luck, not design — the moment a
 // real taps table exists, this gate needs a server half.
 const FEATURE_MIN_MEMBERSHIP_TIER = {
+  // Read to decide whether the dashboard renders the alert PANEL or the pitch
+  // for it — never whether the Asks nav item or the board itself renders.
+  // Those are open to everyone, and a client-side copy could not withhold them
+  // safely anyway.
+  askAlerts: "pro",
+  // The viewer-side gates — see backend/src/lib/entitlements.js. Client copies
+  // are UX only; the server answers 402 regardless.
+  networkOverlap: "plus",
+  watchBusinesses: "pro",
+  checkHistory: "pro",
   testimonials: "plus",
   // Like `testimonials` and unlike the two below it: the server strips the
   // data, so this copy only lets the UI explain a gate that is already

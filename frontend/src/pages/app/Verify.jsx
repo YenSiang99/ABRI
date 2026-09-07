@@ -1,4 +1,10 @@
+import { useState } from "react";
 import { Check, Lock, ShieldCheck } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { submitSsm } from "@/lib/api/businesses";
+import { toast } from "@/lib/toast";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { ExplainBadge } from "@/components/badge/BadgeExplainer";
@@ -111,6 +117,92 @@ function LevelRail({ levels, currentIndex }) {
   );
 }
 
+// The SSM step, from the member's side.
+//
+// This panel used to say "pending manual review — no action needed from you",
+// which was false in the most expensive way available: there was no way to
+// submit a number at all, so an L1 member sat waiting for a review that could
+// never be queued, and Business.ssm was null on every row in the database.
+//
+// TWO STATES, DERIVED FROM TWO COLUMNS. There is no ssmStatus field:
+//
+//   ssm == null  — nothing submitted; show the form
+//   ssm != null  — submitted; show it back and say who it is waiting on
+//
+// (An approved number is not this component's problem — the level has moved
+// to L2 by then and the caller stops rendering it.) The admin queue reads the
+// exact same pair, so what a member sees here and what an admin sees there
+// cannot drift apart.
+function SsmSubmission({ business }) {
+  const { refreshAccount } = useAuth();
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (business.ssm) {
+    return (
+      <div className="mt-6 rounded-xl border border-dashed border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">
+          Registration number submitted — waiting on review.
+        </span>{" "}
+        We cross-check it against the SSM register by hand, usually within a couple of business
+        days. Nothing further needed from you.
+        {/* Shown back verbatim so a member who mistyped can SEE that they did.
+            The alternative — a bare "submitted" — leaves the commonest failure
+            invisible until an admin turns it down days later. */}
+        <p className="mt-3 font-mono text-sm text-foreground">{business.ssm}</p>
+      </div>
+    );
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await submitSsm(value.trim());
+      // The submitted number lives on the session business, so the panel only
+      // flips to its pending state once the session is re-read.
+      await refreshAccount();
+      toast.success("Registration number submitted", {
+        description: "An admin will check it against the SSM register.",
+      });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-6 rounded-xl border border-accent bg-card p-5">
+      <p className="text-sm font-medium text-foreground">
+        Send us your SSM registration number
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        This is the step to SSM-Verified. We check it against the register by hand — which is why
+        no plan can buy this badge.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="202301234567 (1234567-A)"
+          aria-label="SSM registration number"
+          className="max-w-xs font-mono"
+        />
+        <Button type="submit" disabled={saving || value.trim().length < 4}>
+          {saving ? "Sending…" : "Submit for review"}
+        </Button>
+      </div>
+      {/* Says the quiet part out loud: the number is not published by
+          submitting it, and the badge is not granted by submitting it. */}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Copy it exactly as it appears on your SSM documents — both formats are fine. Submitting
+        does not change your badge; an admin has to check it first.
+      </p>
+    </form>
+  );
+}
+
 function Verify() {
   const { account, business } = useAuth();
   const VERIFICATION_LEVEL_DATA = buildVerificationLevelData(account, business);
@@ -156,13 +248,7 @@ function Verify() {
           <LevelRail levels={VERIFICATION_LEVEL_DATA} currentIndex={currentIndex} />
         </div>
 
-        {business.verificationLevel === CLAIMED && (
-          <div className="mt-6 rounded-xl border border-dashed border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">SSM verification: pending manual review.</span>{" "}
-            Our team cross-checks your registration against SSM e-Info records — usually within a couple of
-            business days. No action needed from you.
-          </div>
-        )}
+        {business.verificationLevel === CLAIMED && <SsmSubmission business={business} />}
       </div>
 
       <div className="mt-10 space-y-4">
