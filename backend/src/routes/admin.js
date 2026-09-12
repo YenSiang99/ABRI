@@ -290,6 +290,14 @@ router.post(
       where: { id: business.id },
       data: { verificationLevel: CLAIMED },
     });
+    // Dated, so the profile timeline can say WHEN it lapsed rather than only
+    // that it did. Written here because this is the only route that revokes;
+    // it is recorded, not broadcast — see the type's comment in
+    // lib/networkEvents.js for why it never reaches the feed.
+    await createNetworkEvent(prisma, {
+      type: "business_verification_revoked",
+      subjectBusinessId: business.id,
+    });
     // The direction that matters most to a watcher: somebody they were about
     // to deal with just lost a level. notifyWatchers picks the wording from
     // the direction, so this is the one that reads as a warning.

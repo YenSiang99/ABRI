@@ -15,11 +15,14 @@ import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
+import { serviceCatalogueFor, splitServices } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { vouchersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
+import { recordProfileView } from "../lib/profileView.js";
+import { verificationTimelineFor } from "../lib/verificationTimeline.js";
 import {
   LOOKUP_LIMIT,
   MIN_QUERY_LENGTH,
@@ -62,7 +65,10 @@ async function loadViewerBusiness(req) {
   if (!req.account?.businessId) return null;
   return prisma.business.findUnique({
     where: { id: req.account.businessId },
-    select: { id: true, membershipTier: true },
+    // privateBrowsing rides along because GET /:id needs it on the same read
+    // that the gates need membershipTier — fetching it separately would be a
+    // second query on the most-hit route in the app.
+    select: { id: true, membershipTier: true, privateBrowsing: true },
   });
 }
 
@@ -243,6 +249,32 @@ router.get(
 // no result on this endpoint is EVER a claim about the real world. ABRI has
 // no registry access. An empty match list means "no record on ABRI" and the
 // client must not render it as anything stronger.
+// The service catalogue an owner picks from, for their own category.
+//
+// SERVED RATHER THAN MIRRORED, unlike lib/businessVocab.js, whose frontend copy
+// is a flat array that a human keeps in step. This list is ten times the size
+// and will grow on a different schedule from a release, and a stale copy here
+// does not fail loudly — it just quietly offers fewer canonical services than
+// the server will accept, which is the same silent miss the catalogue exists to
+// remove.
+//
+// Declared BEFORE /:id or Express reads "service-catalogue" as a business id —
+// the same collision routes/asks.js documents for /mine.
+//
+// optionalAuth, not requireAuth: the register form needs this too, and there is
+// nothing private in a list of service names.
+router.get(
+  "/service-catalogue",
+  optionalAuth,
+  asyncHandler(async (req, res) => {
+    const category = req.query.category;
+    if (category && !isValidCategory(category)) {
+      return res.status(400).json({ error: "Unknown category." });
+    }
+    res.json(serviceCatalogueFor(category ?? null));
+  }),
+);
+
 router.get(
   "/lookup",
   optionalAuth,
@@ -297,10 +329,16 @@ router.get(
         ? await vouchersInNetworkFor(ranked.map((m) => m.business.id), viewer.id)
         : new Map();
 
-    // Pro's check history, written here because this is the moment a member
-    // actually looked at a counterparty. Only for a member who can read it
-    // back — see lib/businessCheck.js on why logging a Free member's searches
-    // to sell them the log later is the wrong trade.
+    // Pro's check history. ONE OF TWO WRITE SITES — GET /:id records a profile
+    // open the same way, because the directory folds the check screen in and a
+    // member who browses straight to a business has still checked it. Keep the
+    // two in step: a rule that holds here (session-keyed, self-view excluded,
+    // Pro only) has to hold there, or the log's meaning depends on which route
+    // the member happened to arrive through.
+    //
+    // Only for a member who can read it back — see lib/businessCheck.js on why
+    // logging a Free member's searches to sell them the log later is the wrong
+    // trade.
     //
     // Awaited so a failure surfaces rather than becoming an unhandled
     // rejection, but it writes nothing that the response depends on.
@@ -404,6 +442,48 @@ router.get(
     // membershipTier, so asking can() about its output denies everything.
     const showTestimonials = can(business, "testimonials");
 
+    // The check history's SECOND write site, and the one that matches how the
+    // product is actually used. /businesses/lookup was the only one, which
+    // assumed checking was a separate errand on a separate screen; the
+    // directory folds that screen in, so opening a profile IS the check. A
+    // member who browses to a business and reads its vouches has done the
+    // diligence the log exists to record, and leaving it unrecorded made the
+    // history look broken rather than principled.
+    //
+    // STILL THE MEMBER'S OWN LOG. recordChecks is keyed off the viewer's
+    // session id exactly as it is in lookup — this widens WHEN a row is
+    // written, never who may read one. The direction rule in
+    // lib/businessCheck.js is untouched: nothing here can answer "who has
+    // been checking me?".
+    //
+    // Self-views are excluded. Opening your own profile is not diligence, and
+    // a history whose top entry is always yourself buries the rows that
+    // matter. The dedupe window in lib/businessCheck.js handles the rest: a
+    // member who opens the same profile six times in a day gets one row whose
+    // timestamp and levelAtCheck move to the latest look.
+    //
+    // Awaited for the reason lookup states — a failure should surface rather
+    // than become an unhandled rejection — and nothing in the response
+    // depends on it.
+    const viewer = await loadViewerBusiness(req);
+    if (viewer && viewer.id !== business.id) {
+      // TWO ROWS, ONE PAGE OPEN, AND THEY ARE NOT DUPLICATES. The check
+      // belongs to the viewer and is written only if they can read it back;
+      // the view belongs to the business being looked at and is written
+      // whatever the viewer pays. lib/profileView.js has the long version —
+      // the short one is that gating this second write on the viewer's tier
+      // would make every viewer count in the product an undercount.
+      if (can(viewer, "checkHistory")) {
+        await recordChecks(viewer.id, [business]);
+      }
+      // The viewer's own setting decides whether this view carries their name.
+      // Read off the viewer, never the viewed: the business being looked at
+      // has no say in whether its visitors are identified, which is the point.
+      await recordProfileView(business.id, viewer.id, {
+        anonymous: viewer.privateBrowsing === true,
+      });
+    }
+
     // Deliberately adjacent to the line above, and for the same reason: this
     // reads the plan off the RAW row too. publicBusinessView strips
     // membershipTier, so a gate computed after it would see every business as
@@ -417,6 +497,14 @@ router.get(
     // keeps, so it must not travel inside the half that gets taken away.
     const vouchCount = business.vouchesReceived.length;
 
+    // PUBLIC ON EVERY PLAN AND TO ANONYMOUS VISITORS, deliberately, and the
+    // only part of this response that is. Everything else here is gated on
+    // somebody's plan; this is a factual record of what a registry said and
+    // when, and gating it would mean selling the ability to find out that a
+    // business's verification lapsed. That is the one fact this product exists
+    // to surface — see lib/verificationTimeline.js.
+    const verificationTimeline = await verificationTimelineFor(prisma, business);
+
     // Flatten the live revision's text onto each vouch as `testimonial`.
     // The column of that name is gone (schema.prisma) — it was the copy a
     // revise overwrote — but the public shape is unchanged, so nothing
@@ -429,6 +517,7 @@ router.get(
       business: {
         ...publicBusinessView(business, { showContact: contact.visible }),
         vouchCount,
+        verificationTimeline,
         testimonialsLocked: !showTestimonials,
         // Withheld the same way testimonials are — the keys are absent, not
         // null, so there is no masked value on the wire to un-mask.

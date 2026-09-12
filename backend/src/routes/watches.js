@@ -5,19 +5,26 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { listWatches } from "../lib/businessWatch.js";
 import { listChecks } from "../lib/businessCheck.js";
+import { viewerSummary, listViewers } from "../lib/profileView.js";
 import { can } from "../lib/entitlements.js";
 
 const router = Router();
 
-// The two Pro tools that keep working after the member closes the tab.
+// The member's own tools — what they watch, what they checked, and who has
+// been looking at them.
 //
-// Both are keyed off the SESSION and nothing else. There is no route here
-// that takes a business id and tells you about that business's watchers or
-// who has been checking it — see the models in schema.prisma. A route that
-// answered "who is watching me?" would put a private signal about the watcher
-// onto the watched business's screen, and one that answered "who checked me?"
-// would expose a counterparty's diligence. Both are the mistake
-// lib/follows.js already refuses to make with follower lists.
+// EVERY ROUTE IS KEYED OFF THE SESSION and nothing else. None takes a business
+// id in the path, so none can be pointed at a business the caller is not. That
+// much is unchanged and must stay that way.
+//
+// WHAT CHANGED (Sep 2026): /viewers answers "who looked at me?", which this
+// header previously ruled out in the same breath as "who is watching me?".
+// Those two have come apart deliberately. Watches are still private to the
+// watcher — a route exposing them would tell a business that a specific peer
+// is monitoring its verification, which is a signal about the WATCHER.
+// /viewers reports profile opens, from a separate table (ProfileView) written
+// for that purpose. The reasoning that still rules out a watcher list is in
+// lib/businessCheck.js; read it before adding a fourth route here.
 //
 // PLAN-GATED ON THE VIEWER, which is unusual in this codebase and deliberate.
 // Everywhere else a gate asks about the business being looked AT. These ask
@@ -139,6 +146,109 @@ router.get(
       "Your check history is part of Pro. Upgrade to keep a record of who you checked and when.",
     );
     res.json({ checks: await listChecks(business.id) });
+  }),
+);
+
+// ─── Profile viewers ────────────────────────────────────────────────────────
+//
+// The MIRROR of /checks, and the reason the two share this file and a screen:
+// /checks answers "who did I look at", this answers "who looked at me". Same
+// relation, opposite direction, and a member who can see one immediately asks
+// for the other — which is exactly what happened.
+//
+// THE ONLY ROUTE IN THIS FILE THAT IS NOT ALL-OR-NOTHING. The three above
+// return a 402 and no data to anyone below Pro. This one always answers,
+// because the count is not the paid half:
+//
+//   every plan  → { viewerCount, viewCount, windowDays, identitiesLocked }
+//   pro         → the same, plus `viewers` with names
+//
+// `viewers` is ABSENT rather than empty for a Free or Plus member, the same
+// idiom GET /businesses/:id uses for withheld testimonials and contact
+// fields. An empty array would render as "nobody has viewed you" — the
+// opposite of what a locked list means, and the one message this screen must
+// never show a member who is in fact being looked at.
+router.get(
+  "/viewers",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) fail(400, "You need a claimed business to do this.");
+    const business = await prisma.business.findUnique({ where: { id: req.account.businessId } });
+    if (!business) fail(400, "You need a claimed business to do this.");
+
+    // THE RECIPROCITY RULE, and the reason private browsing is defensible at
+    // all. A member who has opted out of being named does not get to read the
+    // names of the people who looked at them — otherwise the setting is a free
+    // switch for one-way surveillance, which is strictly worse than the
+    // feature it was added to soften. See Business.privateBrowsing.
+    //
+    // It OUTRANKS the plan. A Pro member browsing privately is locked out of
+    // their own list exactly like a Free one, and that is deliberate: the trade
+    // has to be something money cannot settle, or it is not a trade.
+    const browsingPrivately = business.privateBrowsing === true;
+    const showIdentities = can(business, "profileViewers") && !browsingPrivately;
+    const summary = await viewerSummary(business.id);
+
+    res.json({
+      ...summary,
+      // Always sent, so the client can render the toggle's current state on
+      // this screen rather than sending the member to settings to find out
+      // why their list is hidden.
+      privateBrowsing: browsingPrivately,
+      identitiesLocked: !showIdentities,
+      ...(showIdentities
+        ? { viewers: await listViewers(business.id) }
+        : {
+            // WHY it is locked, because the two reasons need different copy
+            // and only the server knows which applies. "upgrade" is a price;
+            // "private_browsing" is a choice the member already made and can
+            // undo for free, and showing them a Pro upsell for it would be
+            // selling something they already have.
+            lockedReason: browsingPrivately ? "private_browsing" : "upgrade",
+            // Absent when the reason is their own setting: there is nothing
+            // to buy, and a tier here would render a price on a free action.
+            ...(browsingPrivately ? {} : { requiredMembershipTier: "pro" }),
+          }),
+    });
+  }),
+);
+
+// The toggle itself.
+//
+// UNGATED BY PLAN, on purpose and permanently. Selling privacy would leave the
+// cheapest members the most exposed in a product whose pitch is trust — see
+// Business.privateBrowsing. It needs only a claimed business, like every other
+// route in this file.
+//
+// PUT rather than PATCH: the body is the whole state of a single boolean, so
+// there is no partial update to express, and a client that sends it twice gets
+// the same answer both times.
+router.put(
+  "/private-browsing",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (!req.account.businessId) fail(400, "You need a claimed business to do this.");
+
+    const { privateBrowsing } = req.body ?? {};
+    // Rejected rather than coerced. "false" the string and 0 are both truthy
+    // or falsy in ways a caller did not mean, and a privacy setting is the
+    // last place to guess what someone intended.
+    if (typeof privateBrowsing !== "boolean") {
+      fail(400, "privateBrowsing must be true or false.");
+    }
+
+    const business = await prisma.business.update({
+      where: { id: req.account.businessId },
+      data: { privateBrowsing },
+      select: { privateBrowsing: true },
+    });
+
+    // NOTHING IS REWRITTEN RETROACTIVELY. Existing ProfileView rows keep the
+    // mode they were written with until the member visits again — see the
+    // `anonymous` column. Turning the setting on does not erase a name the
+    // other business may already have read, and pretending otherwise would be
+    // promising a privacy this cannot deliver.
+    res.json({ privateBrowsing: business.privateBrowsing });
   }),
 );
 

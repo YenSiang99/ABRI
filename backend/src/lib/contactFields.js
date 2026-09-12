@@ -1,3 +1,5 @@
+import { canonicalService } from "./serviceVocab.js";
+
 // Validation and normalisation for the fields an owner may edit on their own
 // business — everything PATCH /businesses/me accepts. Kept apart from
 // lib/contactVisibility.js on purpose: that one answers "who may SEE this",
@@ -186,7 +188,27 @@ function normalizeServices(raw) {
   if (services.some((s) => s.length > MAX.service)) {
     return { error: `Each service must be ${MAX.service} characters or fewer.` };
   }
-  return { value: services };
+
+  // CANONICALISED ON WRITE, which is the whole reason lib/serviceVocab.js
+  // exists. An owner who types "ssm filings" means the catalogue entry "SSM
+  // filings", and storing their casing would leave a value that renders
+  // identically on the profile and matches nothing — the silent miss
+  // businessVocab.js closed category and location to prevent. Anything not in
+  // the catalogue is kept exactly as typed: it is a custom service, and
+  // rewriting someone's own words would be worse than not matching on them.
+  //
+  // Deduped AFTER canonicalising, or "SSM filings" and "ssm filings" survive
+  // as two rows that are now the same string.
+  const canonicalised = services.map((s) => canonicalService(s) ?? s);
+  const seen = new Set();
+  const deduped = canonicalised.filter((s) => {
+    const key = s.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return { value: deduped };
 }
 
 function normalizeDescription(raw) {

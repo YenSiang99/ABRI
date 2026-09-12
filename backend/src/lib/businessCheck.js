@@ -2,16 +2,24 @@ import { prisma } from "../prisma.js";
 
 // The member's own log of which businesses they checked, and when.
 //
-// THE DIRECTION IS THE WHOLE FEATURE. This answers "what have I checked?" and
-// must never be able to answer "who has been checking me?". The second
-// question is what turns a trust directory into surveillance: a business that
-// could see it was being looked into would learn something about a
-// counterparty's private diligence, and members would quietly stop checking
-// anyone they might have to face.
+// THE DIRECTION IS THE WHOLE FEATURE — OF THIS MODULE. It answers "what have I
+// checked?" and still cannot answer "who has been checking me?". Every read
+// below is keyed off the SESSION, never off a business id in a path; there is
+// no function here that takes a target id, and adding one would undo it.
 //
-// Enforced the way lib/follows.js enforces the same rule — every read is
-// keyed off the SESSION, never off a business id in a path. There is no
-// function here that takes a target id, and adding one would undo the model.
+// THAT SECOND QUESTION IS NOW ANSWERED ELSEWHERE (lib/profileView.js, Sep
+// 2026). The argument against answering it at all is preserved because it was
+// never refuted, only outweighed: a business that can see it is being looked
+// into learns something about a counterparty's private diligence, and members
+// who know they are visible stop checking anyone they might have to face —
+// which costs the directory the very data it runs on.
+//
+// What keeps that from happening HERE is that ProfileView is a separate table
+// written under a separate rule. This module's rows are still collected only
+// for members who can read them back, so a Free member's browsing is never
+// banked. Merging the two would silently move every check row into a table
+// that the checked business can read, which is the one change this header
+// exists to prevent — see the ProfileView model comment before trying it.
 //
 // WRITTEN ONLY FOR MEMBERS WHO CAN READ IT BACK (Pro). Logging a Free
 // member's searches to sell them the history later would be collecting data

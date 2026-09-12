@@ -38,6 +38,23 @@ const NETWORK_EVENT_TYPES = new Set([
   "recommendation_published",
   "business_claimed",
   "business_verified",
+  // RECORDED BUT NEVER ANNOUNCED, and the asymmetry is deliberate.
+  //
+  // This row exists so a lapse can be placed in TIME. Before it, revocation
+  // updated Business.verificationLevel and told watchers, and that was all —
+  // a profile could say "not verified" but never "verified Apr 2026, lapsed
+  // Aug 2026", which is the single most useful sentence a trust record can
+  // carry (see lib/verificationTimeline.js).
+  //
+  // It is absent from the feed FOR FREE, not by a special case: every branch
+  // of visibleNetworkEventsWhere matches either a content type or a member of
+  // LEVEL_EVENT_TYPES, and this is in neither list, so nothing matches it.
+  // DO NOT add it to LEVEL_EVENT_TYPES to "tidy up" — that would turn a
+  // pull-only record into a push notification announcing to the whole network
+  // that a named business just lost its badge. The timeline is read by a
+  // counterparty who went looking at decision time; the feed is broadcast.
+  // Those are different acts and only one of them is defensible.
+  "business_verification_revoked",
 ]);
 
 // The two types that announce a move up the verification ladder rather than a
@@ -51,6 +68,10 @@ const LEVEL_EVENT_TYPES = ["business_claimed", "business_verified"];
 const LEVEL_EVENT_LEVEL = {
   business_claimed: CLAIMED,
   business_verified: SSM_VERIFIED,
+  // The level the business DROPPED TO, keeping the column's meaning ("the
+  // level this row announces") identical across all three types. Reading it
+  // as "the level they lost" would invert the comparison in every consumer.
+  business_verification_revoked: CLAIMED,
 };
 
 // The business fields every feed payload carries. Identical today to

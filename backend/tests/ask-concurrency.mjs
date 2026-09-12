@@ -26,7 +26,12 @@ async function login(key) {
 const asker = await login("asker");
 const r0 = await asker("/asks", { method: "POST", body: {
   category: "Service requirement", matchCategory: "Accounting & Tax",
-  matchLocation: "Petaling Jaya", title: "concurrency: 8 answer at once, cap is 6" } });
+  matchLocation: "Petaling Jaya", title: "concurrency: 8 answer at once, cap is 6",
+  // EXPLICIT, because the default is null (uncapped) as of Sep 2026. Without
+  // this the eight writers all succeed and the suite asserts a cap that this
+  // ask never had — it would fail while proving nothing about contention.
+  // The race this covers is still real for any ask whose asker sets a limit.
+  maxAnswers: 6 } });
 const askId = r0.data.ask.id;
 
 // Eight businesses fire simultaneously at a six-slot ask.

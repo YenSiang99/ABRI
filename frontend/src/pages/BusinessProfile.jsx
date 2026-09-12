@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams, useSearchParams} from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Radio, Clock } from "lucide-react";
 
 import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
+import { verificationLevelLabel } from "@/lib/trustLabels";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useFollows } from "@/context/FollowsContext";
@@ -27,9 +33,12 @@ function VouchCard({ vouch }) {
           {vouch.fromBusiness.name.charAt(0)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-ink dark:text-foreground">{vouch.fromBusiness.name}</div>
+          <div className="font-semibold text-ink dark:text-foreground">
+            {vouch.fromBusiness.name}
+          </div>
           <div className="text-xs text-grey-500 dark:text-muted-foreground">
-            {vouch.fromBusiness.category} · {new Date(vouch.createdAt).toLocaleDateString()}
+            {vouch.fromBusiness.category} ·{" "}
+            {new Date(vouch.createdAt).toLocaleDateString()}
           </div>
         </div>
       </div>
@@ -41,6 +50,83 @@ function VouchCard({ vouch }) {
           "{vouch.testimonial}"
         </blockquote>
       )}
+    </div>
+  );
+}
+
+// The verification record — what a registry said about this business, and when.
+//
+// THE ONE PANEL HERE THAT CAN SAY SOMETHING UNFLATTERING, and that is the
+// point of it. Every other surface on this page shows what is currently true:
+// the badge, the vouch count, the recommendations. A counterparty deciding
+// whether to trust this business with work needs the other half — that the
+// SSM verification they can see today was granted in April, or that one they
+// cannot see was lost in August. No other directory will print that.
+//
+// FACTS AND DATES, NO SCORE. Each row is an event on a day. There is no
+// aggregate and no rating: a dated fact is defensible, a number is an opinion
+// somebody will eventually dispute.
+//
+// Public to everyone including logged-out visitors, on every plan — see the
+// note on the server side in routes/businesses.js. Charging to find out that
+// a verification lapsed would invert the entire product.
+const TIMELINE_COPY = {
+  business_claimed: "Claimed by its owner",
+  business_verified: "SSM-verified",
+  business_verification_revoked: "SSM verification revoked",
+};
+
+function VerificationTimeline({ entries }) {
+  if (!entries || entries.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
+      <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
+        Verification record
+      </h2>
+      <p className="mt-1 text-sm text-grey-500 dark:text-muted-foreground">
+        What changed, and when. Including anything that was later withdrawn.
+      </p>
+      <ol className="mt-4 space-y-3">
+        {entries.map((entry) => {
+          const revoked = entry.type === "business_verification_revoked";
+          const lapsed = !entry.inForce;
+          return (
+            <li key={entry.id} className="flex gap-3 text-sm">
+              {/* Date first and in mono, because this panel is read as a
+                  record rather than prose — the eye should land on when. */}
+              <span className="w-24 shrink-0 font-mono text-xs text-grey-500 dark:text-muted-foreground">
+                {new Date(entry.at).toLocaleDateString()}
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={
+                    lapsed
+                      ? "text-grey-500 line-through dark:text-muted-foreground"
+                      : "text-ink dark:text-foreground"
+                  }
+                >
+                  {TIMELINE_COPY[entry.type] ?? entry.type}
+                </span>
+                {/* Struck through AND labelled. The strike alone reads as a
+                    style; the words are what a reader takes away, and this is
+                    the line the whole panel exists to show. */}
+                {lapsed && (
+                  <span className="ml-2 text-xs text-grey-500 dark:text-muted-foreground">
+                    no longer in force
+                  </span>
+                )}
+                {revoked && (
+                  <span className="ml-2 text-xs text-grey-500 dark:text-muted-foreground">
+                    dropped to{" "}
+                    {verificationLevelLabel[entry.level] ?? entry.level}
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -60,11 +146,16 @@ function RecommendationCard({ recommendation }) {
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-5 dark:border-border dark:bg-card">
       <div className="text-sm text-ink dark:text-foreground">
-        <span className="font-semibold">{answeredBy.name}</span> recommended them when{" "}
-        <span className="font-semibold">{ask.askedByBusiness.name}</span> asked for something.
+        <span className="font-semibold">{answeredBy.name}</span> recommended
+        them when{" "}
+        <span className="font-semibold">{ask.askedByBusiness.name}</span> asked
+        for something.
       </div>
       <div className="mt-1 text-xs text-grey-500 dark:text-muted-foreground">
-        {ask.title} · {recommendation.acceptedAt ? new Date(recommendation.acceptedAt).toLocaleDateString() : null}
+        {ask.title} ·{" "}
+        {recommendation.acceptedAt
+          ? new Date(recommendation.acceptedAt).toLocaleDateString()
+          : null}
       </div>
       <p className="mt-3 text-sm leading-relaxed text-grey-600 dark:text-muted-foreground">
         {recommendation.comment}
@@ -98,7 +189,9 @@ function BusinessProfile({ inApp = false }) {
   // default tab omits the param entirely.
   const [tabParams, setTabParams] = useSearchParams();
   const PROFILE_TABS = ["overview", "vouches", "recommendations", "card"];
-  const tab = PROFILE_TABS.includes(tabParams.get("tab")) ? tabParams.get("tab") : "overview";
+  const tab = PROFILE_TABS.includes(tabParams.get("tab"))
+    ? tabParams.get("tab")
+    : "overview";
   const setTab = (value) => {
     const next = new URLSearchParams(tabParams);
     if (value === "overview") next.delete("tab");
@@ -151,7 +244,9 @@ function BusinessProfile({ inApp = false }) {
   // it. See components/app/UpgradePrompt.jsx.
   const vouchGate = useUpgradeGate("giveVouch");
   const canVouch =
-    inApp && VOUCHABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) && isVouchable(business, actingBusiness);
+    inApp &&
+    VOUCHABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) &&
+    isVouchable(business, actingBusiness);
   // Governs both buttons below: you have to be in the app, looking at
   // somebody else, and that somebody has to be claimed. An unclaimed listing
   // has no owner to agree to a connection or to generate anything worth
@@ -206,7 +301,9 @@ function BusinessProfile({ inApp = false }) {
   async function handleFollowToggle() {
     setFollowBusy(true);
     const wasFollowing = isFollowing(business.id);
-    const result = wasFollowing ? await unfollow(business.id) : await follow(business);
+    const result = wasFollowing
+      ? await unfollow(business.id)
+      : await follow(business);
     setFollowBusy(false);
     if (!result.ok) {
       toast.error(result.error);
@@ -255,7 +352,8 @@ function BusinessProfile({ inApp = false }) {
   // on a free business the array is withheld but the count is not, and
   // conflating them is what would silently show "0 vouches" for a business
   // that has twelve.
-  const { services, vouchesReceived, ssm, vouchCount, testimonialsLocked } = business;
+  const { services, vouchesReceived, ssm, vouchCount, testimonialsLocked } =
+    business;
   const { contactLocked, contactLockedReason } = business;
   // Defaulted, because this profile is also rendered from the NFC tap page
   // and by the app-side route, and an older cached payload has neither key.
@@ -301,7 +399,11 @@ function BusinessProfile({ inApp = false }) {
                     being LOOKED AT, so the dialog marks their rung, never
                     the viewer's. */}
                 <ExplainBadge axis="verification" business={business}>
-                  <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
+                  <VerificationBadge
+                    verificationLevel={business.verificationLevel}
+                    size="inline"
+                    chip
+                  />
                 </ExplainBadge>
                 {canRelate &&
                   (connectState === "connected" ? (
@@ -313,16 +415,29 @@ function BusinessProfile({ inApp = false }) {
                     // the member on a request they can't take back. This is
                     // the withdraw affordance, and the only place one exists
                     // outside the Requests tab.
-                    <Button size="sm" variant="secondary" onClick={handleWithdraw} disabled={connecting}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleWithdraw}
+                      disabled={connecting}
+                    >
                       <Clock className="h-3.5 w-3.5" />
                       {connecting ? "Withdrawing…" : "Requested · Withdraw"}
                     </Button>
                   ) : connectState === "incoming" ? (
-                    <Button size="sm" onClick={handleConnect} disabled={connecting}>
+                    <Button
+                      size="sm"
+                      onClick={handleConnect}
+                      disabled={connecting}
+                    >
                       {connecting ? "Accepting…" : "Accept request"}
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={handleConnect} disabled={connecting}>
+                    <Button
+                      size="sm"
+                      onClick={handleConnect}
+                      disabled={connecting}
+                    >
                       {connecting ? "Sending…" : "Connect"}
                     </Button>
                   ))}
@@ -341,7 +456,11 @@ function BusinessProfile({ inApp = false }) {
                   </Button>
                 )}
                 {canVouch && (
-                  <Button size="sm" variant="outline" onClick={vouchGate.guard(() => setVouchOpen(true))}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={vouchGate.guard(() => setVouchOpen(true))}
+                  >
                     Vouch
                   </Button>
                 )}
@@ -363,7 +482,8 @@ function BusinessProfile({ inApp = false }) {
                     {recommendationCount}{" "}
                     {recommendationCount === 1 ? "member has" : "members have"}
                   </span>{" "}
-                  recommended this business. Claim your listing to see who, and why.
+                  recommended this business. Claim your listing to see who, and
+                  why.
                 </p>
               )}
               <Button
@@ -402,7 +522,9 @@ function BusinessProfile({ inApp = false }) {
               <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
                 Category
               </div>
-              <div className="mt-1 text-sm text-ink dark:text-foreground">{business.category}</div>
+              <div className="mt-1 text-sm text-ink dark:text-foreground">
+                {business.category}
+              </div>
             </div>
           </div>
         ) : (
@@ -424,8 +546,8 @@ function BusinessProfile({ inApp = false }) {
             </p>
             <p className="mt-1 text-[13px] text-grey-600 dark:text-muted-foreground">
               This business was recently claimed by its owner. We're manually
-              verifying it against SSM records — vouches and the NFC card
-              unlock once that's complete.
+              verifying it against SSM records — vouches and the NFC card unlock
+              once that's complete.
             </p>
           </div>
         )}
@@ -452,11 +574,14 @@ function BusinessProfile({ inApp = false }) {
 
           <TabsContent value="overview" className="mt-6 space-y-6">
             <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-              <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">About</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
+                About
+              </h2>
               <p className="mt-3 text-sm leading-relaxed text-grey-600 dark:text-muted-foreground">
                 {business.description}
               </p>
             </div>
+            <VerificationTimeline entries={business.verificationTimeline} />
             {/* No tier lock of its own here. On T0 this whole tab isn't
                 rendered (the unclaimed panel replaces it), and on T1 the
                 plan gate already covers it via reason "owner_plan". The
@@ -470,7 +595,9 @@ function BusinessProfile({ inApp = false }) {
             />
             {services.length > 0 && (
               <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-                <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">Services</h2>
+                <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
+                  Services
+                </h2>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {services.map((s) => (
                     <span
@@ -485,7 +612,10 @@ function BusinessProfile({ inApp = false }) {
             )}
           </TabsContent>
 
-          <TabsContent value="vouches" className="mt-6 grid gap-4 md:grid-cols-2">
+          <TabsContent
+            value="vouches"
+            className="mt-6 grid gap-4 md:grid-cols-2"
+          >
             {/* Tier lock wins when both apply: a T1 business can't have
                 published vouches at all, so "get verified" is the more
                 useful thing to say than "this is on a paid plan". */}
@@ -511,7 +641,9 @@ function BusinessProfile({ inApp = false }) {
             ) : vouchesReceived.length > 0 ? (
               vouchesReceived.map((v) => <VouchCard key={v.id} vouch={v} />)
             ) : (
-              <p className="text-sm text-grey-500 dark:text-muted-foreground">No vouches yet.</p>
+              <p className="text-sm text-grey-500 dark:text-muted-foreground">
+                No vouches yet.
+              </p>
             )}
           </TabsContent>
 
@@ -519,16 +651,22 @@ function BusinessProfile({ inApp = false }) {
               would punish the RECOMMENDER, whose work would vanish because of
               somebody else's billing — and it feeds neither vouchCount nor
               the vouch level, so a downgrade has nothing to take away. */}
-          <TabsContent value="recommendations" className="mt-6 grid gap-4 md:grid-cols-2">
+          <TabsContent
+            value="recommendations"
+            className="mt-6 grid gap-4 md:grid-cols-2"
+          >
             {recommendations.length > 0 ? (
-              recommendations.map((r) => <RecommendationCard key={r.id} recommendation={r} />)
+              recommendations.map((r) => (
+                <RecommendationCard key={r.id} recommendation={r} />
+              ))
             ) : (
               // Says the difference out loud, because this is the one place a
               // reader might otherwise conclude the two words mean the same.
               <p className="text-sm text-grey-500 md:col-span-2 dark:text-muted-foreground">
-                No recommendations yet. Recommendations come from members answering someone's ask —
-                they're not vouches. A vouch is a peer staking their own reputation on this
-                business; a recommendation is a peer pointing someone towards them.
+                No recommendations yet. Recommendations come from members
+                answering someone's ask — they're not vouches. A vouch is a peer
+                staking their own reputation on this business; a recommendation
+                is a peer pointing someone towards them.
               </p>
             )}
           </TabsContent>
@@ -548,8 +686,8 @@ function BusinessProfile({ inApp = false }) {
                   Verified via NFC
                 </h2>
                 <p className="mt-2 text-sm text-grey-600 dark:text-muted-foreground">
-                  This business carries an ABRI card. Verification status renders before contact
-                  details on every tap.
+                  This business carries an ABRI card. Verification status
+                  renders before contact details on every tap.
                 </p>
 
                 <div className="mt-6 max-w-md">
@@ -559,8 +697,12 @@ function BusinessProfile({ inApp = false }) {
                         <div className="text-[10px] font-medium uppercase tracking-widest opacity-60">
                           ABRI · Verified
                         </div>
-                        <div className="mt-6 text-xl font-semibold">{business.name}</div>
-                        <div className="text-xs opacity-70">{business.category}</div>
+                        <div className="mt-6 text-xl font-semibold">
+                          {business.name}
+                        </div>
+                        <div className="text-xs opacity-70">
+                          {business.category}
+                        </div>
                       </div>
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow text-sm font-bold text-yellow-ink dark:bg-accent dark:text-accent-foreground">
                         A
@@ -582,7 +724,12 @@ function BusinessProfile({ inApp = false }) {
 
       {canVouch && (
         <>
-          <VouchDialog open={vouchOpen} onOpenChange={setVouchOpen} targetBusiness={business} onSuccess={refetchBusiness} />
+          <VouchDialog
+            open={vouchOpen}
+            onOpenChange={setVouchOpen}
+            targetBusiness={business}
+            onSuccess={refetchBusiness}
+          />
           <UpgradePrompt gate={vouchGate} />
         </>
       )}

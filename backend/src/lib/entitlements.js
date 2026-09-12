@@ -151,8 +151,21 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   watchBusinesses: "pro",
 
   // The member's own log of what they checked and when. NOT a record of who
-  // checked THEM — see the BusinessCheck comment in schema.prisma.
+  // checked THEM — that is profileViewers below, which is a different model
+  // with a different owner. See the BusinessCheck comment in schema.prisma.
   checkHistory: "pro",
+
+  // The NAMES of the businesses that opened your profile. Gates the identities
+  // ONLY — every plan sees the count, and lib/profileView.js explains why
+  // gating that too would leave nothing worth upgrading for.
+  //
+  // The one gate in this registry that asks about the business being looked
+  // AT and is nonetheless read by that business about ITSELF, so it sits on
+  // neither side of the owner/viewer split the blocks above draw. It is a gate
+  // on your own inbound data, which is a third thing, and it is here rather
+  // than in the viewer-side block because nothing about the VIEWER's plan
+  // changes what this returns.
+  profileViewers: "pro",
 
 };
 

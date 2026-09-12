@@ -157,8 +157,21 @@ const ASK_DETAIL_INCLUDE = {
 // What must NOT happen instead is loosening these to substring or fuzzy
 // comparisons — that converts a closed list back into free text by the back
 // door and takes the silent-miss bug with it.
+// "service" SITS ABOVE "exact", and the ordering is the one judgement call in
+// this function. A business that does the exact thing being asked for, in the
+// next town, is a better answer than one in the same street that merely shares
+// a trade — for professional services the skill travels and the distance does
+// not matter much. If that stops being true for a category (anything with a
+// site visit), the fix is a per-category ordering, not a reshuffle here.
+//
+// An ask with no matchServices can never reach "service", so every ask written
+// before that column existed keeps exactly the two strengths it had.
 function matchStrengthFor(ask, business) {
   if (!business || ask.matchCategory !== business.category) return null;
+  const wanted = ask.matchServices ?? [];
+  if (wanted.length > 0 && (business.services ?? []).some((s) => wanted.includes(s))) {
+    return "service";
+  }
   return ask.matchLocation === business.location ? "exact" : "category";
 }
 
@@ -167,11 +180,24 @@ function matchStrengthFor(ask, business) {
 //
 // Callers that COUNT pass expiresAt themselves rather than sweeping — see
 // applyExpiryIfNeeded's comment for why a count must not write.
+// Ordered widest to narrowest: "category" is every ask in your trade, "exact"
+// narrows to your locality, "service" narrows to asks naming something you
+// actually do.
+//
+// `hasSome` is the only operator here that is not equality, and it is still an
+// exact one — it asks whether any element of matchServices appears in the
+// business's services array, element by element. That is what keeps the
+// closed-vocabulary guarantee intact: the join is still on whole canonical
+// strings, never on substrings, so lib/businessVocab.js's warning against
+// "loosening these to substring or fuzzy comparisons" is honoured.
 function matchingAsksWhere(business, { strength = "category" } = {}) {
   return {
     status: "open",
     matchCategory: business.category,
     ...(strength === "exact" ? { matchLocation: business.location } : {}),
+    ...(strength === "service"
+      ? { matchServices: { hasSome: business.services ?? [] } }
+      : {}),
   };
 }
 
@@ -229,15 +255,23 @@ function serializeAsk(ask, viewerBusiness) {
     category: ask.category,
     matchCategory: ask.matchCategory,
     matchLocation: ask.matchLocation,
+    matchServices: ask.matchServices ?? [],
     title: ask.title,
     detail: ask.detail,
     status: ask.status,
-    maxAnswers: ask.maxAnswers,
+    // NULL MEANS UNCAPPED, on both of these, and a client must check before
+    // doing arithmetic. `Math.max(0, null - 5)` is 0, which would render as
+    // "full" on an ask that accepts everybody — the single worst way to get
+    // this wrong, and the reason both are null rather than Infinity or a
+    // sentinel number.
+    maxAnswers: ask.maxAnswers ?? null,
     answerCount,
     // Derived, never a status. An ask that has filled its slots stops taking
     // answers but stays "open", because the asker still has a decision to
     // make — treating full as closed is the likeliest thing to get wrong here.
-    slotsLeft: Math.max(0, ask.maxAnswers - answerCount),
+    slotsLeft: ask.maxAnswers === null || ask.maxAnswers === undefined
+      ? null
+      : Math.max(0, ask.maxAnswers - answerCount),
     expiresAt: ask.expiresAt,
     createdAt: ask.createdAt,
     closedAt: ask.closedAt,

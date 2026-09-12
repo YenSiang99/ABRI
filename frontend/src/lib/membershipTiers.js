@@ -54,8 +54,20 @@ const membershipTierPriceNote = {
 // than a yes/no. Kept deliberately short — this is the table that has to be
 // readable at a glance on a phone, not the full build checklist.
 const MEMBERSHIP_TIER_FEATURES = [
-  { label: "Listed in the directory", free: true, plus: true, pro: true, enterprise: true },
-  { label: "SSM-verified badge", free: false, plus: true, pro: true, enterprise: true },
+  {
+    label: "Listed in the directory",
+    free: true,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "SSM-verified badge",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // ─── The check-a-business screen, Sep 2026 ───────────────────────────────
   //
   // These five were missing from this table for a while after they shipped,
@@ -68,32 +80,87 @@ const MEMBERSHIP_TIER_FEATURES = [
   // visitors — an invite that cannot be verified without joining is
   // self-defeating — and the feed is open to every member. Four ticks says
   // "not gated", which is a thing worth saying on a pricing page.
-  { label: "Check a business — by name, SSM number or website", free: true, plus: true, pro: true, enterprise: true },
-  { label: "Trust feed — vouches and verifications as they happen", free: true, plus: true, pro: true, enterprise: true },
+  {
+    label: "Check a business — by name, SSM number or website",
+    free: true,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "Trust feed — vouches and verifications as they happen",
+    free: true,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // ENFORCED, by `networkOverlap` — and the only row here that gates on the
   // VIEWER's plan rather than the subject's. It is allowed to because it
   // withholds nothing the seller published: it compares the reader's own
   // connections against the business's vouchers, and a stranger has no
   // connections to compare. See the viewer-side gates block in
   // backend/src/lib/entitlements.js before adding a second one.
-  { label: "See which of their vouchers you already know", free: false, plus: true, pro: true, enterprise: true },
+  {
+    label: "See which of their vouchers you already know",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // ENFORCED, by `watchBusinesses`. Pro's second delivered row.
-  { label: "Watch a business for verification changes", free: false, plus: false, pro: true, enterprise: true },
+  {
+    label: "Watch a business for verification changes",
+    free: false,
+    plus: false,
+    pro: true,
+    enterprise: true,
+  },
   // ENFORCED, by `checkHistory`.
-  { label: "Your record of who you checked, and when", free: false, plus: false, pro: true, enterprise: true },
+  {
+    label: "Your record of who you checked, and when",
+    free: false,
+    plus: false,
+    pro: true,
+    enterprise: true,
+  },
+  // ENFORCED, by `profileViewers` — and the only row in this table whose Free
+  // and Plus columns are a STRING rather than a dash, because they are not
+  // nothing. Every plan is told how many businesses opened its profile; what
+  // Pro buys is their names. A dash in those columns would be the table
+  // under-selling the product again, which is the failure the block above
+  // this one describes.
+  {
+    label: "Who viewed your profile",
+    free: "How many",
+    plus: "How many",
+    pro: "Who",
+    enterprise: "Who",
+  },
   // Free, and nothing anywhere gates it: PATCH /businesses/me asks only for
   // an approved claim. This row said `false` until Aug 2026, which made the
   // table the only thing in the product claiming otherwise. Editing your own
   // page is table stakes for being listed at all — what Plus buys is the
   // contact block on it being VISIBLE (see the row below), not writable.
-  { label: "Full editable profile", free: true, plus: true, pro: true, enterprise: true },
+  {
+    label: "Full editable profile",
+    free: true,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // GATED, in the UI only — see FEATURE_MIN_MEMBERSHIP_TIER below and its counterpart
   // in backend/src/lib/entitlements.js. /app/card is not SHUT to Free: it
   // shows them the card artwork with their own details on it, marked as a
   // preview, and withholds the printed card, the status panel and the tap
   // history. The dash in this column is right anyway — what Plus sells is
   // the physical card, and a Free member doesn't get one.
-  { label: "NFC card", free: false, plus: "1 card", pro: "1 card", enterprise: "Per person" },
+  {
+    label: "NFC card",
+    free: false,
+    plus: "1 card",
+    pro: "1 card",
+    enterprise: "Per person",
+  },
   // ENFORCED. These four values must match VOUCH_CAP_BY_PLAN in
   // backend/src/lib/vouchCap.js exactly — it's a rolling 30-day window,
   // not a calendar month.
@@ -101,14 +168,26 @@ const MEMBERSHIP_TIER_FEATURES = [
   // Free is a dash, not "0 / mo". Zero-of-a-quantity invites the reader to
   // treat it as a small allowance that might be topped up; a dash says the
   // feature starts at Plus, which is what the server enforces (`giveVouch`).
-  { label: "Vouches you can give", free: false, plus: "20 / mo", pro: "40 / mo", enterprise: "100 / mo" },
+  {
+    label: "Vouches you can give",
+    free: false,
+    plus: "20 / mo",
+    pro: "40 / mo",
+    enterprise: "100 / mo",
+  },
   // ENFORCED, by `acceptVouch` — and the row that describes the Free tier
   // most honestly, so it sits next to the giving row rather than further
   // down. A Free business still RECEIVES vouch requests in full: the
   // request lands, the notification fires, the card sits in their queue.
   // What it can't do is publish one. Net effect, and the thing to say out
   // loud rather than let a reader discover: a Free business has no vouches.
-  { label: "Accept vouches onto your profile", free: false, plus: true, pro: true, enterprise: true },
+  {
+    label: "Accept vouches onto your profile",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // ENFORCED, by FEATURE_MIN_MEMBERSHIP_TIER in backend/src/lib/entitlements.js —
   // GET /businesses/:id withholds the text itself, not just the UI.
   //
@@ -117,7 +196,13 @@ const MEMBERSHIP_TIER_FEATURES = [
   // the wire (it has no endpoint yet). Every other row is still a promise,
   // and the comment saying so is what keeps this table from quietly becoming
   // fiction — move a row up as it starts being enforced.
-  { label: "Testimonials shown on your page", free: false, plus: true, pro: true, enterprise: true },
+  {
+    label: "Testimonials shown on your page",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
   // ENFORCED. GET /businesses/:id withholds phone/whatsapp/email outright —
   // the server sends nothing, so there is no masked value on the page to
   // un-mask.
@@ -131,9 +216,27 @@ const MEMBERSHIP_TIER_FEATURES = [
   // is only "be logged in", which is anti-scraping, not billing.
   //
   // Rule: backend/src/lib/contactVisibility.js.
-  { label: "Your contact details visible to members", free: false, plus: true, pro: true, enterprise: true },
-  { label: "Profile view alerts + weekly summary", free: false, plus: true, pro: true, enterprise: true },
-  { label: "Search ranking", free: "Standard", plus: "Higher", pro: "Top", enterprise: "Top" },
+  {
+    label: "Your contact details visible to members",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "Profile view alerts + weekly summary",
+    free: false,
+    plus: true,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "Search ranking",
+    free: "Standard",
+    plus: "Higher",
+    pro: "Top",
+    enterprise: "Top",
+  },
   // ENFORCED — by VERIFICATION, not by plan, and the only row in this table
   // that says so. Posting an ask needs T2 (SSM-verified), which no plan can
   // buy (§6: "verification cannot be bought"); answering needs nothing at all.
@@ -144,23 +247,53 @@ const MEMBERSHIP_TIER_FEATURES = [
   // under Enterprise, which described an unbuilt white-label item. Four ticks
   // would have been worse than four strings: a tick reads as "included on
   // Free", which over-promises to a member who isn't verified yet.
-  { label: "Asks board — post and answer", free: "SSM-verified", plus: "SSM-verified", pro: "SSM-verified", enterprise: "SSM-verified" },
+  {
+    label: "Asks board — post and answer",
+    free: "SSM-verified",
+    plus: "SSM-verified",
+    pro: "SSM-verified",
+    enterprise: "SSM-verified",
+  },
   // ENFORCED, by `askAlerts` in backend/src/lib/entitlements.js — GET
   // /asks/alerts answers 402 below Pro. What Pro buys is being TOLD an ask
   // matches what you do, not the ability to act on one: the same asks are on
   // the board for everyone, one filter away. Push versus pull.
   //
   // Pro's first row in this table that isn't a promise.
-  { label: "Told when an ask matches you", free: false, plus: false, pro: true, enterprise: true },
+  {
+    label: "Told when an ask matches you",
+    free: false,
+    plus: false,
+    pro: true,
+    enterprise: true,
+  },
   // Nothing behind this yet — no route, no screen, no data. It used to read
   // "Referral tracker + introductions"; the introductions half was removed
   // in Aug 2026 (the screen was mock data end to end) and the referral
   // tracker has never been built, so this row is Pro's headline promise and
   // is entirely a promise. It's the first thing to make real, or the first
   // thing to replace, before Pro is sold to anyone.
-  { label: "Referral tracker", free: false, plus: false, pro: true, enterprise: true },
-  { label: "Business card scanner", free: false, plus: false, pro: true, enterprise: true },
-  { label: "Team accounts", free: false, plus: false, pro: false, enterprise: true },
+  {
+    label: "Referral tracker",
+    free: false,
+    plus: false,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "Business card scanner",
+    free: false,
+    plus: false,
+    pro: true,
+    enterprise: true,
+  },
+  {
+    label: "Team accounts",
+    free: false,
+    plus: false,
+    pro: false,
+    enterprise: true,
+  },
 ];
 
 // The features tier `t` adds over the tier below it, for the in-app upgrade
@@ -190,7 +323,10 @@ function membershipTierUpgrades(t) {
   const below = MEMBERSHIP_TIER_ORDER[i - 1];
   return MEMBERSHIP_TIER_FEATURES.filter(
     (row) => Boolean(row[t]) && (below === undefined || row[t] !== row[below]),
-  ).map((row) => ({ label: row.label, detail: row[t] === true ? null : row[t] }));
+  ).map((row) => ({
+    label: row.label,
+    detail: row[t] === true ? null : row[t],
+  }));
 }
 
 // Mirrors FEATURE_MIN_MEMBERSHIP_TIER in backend/src/lib/entitlements.js, which is
@@ -219,6 +355,12 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   networkOverlap: "plus",
   watchBusinesses: "pro",
   checkHistory: "pro",
+  // The NAMES of the businesses that opened your profile. Read to decide
+  // whether the viewers tab renders a list or a count with a price on it —
+  // NOT whether the tab renders at all. Every plan sees how many; only Pro
+  // sees who. A `false` here must never blank the panel, or a Free member
+  // loses the one number that would make them want it.
+  profileViewers: "pro",
   testimonials: "plus",
   // Like `testimonials` and unlike the two below it: the server strips the
   // data, so this copy only lets the UI explain a gate that is already

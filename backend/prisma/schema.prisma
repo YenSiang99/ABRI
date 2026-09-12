@@ -189,6 +189,27 @@ model Business {
   checksMade  BusinessCheck[] @relation("CheckBy")
   checksAbout BusinessCheck[] @relation("CheckTarget")
 
+  // ProfileView is the DELIBERATE EXCEPTION to the paragraph above, and the
+  // only relation here that is read from the target's side. See the model.
+  profileViewsMade     ProfileView[] @relation("ProfileViewer")
+  profileViewsReceived ProfileView[] @relation("ProfileViewTarget")
+
+  // Browse without being named. Off by default, and that default is the
+  // feature working at all: a network where most members start invisible has
+  // a viewers screen that says "someone" forever.
+  //
+  // NOT A PAID SETTING, and it must not become one. Selling privacy would
+  // make the cheapest members the most exposed, in a product whose entire
+  // pitch is trust.
+  //
+  // IT COSTS THE MEMBER THEIR OWN VIEWER LIST — routes/watches.js enforces
+  // that, not this column. Without the reciprocity this is one-way
+  // surveillance that anyone can switch on: see everyone who looked at you,
+  // be seen by none of them. The trade is the only reason the setting is
+  // defensible, so a change here that leaves /viewers readable while this is
+  // true reintroduces exactly what it was added to prevent.
+  privateBrowsing Boolean @default(false)
+
   // The first indexes this model has ever carried, added with the
   // check-a-business lookup (GET /businesses/lookup) that queries both.
   //
@@ -617,7 +638,95 @@ model BusinessCheck {
   @@index([checkedById, createdAt])
   // Dedupe: checking the same business twice in a day updates the existing
   // row rather than filling the log with one member's repeated typing.
+  //
+  // NOTE there is no [checkedId, ...] index and there should never be one.
+  // This table is queried by checker only. "Who checked me" lives in
+  // ProfileView, which is written on a different rule — an index here would
+  // be the first step toward answering it from the wrong table.
   @@index([checkedById, checkedId])
+}
+
+// Who opened whose profile — the inbound half of GET /businesses/:id.
+//
+// THIS MODEL IS READ FROM THE TARGET'S SIDE, which every other looking-at-you
+// relation in this schema refuses to allow. BusinessCheck says a route that
+// answered "who has been checking me?" would expose a counterparty's
+// diligence, and lib/businessCheck.js calls that the thing that turns a trust
+// directory into surveillance. That reasoning was not wrong and is not
+// retracted — the product owner weighed it against the feature and chose the
+// feature (Sep 2026). What follows is the shape that concedes the least.
+//
+// SEPARATE FROM BusinessCheck ON PURPOSE, though both are written by the same
+// request. They are different records with different owners:
+//
+//   BusinessCheck belongs to the VIEWER. It is their diligence log, it stores
+//     levelAtCheck because it is evidence of what they were told when they
+//     decided, and lib/businessCheck.js is explicit that it is collected only
+//     for members who can read it back — so a Free member's browsing is never
+//     banked against a future upgrade.
+//
+//   ProfileView belongs to the VIEWED. It has to be written for EVERY signed-in
+//     viewer regardless of their plan, or the count is not a count: gate the
+//     write on the viewer's tier and "12 businesses viewed you" would silently
+//     mean "12 Pro businesses viewed you", understating it by however many
+//     Free members looked.
+//
+// Merging them would force one of those two rules to give way. Keeping them
+// apart costs one extra row per profile open and keeps BusinessCheck's
+// promise literally true.
+//
+// ONE ROW PER PAIR, not per view. A viewer who opens the same profile daily is
+// one entry whose count and timestamp move, which is both what the screen
+// wants to show (a list of businesses, not a list of events) and what keeps
+// this table from growing without bound on the highest-traffic route in the
+// app.
+model ProfileView {
+  id String @id @default(cuid())
+
+  // The business whose profile was opened — the one who gets to read this row.
+  viewedId String
+  viewed   Business @relation("ProfileViewTarget", fields: [viewedId], references: [id])
+
+  // The business doing the looking. Always a claimed business: an anonymous
+  // visitor has no id to record and is counted nowhere, which is stated here
+  // because "nobody viewed you" and "only strangers viewed you" look identical
+  // on the screen and only this line distinguishes them.
+  viewerId String
+  viewer   Business @relation("ProfileViewer", fields: [viewerId], references: [id])
+
+  // Written from the viewer's Business.privateBrowsing AT THE TIME OF THE VIEW.
+  //
+  // THE ROW IS STILL WRITTEN AND STILL COUNTED. Skipping the write for a
+  // private viewer would understate every count in the product — the viewed
+  // business would be told "3 businesses viewed you" when the true answer was
+  // five, which is worse than telling them two of the five were anonymous.
+  // What this flag removes is the NAME, in listViewers; viewerSummary does not
+  // look at it.
+  //
+  // CARRIES THE MODE OF THE LATEST VIEW, because there is one row per pair and
+  // it is upserted. A member who browses publicly in March and privately in
+  // April is anonymous on that row from April onward — their earlier named
+  // visit is not preserved separately. That direction is the safe one: turning
+  // the setting on hides you going forward AND withdraws the name from a list
+  // you are still visiting. The reverse (private, then public) reveals you,
+  // which is what choosing to browse publicly means.
+  anonymous Boolean @default(false)
+
+  // Total opens by this viewer, all time. Distinct viewers is the row count;
+  // total views is the sum of this. The screen shows the first and the second
+  // is what makes "viewed you 4 times" possible without an event table.
+  viewCount Int @default(1)
+
+  // First and most recent open. lastViewedAt is what every read orders and
+  // windows on — firstViewedAt exists so "they have been watching you since
+  // March" stays answerable after the count has been rolled up.
+  firstViewedAt DateTime @default(now())
+  lastViewedAt  DateTime @default(now())
+
+  // One row per (viewed, viewer) pair — the upsert target.
+  @@unique([viewedId, viewerId])
+  // The only read this model has: my viewers, newest first, windowed.
+  @@index([viewedId, lastViewedAt])
 }
 
 model NetworkEvent {
@@ -914,6 +1023,21 @@ model Ask {
   matchCategory String
   matchLocation String
 
+  // The THIRD routing key, and the one §7 above predicted: "they arrive as
+  // their own String[] columns beside these two and a widened matchTierFor —
+  // no migration of anything already written here." This is that column, and
+  // that promise held: every existing ask has [] and behaves exactly as it did.
+  //
+  // CANONICAL SERVICES ONLY, validated on write against lib/serviceVocab.js.
+  // A custom service a business typed is deliberately unmatchable — see that
+  // file — so letting one in here would create an ask nothing can ever match,
+  // which is the silent miss this whole mechanism exists to remove.
+  //
+  // EMPTY MEANS "ANYONE IN THIS TRADE", not "nobody". An asker who does not
+  // know which service they need should not have to guess one, and the board
+  // still routes them by category and location exactly as before.
+  matchServices String[] @default([])
+
   // One line, shown everywhere. `detail` is the body and is optional: an ask
   // reading "Looking for a corporate secretary in KL" is already complete,
   // and requiring a paragraph is how a board fills up with padding.
@@ -937,11 +1061,20 @@ model Ask {
   // migration, and the client reads the cap off the ask instead of keeping a
   // constant that can drift from the server's.
   //
-  // 6 because at current density a category holds five or six businesses, so
-  // the cap binds on VOLUME and never on eligibility — everyone in your line
-  // of work can answer, exactly once — and six answers still fit on one
-  // screen for the asker to compare without pagination.
-  maxAnswers Int @default(6)
+  // NULL MEANS NO CAP, and null is now the default.
+  //
+  // It was 6, reasoned as "at current density a category holds five or six
+  // businesses, so the cap binds on VOLUME and never on eligibility". That
+  // reasoning was self-defeating in both directions: while it never binds it
+  // does nothing, and the moment it does bind it locks out the SEVENTH
+  // business to answer — which selects on speed, not on fit. A board that
+  // rewards refreshing fastest is the marketplace §6 rules out.
+  //
+  // Kept as a nullable column rather than deleted, because the clutter problem
+  // it was aimed at is real: an asker does have to read every answer. The fix
+  // is that the limit is now the ASKER'S to set, on an ask where they want
+  // one, instead of a global default applied to askers who never asked for it.
+  maxAnswers Int?
 
   // The deadline, stored rather than derived from createdAt + a constant.
   // Three reasons: the lazy check is a comparison rather than arithmetic;

@@ -7,6 +7,7 @@ import { createActivityEvent } from "../lib/activityEvents.js";
 import { createNetworkEvent } from "../lib/networkEvents.js";
 import { applyExpiryIfNeeded, ASK_EXPIRY_DAYS } from "../lib/askExpiry.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
+import { canonicalService } from "../lib/serviceVocab.js";
 import { can } from "../lib/entitlements.js";
 import {
   ASK_CATEGORY_SET,
@@ -142,7 +143,9 @@ router.get(
           { status: "under_review", askedByBusinessId: own.id },
         ],
         ...(category ? { category } : {}),
-        ...(matchStrength === "exact" || matchStrength === "category"
+        ...(matchStrength === "service" ||
+        matchStrength === "exact" ||
+        matchStrength === "category"
           ? matchingAsksWhere(own, { strength: matchStrength })
           : {}),
       },
@@ -271,11 +274,35 @@ router.post(
       fail(403, "Posting an ask needs SSM verification. Your listing isn't verified yet.");
     }
 
-    const { category, matchCategory, matchLocation, title, detail } = req.body ?? {};
+    const { category, matchCategory, matchLocation, matchServices, maxAnswers, title, detail } =
+      req.body ?? {};
 
     if (!ASK_CATEGORY_SET.has(category)) fail(400, "Pick what kind of need this is.");
     if (!isValidCategory(matchCategory)) fail(400, "Pick who could help from the list.");
     if (!isValidLocation(matchLocation)) fail(400, "Pick a location from the list.");
+
+    // Optional, and validated against the catalogue rather than accepted as
+    // typed. An ask naming a service no business can hold is an ask nothing
+    // will ever match — the silent miss lib/serviceVocab.js exists to remove —
+    // so a bad value is refused loudly here instead of stored quietly.
+    const services = Array.isArray(matchServices) ? matchServices : [];
+    const canonicalServices = [];
+    for (const raw of services) {
+      const hit = canonicalService(raw);
+      if (!hit) fail(400, `"${raw}" isn't a service anyone can be matched on.`);
+      if (!canonicalServices.includes(hit)) canonicalServices.push(hit);
+    }
+
+    // The asker's own clutter limit, and null unless they set one. Rejected
+    // rather than clamped when it is nonsense: a cap of 0 accepts nothing and
+    // is far more likely a client bug than an intention.
+    let cap = null;
+    if (maxAnswers !== undefined && maxAnswers !== null) {
+      if (!Number.isInteger(maxAnswers) || maxAnswers < 1) {
+        fail(400, "An answer limit must be a whole number of 1 or more.");
+      }
+      cap = maxAnswers;
+    }
 
     const cleanTitle = title?.trim();
     if (!cleanTitle) fail(400, "Say what you're looking for.");
@@ -289,6 +316,8 @@ router.post(
         category,
         matchCategory,
         matchLocation,
+        matchServices: canonicalServices,
+        maxAnswers: cap,
         title: cleanTitle,
         detail: cleanDetail,
         expiresAt: new Date(Date.now() + ASK_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
@@ -412,11 +441,19 @@ router.post(
     }
 
     // Fast path: refuse before writing anything when the ask is already full.
-    const usedBefore = await prisma.askAnswer.count({
-      where: { askId: ask.id, status: { in: ANSWER_CAP_STATUSES } },
-    });
-    if (usedBefore >= ask.maxAnswers) {
-      fail(409, `This ask already has ${ask.maxAnswers} answers.`);
+    //
+    // SKIPPED ENTIRELY WHEN maxAnswers IS NULL, which is now the default — see
+    // the column comment. Guarding on null rather than treating it as 0 or
+    // Infinity keeps the comparison honest: `usedBefore >= null` is false for
+    // every count, which would look like it works and then silently let a cap
+    // of 0 through as unlimited.
+    if (ask.maxAnswers !== null && ask.maxAnswers !== undefined) {
+      const usedBefore = await prisma.askAnswer.count({
+        where: { askId: ask.id, status: { in: ANSWER_CAP_STATUSES } },
+      });
+      if (usedBefore >= ask.maxAnswers) {
+        fail(409, `This ask already has ${ask.maxAnswers} answers.`);
+      }
     }
 
     const answer = await prisma.askAnswer.upsert({
@@ -443,13 +480,19 @@ router.post(
     // SAME ranking and exactly the overshooting ones back out — ordering by
     // createdAt alone would tie on identical timestamps and let two writers
     // both believe they were inside the cap.
-    const claimed = await prisma.askAnswer.findMany({
-      where: { askId: ask.id, status: { in: ANSWER_CAP_STATUSES } },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      select: { id: true },
-    });
+    // Also skipped when uncapped: with no cap there is no race to resolve, and
+    // running this would be a findMany over every answer on the ask for each
+    // new one — the cost this guard was always paying for a limit that is now
+    // the exception rather than the rule.
+    const claimed = ask.maxAnswers === null || ask.maxAnswers === undefined
+      ? []
+      : await prisma.askAnswer.findMany({
+          where: { askId: ask.id, status: { in: ANSWER_CAP_STATUSES } },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: { id: true },
+        });
     const rank = claimed.findIndex((a) => a.id === answer.id);
-    if (rank >= ask.maxAnswers) {
+    if (claimed.length > 0 && rank >= ask.maxAnswers) {
       // We overshot. Undo precisely what we did: a row we created is deleted,
       // a withdrawn row we revived goes back to withdrawn rather than being
       // destroyed, because it is somebody's earlier answer and the @@unique

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Radio, MapPin, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { updateMyBusiness } from "@/lib/api/businesses";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import { membershipTierAllows } from "@/lib/membershipTiers";
 import { toast } from "@/lib/toast";
+import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 import { CLAIMED } from "@/lib/verificationLevels";
 
 function Stat({ label, value }) {
@@ -36,14 +37,236 @@ function Stat({ label, value }) {
 
 function formatMemberSince(iso) {
   if (!iso) return "";
-  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(iso));
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
 }
 
 // Every field this dialog edits, and the empty-string default each one resets
 // to. All six contact columns are nullable, so "" is what an unset field looks
 // like in an input — and "" is also what the server reads as "clear it", which
 // makes the round trip symmetrical.
-const FIELDS = ["description", "phone", "whatsapp", "email", "website", "address", "openingHours"];
+const FIELDS = [
+  "description",
+  "phone",
+  "whatsapp",
+  "email",
+  "website",
+  "address",
+  "openingHours",
+];
+
+// The services picker — the half of this page the Asks board depends on.
+//
+// WHY THIS IS NOT A TEXT INPUT ANY MORE. It was one comma-separated field, and
+// that made every service a unique string: "SSM filings", "SSM filing" and
+// "ssm  filings" are three values no query can join. Category and location were
+// closed for exactly this reason (see lib/businessVocab.js) because the Asks
+// board routes on them by equality; services were left behind, which is why the
+// board can only match on category today. Picking from a list is what turns
+// this field into something an ask can be routed by.
+//
+// CUSTOM SERVICES SURVIVE, deliberately — see backend/src/lib/serviceVocab.js.
+// A closed list would be a claim that we can name every professional service in
+// the Klang Valley. What the split buys is honesty about which ones match: the
+// catalogue ones do, a typed one is shown and searched but routed by nothing,
+// and the UI says so rather than letting an owner think they are covered.
+// The owner's view of a recommendation, deliberately shaped like
+// RecommendationCard in BusinessProfile.jsx and NOT like VouchListItem.
+//
+// Same reasoning as there: a vouch is two-party and unconditional, a
+// recommendation is three-party and answers a specific question. If the two
+// rendered alike on this page the weaker signal would borrow the stronger
+// one's credibility — and this is the page where an owner forms their idea of
+// what their profile is worth, so it is the worst place to blur them.
+function OwnRecommendationCard({ recommendation }) {
+  const { answeredBy, ask } = recommendation;
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="text-sm text-foreground">
+        <span className="font-semibold">{answeredBy.name}</span> recommended you
+        when <span className="font-semibold">{ask.askedByBusiness.name}</span>{" "}
+        asked for something.
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {ask.title}
+        {recommendation.acceptedAt
+          ? ` · ${new Date(recommendation.acceptedAt).toLocaleDateString()}`
+          : ""}
+      </div>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        {recommendation.comment}
+      </p>
+    </div>
+  );
+}
+
+function ServicePicker({ category, selected, onChange }) {
+  const [catalogue, setCatalogue] = useState(null);
+  const [custom, setCustom] = useState("");
+  const [showOthers, setShowOthers] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    fetchServiceCatalogue(category)
+      .then((data) => live && setCatalogue(data))
+      .catch(() => live && setCatalogue({ services: [], others: [] }));
+    return () => {
+      live = false;
+    };
+  }, [category]);
+
+  const canonical = new Set([
+    ...(catalogue?.services ?? []),
+    ...(catalogue?.others ?? []).flatMap((o) => o.services),
+  ]);
+  // Anything selected that the catalogue does not know about. Listed
+  // separately so it is visible that it is different, not hidden among the
+  // chips that do match.
+  const customSelected = selected.filter((s) => !canonical.has(s));
+
+  function toggle(service) {
+    onChange(
+      selected.includes(service)
+        ? selected.filter((s) => s !== service)
+        : [...selected, service],
+    );
+  }
+
+  function addCustom() {
+    const value = custom.trim();
+    if (!value) return;
+    // Case-insensitive, because the server canonicalises on write and a member
+    // who types a catalogue service in lower case should see the chip they
+    // already have light up rather than get a second one.
+    const existing = [...canonical, ...selected].find(
+      (s) => s.toLowerCase() === value.toLowerCase(),
+    );
+    if (existing) {
+      if (!selected.includes(existing)) onChange([...selected, existing]);
+    } else {
+      onChange([...selected, value]);
+    }
+    setCustom("");
+  }
+
+  function Chip({ service }) {
+    const on = selected.includes(service);
+    return (
+      <button
+        type="button"
+        onClick={() => toggle(service)}
+        aria-pressed={on}
+        className={
+          "rounded-full border px-3 py-1.5 text-[13px] transition-colors " +
+          (on
+            ? "border-foreground bg-foreground text-background"
+            : "border-border text-muted-foreground hover:text-foreground")
+        }
+      >
+        {service}
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+        Services
+      </label>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Pick what you actually do. These are what the asks board uses to route
+        work to you.
+      </p>
+
+      {catalogue === null ? (
+        <p className="mt-3 text-sm text-muted-foreground">Loading services…</p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {catalogue.services.map((s) => (
+              <Chip key={s} service={s} />
+            ))}
+          </div>
+
+          {/* Behind a toggle, not hidden: an accounting firm that genuinely
+              does payroll-software integration should be able to say so, but
+              showing forty chips from four categories by default would bury
+              the twelve that fit. */}
+          {catalogue.others?.length > 0 && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowOthers((v) => !v)}
+                className="text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              >
+                {showOthers ? "Hide" : "Show"} services from other categories
+              </button>
+              {showOthers &&
+                catalogue.others.map((group) => (
+                  <div key={group.category} className="mt-3">
+                    <div className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                      {group.category}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {group.services.map((s) => (
+                        <Chip key={s} service={s} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {customSelected.length > 0 && (
+            <div className="mt-4">
+              <div className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                Your own
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {customSelected.map((s) => (
+                  <Chip key={s} service={s} />
+                ))}
+              </div>
+              {/* Said plainly rather than left to be discovered. An owner who
+                  thinks a typed service routes work to them is worse off than
+                  one who knows it does not. */}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Shown on your profile, but asks aren&rsquo;t routed by these —
+                pick from the list above where one fits.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex gap-2">
+            <Input
+              placeholder="Add your own service"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  // The dialog's save button is the form's default action;
+                  // Enter here means "add this chip", never "submit".
+                  e.preventDefault();
+                  addCustom();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addCustom}
+              disabled={!custom.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function EditProfileDialog({ business, onSaved }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +276,9 @@ function EditProfileDialog({ business, onSaved }) {
 
   function seed() {
     const next = Object.fromEntries(FIELDS.map((f) => [f, business[f] ?? ""]));
-    next.services = business.services.join(", ");
+    // An ARRAY now, not a joined string — the picker below owns the list and
+    // the comma was only ever a way to fake multi-select in a text input.
+    next.services = business.services ?? [];
     return next;
   }
 
@@ -85,10 +310,7 @@ function EditProfileDialog({ business, onSaved }) {
     try {
       await updateMyBusiness({
         ...Object.fromEntries(FIELDS.map((f) => [f, form[f] ?? ""])),
-        services: (form.services ?? "")
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean),
+        services: form.services ?? [],
       });
       await onSaved();
       toast.success("Profile updated");
@@ -112,12 +334,16 @@ function EditProfileDialog({ business, onSaved }) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
-          <DialogDescription>This is what other members see on your public profile.</DialogDescription>
+          <DialogDescription>
+            This is what other members see on your public profile.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">About</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              About
+            </label>
             <Textarea
               className="mt-2"
               rows={4}
@@ -125,31 +351,31 @@ function EditProfileDialog({ business, onSaved }) {
               onChange={(e) => set("description", e.target.value)}
             />
           </div>
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Services (comma-separated)
-            </label>
-            <Input
-              className="mt-2"
-              value={form.services ?? ""}
-              onChange={(e) => set("services", e.target.value)}
-            />
-          </div>
+          <ServicePicker
+            category={business.category}
+            selected={form.services ?? []}
+            onChange={(next) => set("services", next)}
+          />
 
           <div className="border-t border-border pt-4">
-            <div className="text-sm font-semibold text-foreground">Contact details</div>
+            <div className="text-sm font-semibold text-foreground">
+              Contact details
+            </div>
             {/* The honest statement of the gate, next to the inputs it
                 governs — not only in the pricing table. An owner filling
                 these in deserves to know who will actually see them. */}
             <p className="mt-1 text-xs text-muted-foreground">
-              Phone, WhatsApp and email are shown to logged-in members, on Plus and above.
-              Website, address and opening hours are public on every tier.
+              Phone, WhatsApp and email are shown to logged-in members, on Plus
+              and above. Website, address and opening hours are public on every
+              tier.
             </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Phone</label>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Phone
+              </label>
               <Input
                 className="mt-2"
                 placeholder="03-7955 1234"
@@ -158,7 +384,9 @@ function EditProfileDialog({ business, onSaved }) {
               />
             </div>
             <div>
-              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">WhatsApp</label>
+              <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                WhatsApp
+              </label>
               <Input
                 className="mt-2"
                 placeholder="012-345 6789"
@@ -179,7 +407,9 @@ function EditProfileDialog({ business, onSaved }) {
             />
           </div>
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Website</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Website
+            </label>
             <Input
               className="mt-2"
               placeholder="yourcompany.my"
@@ -188,7 +418,9 @@ function EditProfileDialog({ business, onSaved }) {
             />
           </div>
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Address</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Address
+            </label>
             <Input
               className="mt-2"
               value={form.address ?? ""}
@@ -212,7 +444,11 @@ function EditProfileDialog({ business, onSaved }) {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
+          <Button
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={saving}
+          >
             Cancel
           </Button>
           <Button onClick={save} disabled={saving}>
@@ -230,13 +466,20 @@ function Profile() {
   // The owner always sees their own testimonials here (/auth/me is
   // ungated) — this is only about what VISITORS get on the public profile.
   const testimonialsHidden =
-    business.vouchCount > 0 && !membershipTierAllows(business.membershipTier, "testimonials");
+    business.vouchCount > 0 &&
+    !membershipTierAllows(business.membershipTier, "testimonials");
   // Same shape as the line above, and the same reason: /auth/me is ungated, so
   // the owner always sees their own contact details here. These two flags are
   // only about what VISITORS get on the public profile.
-  const hasAnyContact = Boolean(business.phone || business.whatsapp || business.email);
-  const contactHidden = hasAnyContact && !membershipTierAllows(business.membershipTier, "contactDetails");
-  const contactEmpty = !hasAnyContact && membershipTierAllows(business.membershipTier, "contactDetails");
+  const hasAnyContact = Boolean(
+    business.phone || business.whatsapp || business.email,
+  );
+  const contactHidden =
+    hasAnyContact &&
+    !membershipTierAllows(business.membershipTier, "contactDetails");
+  const contactEmpty =
+    !hasAnyContact &&
+    membershipTierAllows(business.membershipTier, "contactDetails");
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -260,15 +503,24 @@ function Profile() {
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4" /> {business.location}
                 </span>
-                {account?.createdAt && <span>Member since {formatMemberSince(account.createdAt)}</span>}
+                {account?.createdAt && (
+                  <span>
+                    Member since {formatMemberSince(account.createdAt)}
+                  </span>
+                )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {/* Linked, same as the Dashboard row and for the same reason.
                     Wrapped here rather than inside the badge components — they
                     also render on other businesses' profiles, where this link
                     would be wrong. */}
-                <Link to="/app/verify" aria-label="What the verification level means">
-                  <AppVerificationBadge verificationLevel={business.verificationLevel} />
+                <Link
+                  to="/app/verify"
+                  aria-label="What the verification level means"
+                >
+                  <AppVerificationBadge
+                    verificationLevel={business.verificationLevel}
+                  />
                 </Link>
                 <Link to="/app/vouches" aria-label="What the vouch level means">
                   <VouchBadge vouchLevel={business.vouchLevel} />
@@ -284,18 +536,30 @@ function Profile() {
 
         <div className="mt-6 grid gap-4 border-t border-border pt-6 sm:grid-cols-3">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">SSM Record</div>
-            <div className="mt-1 font-mono text-sm text-foreground">Reg. {business.ssm}</div>
-          </div>
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Vouches Received</div>
-            <div className="mt-1 text-sm text-foreground">
-              {locked ? "Unlocks after SSM verification" : `${business.vouchCount} peers`}
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              SSM Record
+            </div>
+            <div className="mt-1 font-mono text-sm text-foreground">
+              Reg. {business.ssm}
             </div>
           </div>
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Category</div>
-            <div className="mt-1 text-sm text-foreground">{business.category}</div>
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Vouches Received
+            </div>
+            <div className="mt-1 text-sm text-foreground">
+              {locked
+                ? "Unlocks after SSM verification"
+                : `${business.vouchCount} peers`}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Category
+            </div>
+            <div className="mt-1 text-sm text-foreground">
+              {business.category}
+            </div>
           </div>
         </div>
       </div>
@@ -303,14 +567,29 @@ function Profile() {
       <Tabs defaultValue="overview" className="mt-8">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="vouches">Vouches ({locked ? 0 : business.vouchCount})</TabsTrigger>
+          <TabsTrigger value="vouches">
+            Vouches ({locked ? 0 : business.vouchCount})
+          </TabsTrigger>
+          {/* Mirrors the public profile's tab order for the reason given in
+              BusinessProfile.jsx: always AFTER Vouches, never first, because a
+              recommendation is the lighter of the two signals and the order is
+              where that has to be visible. This page was missing the tab
+              entirely, so an owner could not see the half of their own profile
+              that visitors could. */}
+          <TabsTrigger value="recommendations">
+            Recommendations ({locked ? 0 : (business.recommendationCount ?? 0)})
+          </TabsTrigger>
           <TabsTrigger value="card">NFC Card</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           <div className="rounded-2xl border border-border bg-card p-6">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">About</h2>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{business.description}</p>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              About
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              {business.description}
+            </p>
           </div>
           {/* contactLocked false: this is the owner's own view, which is
               never gated. The upsell below is what tells them the public
@@ -332,16 +611,22 @@ function Profile() {
               so — a visitor would just see a profile with no phone number. */}
           {contactEmpty && (
             <p className="text-sm text-muted-foreground">
-              Your tier shows your contact details to members — but you haven't added any yet. Use
-              Edit profile to add a phone number, WhatsApp or email.
+              Your tier shows your contact details to members — but you haven't
+              added any yet. Use Edit profile to add a phone number, WhatsApp or
+              email.
             </p>
           )}
 
           <div className="rounded-2xl border border-border bg-card p-6">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">Services</h2>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              Services
+            </h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {business.services.map((s) => (
-                <span key={s} className="rounded-full border border-border bg-secondary px-3 py-1 text-sm text-secondary-foreground">
+                <span
+                  key={s}
+                  className="rounded-full border border-border bg-secondary px-3 py-1 text-sm text-secondary-foreground"
+                >
                   {s}
                 </span>
               ))}
@@ -380,10 +665,45 @@ function Profile() {
             // onChanged was missing here, so "Vouch back" from this page
             // submitted fine but left the UI showing pre-submit state.
             business.vouches.map((v) => (
-              <VouchListItem key={v.id} vouch={v} mode="received" onChanged={refreshAccount} />
+              <VouchListItem
+                key={v.id}
+                vouch={v}
+                mode="received"
+                onChanged={refreshAccount}
+              />
             ))
           ) : (
-            <p className="text-sm text-muted-foreground md:col-span-2">No vouches yet.</p>
+            <p className="text-sm text-muted-foreground md:col-span-2">
+              No vouches yet.
+            </p>
+          )}
+        </TabsContent>
+
+        <TabsContent
+          value="recommendations"
+          className="mt-6 grid gap-4 md:grid-cols-2"
+        >
+          {locked ? (
+            <div className="md:col-span-2">
+              <LockedFeature
+                title="Recommendations locked"
+                description="Recommendations will appear here once your SSM verification is complete."
+              />
+            </div>
+          ) : (business.recommendations ?? []).length > 0 ? (
+            (business.recommendations ?? []).map((r) => (
+              <OwnRecommendationCard key={r.id} recommendation={r} />
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground md:col-span-2">
+              {/* Says WHY it is empty, not just that it is. An owner whose
+                  own accepted answers are self-nominations would otherwise
+                  read this as a bug — which is exactly how it was reported.
+                  See the self-nomination note in routes/businesses.js. */}
+              No recommendations yet. These come from another member naming you
+              in an answer to someone&rsquo;s ask — putting yourself forward and
+              being accepted is not one, and never appears here.
+            </p>
           )}
         </TabsContent>
 
@@ -412,8 +732,12 @@ function Profile() {
                       <div className="text-[10px] font-medium uppercase tracking-widest opacity-60">
                         ABRI · Verified
                       </div>
-                      <div className="mt-6 text-xl font-semibold">{business.name}</div>
-                      <div className="text-xs opacity-70">{business.category}</div>
+                      <div className="mt-6 text-xl font-semibold">
+                        {business.name}
+                      </div>
+                      <div className="text-xs opacity-70">
+                        {business.category}
+                      </div>
                     </div>
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
                       A
@@ -429,7 +753,10 @@ function Profile() {
                   <Stat label="Card taps this month" value="23" />
                   <Stat label="Leads captured" value="8" />
                   <Stat label="Status" value="Active · Founding batch" />
-                  <Button variant="outline" onClick={() => toast("Replacement request sent")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => toast("Replacement request sent")}
+                  >
                     Request replacement (RM50)
                   </Button>
                 </div>

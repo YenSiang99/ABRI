@@ -37,9 +37,16 @@ const answerers = {};
 for (const k of ["a2","a3","a4","a5","a6","a7"]) answerers[k] = await login(k);
 
 console.log("\n1. T2 posts an ask");
+// maxAnswers IS EXPLICIT NOW, and that is the point of the change it tracks.
+// It used to default to 6 for every ask, so step 4 below tested a cap nobody
+// had asked for. The default is null (uncapped) — a first-come lockout selects
+// on speed rather than fit, which is the wrong axis for a board that routes
+// work — so an ask that wants a limit states one, and this suite still covers
+// the capped path because this ask does.
 let r = await asker("/asks", { method: "POST", body: {
   category: "Service requirement", matchCategory: "Accounting & Tax",
   matchLocation: "Petaling Jaya", title: "Need an accountant for SSM annual returns",
+  maxAnswers: 6,
 }});
 assert.equal(r.status, 201, JSON.stringify(r.data));
 const askId = r.data.ask.id;
@@ -58,7 +65,7 @@ r = await t1(`/asks/${askId}/answers`, { method: "POST",
 assert.equal(r.status, 409, `expected 409, got ${r.status}`);
 ok(`one answer per business (409: "${r.data.error}")`);
 
-console.log("\n4. Fill the cap, then a seventh is refused");
+console.log("\n4. Fill the asker's own cap of 6, then a seventh is refused");
 for (const k of ["a2","a3","a4","a5"]) {
   r = await answerers[k](`/asks/${askId}/answers`, { method: "POST",
     body: { recommendedBusinessId: `${P}target`, comment: `Recommending from ${k}.` } });
