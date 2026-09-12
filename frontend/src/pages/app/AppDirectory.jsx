@@ -61,8 +61,13 @@ function AppDirectory() {
   // finished typing.
   const load = useCallback(
     async (page) => {
-      const filter = verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
-      const data = await fetchBusinessPage({ search: query.trim(), verificationLevel: filter, page });
+      const filter =
+        verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
+      const data = await fetchBusinessPage({
+        search: query.trim(),
+        verificationLevel: filter,
+        page,
+      });
       // Your own business is never a search result — you cannot connect to,
       // follow or vouch for yourself, so every action on the card would be
       // dead. Filtered here rather than server-side because the same route
@@ -109,7 +114,9 @@ function AppDirectory() {
     if (wasIncoming || result.connection?.status === "accepted") {
       toast.success(`You're connected with ${target.name}`);
     } else {
-      toast.success(`Request sent to ${target.name} — you'll see it under Requests`);
+      toast.success(
+        `Request sent to ${target.name} — you'll see it under Requests`,
+      );
     }
   }
 
@@ -123,8 +130,8 @@ function AppDirectory() {
           Directory
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-          Search by name or category to browse — or paste an SSM registration number or a website
-          to check one specific business.
+          Search by name or category to browse — or paste an SSM registration
+          number or a website to check one specific business.
         </p>
       </div>
 
@@ -159,7 +166,8 @@ function AppDirectory() {
 
       {status === "ready" && (
         <div className="mt-4 text-sm text-muted-foreground">
-          {businesses.length} {businesses.length === 1 ? "business" : "businesses"}
+          {businesses.length}{" "}
+          {businesses.length === 1 ? "business" : "businesses"}
         </div>
       )}
 
@@ -169,9 +177,14 @@ function AppDirectory() {
         </div>
       ) : businesses.length > 0 ? (
         <>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* auto-rows-fr makes every ROW the same height, not just every card
+              within a row. Grid sizes rows independently by default, so a row
+              whose names all fit on one line came out shorter than its
+              neighbours and the grid still read as uneven even once the cards
+              in each row matched. */}
+          <div className="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((b) => (
-              <div key={b.id}>
+              <div key={b.id} className="relative">
                 {/* Only when the member actually typed something, and only
                     above the card it explains. On an unfiltered browse every
                     row would carry "matched on name", which is noise. */}
@@ -188,16 +201,30 @@ function AppDirectory() {
                   connectionState={connectionStateWith(b.id).state}
                   connecting={connectingId === b.id}
                   onConnect={handleConnect}
+                  reserveTopRight
                 />
                 {/* Plus, and silent when there is no overlap. */}
-                <NetworkOverlap vouchers={b.vouchersInYourNetwork} basePath="/app/business" />
-                {/* Pro. Outside the card because BusinessCard is a <Link> —
-                    a button nested in it would navigate as well as fire. */}
-                <div className="mt-2">
+                <NetworkOverlap
+                  vouchers={b.vouchersInYourNetwork}
+                  basePath="/app/business"
+                />
+                {/* Pro. STILL A SIBLING OF THE CARD, NOT A CHILD — BusinessCard
+                    is a <Link>, and a button inside an anchor both navigates
+                    and fires. It used to sit in its own row below the card,
+                    which read as a caption rather than a control and put a
+                    Pro action further from the card than the card's own
+                    buttons. Absolute positioning gets it into the corner
+                    while keeping it out of the anchor: the DOM is unchanged,
+                    only the paint order is.
+
+                    The card reserves the space with `reserveTopRight`, so a
+                    long business name truncates before it reaches this. */}
+                <div className="absolute right-3 top-3 z-10">
                   <WatchButton
                     business={b}
                     watching={watchedIds.has(b.id)}
                     onChanged={refreshWatches}
+                    iconOnly
                   />
                 </div>
               </div>

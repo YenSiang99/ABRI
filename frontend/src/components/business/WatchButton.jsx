@@ -22,7 +22,21 @@ import { toast } from "@/lib/toast";
 // intercepts — the UpgradePrompt doctrine, and the only honest way to sell
 // something: reach for it and be told the price, rather than never learning
 // it existed.
-function WatchButton({ business, watching, onChanged, size = "sm" }) {
+// `iconOnly` is for the directory grid, where this button is positioned OVER
+// the card rather than under it. A labelled button there would either cover
+// the business name or push the card's own layout around; the bell alone is
+// the whole control, and the state it can be in is two.
+//
+// The label does not disappear, it moves — title and aria-label carry it, so
+// the control is still named for a screen reader and on hover. An icon button
+// with no accessible name is a button nobody can describe.
+function WatchButton({
+  business,
+  watching,
+  onChanged,
+  size = "sm",
+  iconOnly = false,
+}) {
   const gate = useUpgradeGate("watchBusinesses");
   const [busy, setBusy] = useState(false);
 
@@ -38,7 +52,8 @@ function WatchButton({ business, watching, onChanged, size = "sm" }) {
         // honesty the follow toast carries. A member who thinks watching
         // notifies the business has been misled by the button.
         toast.success(`Watching ${business.name}`, {
-          description: "We'll tell you if their verification changes. They aren't notified.",
+          description:
+            "We'll tell you if their verification changes. They aren't notified.",
         });
       }
       await onChanged?.();
@@ -53,11 +68,37 @@ function WatchButton({ business, watching, onChanged, size = "sm" }) {
     }
   }
 
+  const label = watching
+    ? `Stop watching ${business.name}`
+    : `Watch ${business.name}`;
+
   return (
     <>
-      <Button size={size} variant="outline" disabled={busy} onClick={gate.guard(toggle)}>
-        {watching ? <BellOff className="mr-1.5 h-3.5 w-3.5" /> : <Bell className="mr-1.5 h-3.5 w-3.5" />}
-        {watching ? "Watching" : "Watch"}
+      <Button
+        size={iconOnly ? "icon" : size}
+        variant="outline"
+        disabled={busy}
+        onClick={gate.guard(toggle)}
+        title={label}
+        aria-label={iconOnly ? label : undefined}
+        aria-pressed={watching}
+      >
+        {iconOnly ? (
+          watching ? (
+            <BellOff className="h-3.5 w-3.5" />
+          ) : (
+            <Bell className="h-3.5 w-3.5" />
+          )
+        ) : (
+          <>
+            {watching ? (
+              <BellOff className="mr-1.5 h-3.5 w-3.5" />
+            ) : (
+              <Bell className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {watching ? "Watching" : "Watch"}
+          </>
+        )}
       </Button>
       <UpgradePrompt gate={gate} />
     </>

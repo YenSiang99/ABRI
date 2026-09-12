@@ -22,25 +22,68 @@ function BusinessCard({
   connecting = false,
   onConnect,
   showActions = false,
+  // Keeps the top-right corner clear for a control the CALLER positions over
+  // this card — the directory's watch button. It cannot be passed in as a
+  // child, because this whole card is a <Link> and a button inside an anchor
+  // both navigates and fires; so the caller overlays it absolutely and uses
+  // this to stop the business name running underneath.
+  //
+  // Padding on the header row only, not the card: the actions row at the
+  // bottom is nowhere near the corner and should keep its full width.
+  //
+  // pr-6 is measured, not guessed. The card's own padding is p-6 (24px) and
+  // the overlaid button sits at right-3 (12px) with size-8 (32px), so it
+  // reaches 44px in from the card edge and intrudes 20px past the content
+  // box. 24px clears it with 4px to spare. A larger value is not safer, it
+  // just spends the business name's width — these cards are three-up on a
+  // wide screen and the name truncates early enough already.
+  reserveTopRight = false,
 }) {
   return (
     <Link
       to={`${basePath}/${business.id}`}
-      className="block rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-border dark:bg-card"
+      // h-full AND flex-col together, and neither is decoration.
+      //
+      // h-full: a grid row stretches its ITEMS, and in the app directory the
+      // item is a wrapper <div> (it has to be — the watch button is positioned
+      // against it), so the stretch stopped at the wrapper and every card in a
+      // row ended at its own content height. A card whose location wrapped to
+      // two lines stood taller than its neighbours and the row looked ragged.
+      //
+      // flex-col + mt-auto on the actions: once the cards are equal height,
+      // the shorter ones have slack, and slack has to go somewhere. Without
+      // this it lands under the buttons and they float mid-card; with it the
+      // buttons sit on the bottom edge and line up across the row.
+      className="flex h-full flex-col rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-border dark:bg-card"
     >
-      <div className="flex items-start gap-4">
+      <div
+        className={`flex items-start gap-4${reserveTopRight ? " pr-6" : ""}`}
+      >
         <div className="grid size-12 flex-none place-items-center rounded-xl bg-ink text-lg font-extrabold text-yellow dark:bg-grey-700">
           {business.name.charAt(0)}
         </div>
         <div className="min-w-0">
-          <div className="truncate text-[17px] font-extrabold text-ink dark:text-foreground">
+          {/* TWO LINES, NOT ONE ELLIPSIS. `truncate` cut most real names in
+              half at three-up ("Bangsar Legal Pa…"), which is the one string
+              on this card a reader is actually scanning for. line-clamp-2
+              gives it a second line and only then gives up, which fits every
+              name in the seed data; break-words keeps a single long token
+              (a domain-style name) inside the box rather than widening it.
+
+              leading-tight because two lines at the default leading pushed
+              the badge down enough to change the card's rhythm. */}
+          <div className="line-clamp-2 text-[17px] leading-tight font-extrabold break-words text-ink dark:text-foreground">
             {business.name}
           </div>
           <div className="mt-[3px] text-[13.5px] text-grey-600 dark:text-muted-foreground">
             {business.category} · {business.location}
           </div>
           <div className="mt-2.5">
-            <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />
+            <VerificationBadge
+              verificationLevel={business.verificationLevel}
+              size="inline"
+              chip
+            />
           </div>
         </div>
       </div>
@@ -68,7 +111,7 @@ function BusinessCard({
               : "No vouches yet"}
       </div>
       {showActions && (
-        <div className="mt-4 flex gap-2">
+        <div className="mt-auto flex gap-2 pt-4">
           <Button size="sm" variant="outline">
             View Profile <ArrowUpRight className="h-3.5 w-3.5" />
           </Button>

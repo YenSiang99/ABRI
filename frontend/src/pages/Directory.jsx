@@ -21,9 +21,16 @@ function Directory() {
   // is the asset the product sells.
   const load = useCallback(
     async (page) => {
-      const filter = verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
-      const data = await fetchBusinessPage({ search: query.trim(), verificationLevel: filter, page });
-      setBusinesses((prev) => (page > 1 ? [...prev, ...data.businesses] : data.businesses));
+      const filter =
+        verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
+      const data = await fetchBusinessPage({
+        search: query.trim(),
+        verificationLevel: filter,
+        page,
+      });
+      setBusinesses((prev) =>
+        page > 1 ? [...prev, ...data.businesses] : data.businesses,
+      );
       setHasMore(data.hasMore);
       setPage(data.page);
     },
@@ -90,7 +97,8 @@ function Directory() {
 
       {status === "ready" && (
         <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
-          {businesses.length} {businesses.length === 1 ? "business" : "businesses"}
+          {businesses.length}{" "}
+          {businesses.length === 1 ? "business" : "businesses"}
         </div>
       )}
 
@@ -100,7 +108,7 @@ function Directory() {
         </div>
       ) : businesses.length > 0 ? (
         <>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((business) => (
               <BusinessCard key={business.id} business={business} />
             ))}
