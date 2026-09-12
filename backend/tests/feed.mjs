@@ -247,18 +247,66 @@ for (const [i, id] of PAGING_SUBJECTS.entries()) {
   } });
 }
 
-const all = (await asker("/feed?limit=50")).data;
+// THE BASELINE IS A PREFIX, NOT "EVERYTHING", and the difference is what this
+// assertion got wrong for a while. 50 is MAX_LIMIT in routes/feed.js, so this
+// call returns AT MOST 50 rows however many exist — it was a stand-in for the
+// whole feed only while the database held fewer than 50 visible events.
+// scripts/seed-demo.mjs adds 48 on its own, which pushed a real feed to 56 and
+// made this suite fail with a diff whose first divergence was at index 50: the
+// end of the truncated list, not a paging fault. Paging was correct the whole
+// time — no duplicates, no gaps, same order for all 50 it could compare.
+//
+// So the invariant is a PREFIX one: walking the feed two at a time must
+// reproduce the first N ids of a single large read, for as far as that read
+// goes. Asserting more than that would be asserting how much demo data happens
+// to be loaded, which is not a property of the feed.
+const all = (await asker(`/feed?limit=50`)).data;
 assert.ok(all.events.length >= 6, `expected at least 6 events, got ${all.events.length}`);
-const seen = [];
+// The loop runs until the cursor says stop. MAX_PAGES is a runaway guard, not
+// a page budget — it was 20, which at two per page could only ever see 40
+// events, so a feed larger than that ended the walk early and silently. That
+// is the same fault as the baseline above: a constant sized for whatever the
+// database happened to hold when it was written. Derived from the feed's own
+// length so it scales with the data, with room to spare.
+const MAX_PAGES = all.events.length * 2 + 20;
+const seenEvents = [];
 let cursor = null;
-for (let page = 0; page < 20; page++) {
+let pages = 0;
+for (; pages < MAX_PAGES; pages++) {
   const res = await asker(`/feed?limit=2${cursor ? `&cursor=${cursor}` : ""}`);
-  seen.push(...res.data.events.map((e) => e.id));
+  seenEvents.push(...res.data.events);
   cursor = res.data.nextCursor;
   if (!cursor) break;
 }
+const seen = seenEvents.map((e) => e.id);
+// Hitting the guard means the cursor never returned null — a paging bug that
+// would otherwise look like a short walk.
+assert.ok(pages < MAX_PAGES, `cursor never terminated after ${MAX_PAGES} pages`);
 assert.equal(new Set(seen).size, seen.length, "no id appears on two pages");
-assert.deepEqual(seen, all.events.map((e) => e.id), "paged order matches the unpaged order exactly");
+// Paging must reach at least as far as the capped read did, or it dropped rows.
+assert.ok(
+  seen.length >= all.events.length,
+  `paging returned ${seen.length} events, fewer than the ${all.events.length} a single read saw`,
+);
+assert.deepEqual(
+  seen.slice(0, all.events.length),
+  all.events.map((e) => e.id),
+  "paged order matches the unpaged order exactly",
+);
+// Checks the WHOLE walk, not just the prefix a capped read can cover — every
+// row past index MAX_LIMIT is otherwise unverified, and those are exactly the
+// rows only paging can reach. The order is the one routes/feed.js declares:
+// createdAt descending, id descending to break a millisecond tie.
+for (let i = 1; i < seenEvents.length; i++) {
+  const prev = seenEvents[i - 1];
+  const curr = seenEvents[i];
+  const prevAt = new Date(prev.createdAt).getTime();
+  const currAt = new Date(curr.createdAt).getTime();
+  assert.ok(
+    prevAt > currAt || (prevAt === currAt && prev.id > curr.id),
+    `paging broke the sort between ${prev.id} (${prev.createdAt}) and ${curr.id} (${curr.createdAt})`,
+  );
+}
 const tied = all.events.filter((e) => new Date(e.createdAt).getTime() === tie.getTime());
 assert.equal(tied.length, 2, "both same-millisecond events survived paging");
 ok(`paged ${seen.length} events two at a time — no duplicates, same order, ties held`);
