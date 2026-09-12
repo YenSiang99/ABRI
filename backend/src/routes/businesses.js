@@ -23,6 +23,7 @@ import { vouchersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
 import { recordProfileView } from "../lib/profileView.js";
 import { verificationTimelineFor } from "../lib/verificationTimeline.js";
+import { confirmedEngagementsFor, engagementSummaryFor, serializeEngagement } from "../lib/engagements.js";
 import {
   LOOKUP_LIMIT,
   MIN_QUERY_LENGTH,
@@ -505,6 +506,16 @@ router.get(
     // to surface — see lib/verificationTimeline.js.
     const verificationTimeline = await verificationTimelineFor(prisma, business);
 
+    // The other half of the audit record, and public on the same terms and for
+    // the same reason. A confirmed engagement is a fact two businesses agreed
+    // on; gating it would mean selling the ability to find out who a business
+    // has actually worked with, which is the question this product exists to
+    // answer. Confirmed only — see the status comment on the model.
+    const [engagementRows, engagementSummary] = await Promise.all([
+      confirmedEngagementsFor(business.id),
+      engagementSummaryFor(business.id),
+    ]);
+
     // Flatten the live revision's text onto each vouch as `testimonial`.
     // The column of that name is gone (schema.prisma) — it was the copy a
     // revise overwrote — but the public shape is unchanged, so nothing
@@ -518,6 +529,11 @@ router.get(
         ...publicBusinessView(business, { showContact: contact.visible }),
         vouchCount,
         verificationTimeline,
+        // viewerBusinessId is null: this is the PUBLIC view, so no
+        // `counterparty` is resolved and no proposedByYou is claimed. A reader
+        // sees both ends named and works out for themselves which is which.
+        engagements: engagementRows.map((e) => serializeEngagement(e, null)),
+        engagementSummary,
         testimonialsLocked: !showTestimonials,
         // Withheld the same way testimonials are — the keys are absent, not
         // null, so there is no masked value on the wire to un-mask.

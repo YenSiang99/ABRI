@@ -193,6 +193,7 @@ function SidebarNav({
   unreadCount,
   vouchActionCount,
   askActionCount,
+  engagementCount,
   incomingCount,
   onSignOut,
 }) {
@@ -272,7 +273,12 @@ function SidebarNav({
                       pitch. */}
                   {item.url === "/app/inbox" && (
                     <NavBadge
-                      count={vouchActionCount + askActionCount + incomingCount}
+                      count={
+                        vouchActionCount +
+                        askActionCount +
+                        incomingCount +
+                        engagementCount
+                      }
                       label="waiting on you"
                     />
                   )}
@@ -404,7 +410,8 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount, askActionCount } = useNotifications();
+  const { unreadCount, vouchActionCount, askActionCount, engagementCount } =
+    useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
   // contexts, matching how the other two counts arrive.
@@ -442,6 +449,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           unreadCount={unreadCount}
           vouchActionCount={vouchActionCount}
           askActionCount={askActionCount}
+          engagementCount={engagementCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
         />
@@ -471,6 +479,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               unreadCount={unreadCount}
               vouchActionCount={vouchActionCount}
               askActionCount={askActionCount}
+              engagementCount={engagementCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}
             />

@@ -8,13 +8,35 @@
 // Events that land on the giver's own record rather than their queue —
 // they name something that has already settled, and the Requests tab (which
 // only lists in-flight vouches) won't contain it.
-const GIVEN_TAB_TYPES = new Set(["vouch_published", "vouch_cancelled", "vouch_expired"]);
+const GIVEN_TAB_TYPES = new Set([
+  "vouch_published",
+  "vouch_cancelled",
+  "vouch_expired",
+]);
+
+// Engagements. All four land on the Inbox tab rather than a specific row, for
+// the structural reason this file already states about vouches and asks:
+// ActivityEvent carries a type and an actor and no subject id, so there is
+// nothing to deep-link to.
+//
+// `engagement_proposed` goes to the tab that can CLEAR it. The other three name
+// something already settled — confirmed, declined or lapsed — and there is no
+// work left, but the same tab is still where the record is, so they share it.
+const ENGAGEMENT_TYPES = new Set([
+  "engagement_proposed",
+  "engagement_confirmed",
+  "engagement_declined",
+  "engagement_expired",
+]);
 
 // Connection events that name something already SETTLED. Both land on the
 // actor's profile, because the message names them and there is nothing left
 // to do about it. `connection_requested` is deliberately not in here — a
 // request is work, and work goes to the page that can clear it.
-const SETTLED_CONNECTION_TYPES = new Set(["connection_added", "connection_accepted"]);
+const SETTLED_CONNECTION_TYPES = new Set([
+  "connection_added",
+  "connection_accepted",
+]);
 
 // Ask events, split by who owns the work: asker-side events go to the list of
 // asks this business posted, answerer-side ones to the list it answered.
@@ -45,7 +67,9 @@ function activityLink(event) {
     // The profile of whoever connected, since the message names them. Falls
     // back to the connections list if the actor has since been removed — the
     // event survives its actor, because actorBusinessId is nullable.
-    return event.actorId ? `/app/business/${event.actorId}` : "/app/network/connections";
+    return event.actorId
+      ? `/app/business/${event.actorId}`
+      : "/app/network/connections";
   }
 
   // "X wants to connect with you" is the one connection event with something
@@ -59,9 +83,14 @@ function activityLink(event) {
 
   // The one that leaves the Asks section entirely, because the thing it names
   // is on the member's own profile, not on the board.
-  if (event.type === "ask_recommendation_received" || event.type === "recommendations_waiting") {
+  if (
+    event.type === "ask_recommendation_received" ||
+    event.type === "recommendations_waiting"
+  ) {
     return "/app/profile?tab=recommendations";
   }
+
+  if (ENGAGEMENT_TYPES.has(event.type)) return "/app/inbox?tab=engagements";
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
 

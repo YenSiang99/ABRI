@@ -2,6 +2,22 @@
 // types just add a map entry rather than needing frontend changes. Keyed
 // by type; each fn takes the actor business's name.
 const ACTIVITY_MESSAGES = {
+  // Engagements. "says you worked together" rather than "logged an
+  // engagement": the reader has to be able to tell at a glance that a CLAIM
+  // has been made about them which they are being asked to agree with, not
+  // that a record already exists.
+  engagement_proposed: (actorName) => `${actorName} says you worked together.`,
+  engagement_confirmed: (actorName) => `${actorName} confirmed you worked together.`,
+  // Proposer only, and it names the decision because there was one — somebody
+  // actively said this did not happen, which the proposer is entitled to know.
+  engagement_declined: (actorName) => `${actorName} says you didn't work together.`,
+  // Proposer only, and worded so it names no culprit. Nobody declined this; it
+  // sat for 14 days and lapsed. Same distinction vouch_expired exists for:
+  // without a separate type the proposer is told they were refused by a
+  // business that never did anything. "14 days" mirrors EXPIRY_DAYS in
+  // lib/engagements.js and cannot be imported (that module imports this one).
+  engagement_expired: (actorName) =>
+    `Your engagement with ${actorName} lapsed after 14 days without a reply.`,
   vouch_submitted: (actorName) => `${actorName} sent you a vouch to review.`,
   vouch_published: (actorName) => `${actorName} accepted your vouch.`,
   vouch_cancelled: (actorName) => `${actorName} cancelled your vouch.`,

@@ -2,17 +2,25 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Inbox as InboxIcon,
+  Briefcase,
   Handshake,
   Users,
   ClipboardList,
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { VouchRequestCard } from "@/components/app/VouchRequestCard";
 import { RequestCard } from "@/pages/app/network/NetworkRequests";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyAsks } from "@/lib/api/asks";
+import {
+  fetchEngagements,
+  confirmEngagement,
+  declineEngagement,
+} from "@/lib/api/engagements";
+import { toast } from "@/lib/toast";
 
 // Everything waiting on this member, in one place.
 //
@@ -42,7 +50,84 @@ import { fetchMyAsks } from "@/lib/api/asks";
 // instead of "things you owe" — which is the distinction that makes an inbox
 // worth opening at all. It stays on Home.
 
-const TABS = ["vouches", "connections", "answers"];
+const TABS = ["vouches", "connections", "answers", "engagements"];
+
+// One proposed engagement waiting on this member.
+//
+// CONFIRM IS A CLAIM ABOUT THEM, so the card leads with who said it and what
+// they said — not with the buttons. A member who confirms without reading has
+// put their name on somebody else's record of the relationship, which is the
+// one thing this model exists to prevent.
+//
+// Declining is a ghost button, not a destructive one, for the reason
+// NetworkRequests gives about declining a connection: saying "that didn't
+// happen" is an ordinary answer, and a red button would make it read as an
+// accusation.
+function EngagementRequestCard({ engagement, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const { counterparty, service, note, occurredOn } = engagement;
+
+  const month = new Date(occurredOn).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  async function act(fn, message) {
+    setBusy(true);
+    try {
+      await fn(engagement.id);
+      toast(message);
+      await onChanged();
+    } catch (err) {
+      setBusy(false);
+      toast.error(err.message ?? "Couldn't update that.");
+    }
+  }
+
+  return (
+    <li className="rounded-2xl border border-border p-5">
+      <div className="text-sm text-foreground">
+        <span className="font-semibold">{counterparty?.name}</span> says you
+        worked together.
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {month}
+        {service ? ` · ${service}` : ""}
+      </div>
+      {note && (
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          {note}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() => act(confirmEngagement, "Confirmed")}
+        >
+          Confirm
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() =>
+            act(declineEngagement, "Marked as not worked together")
+          }
+        >
+          That didn&rsquo;t happen
+        </Button>
+      </div>
+      {/* Said once, plainly. Confirming publishes to both profiles, and a
+          member who learns that afterwards has been surprised by their own
+          click. */}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Confirming shows this on both your profiles. Declining is private — only
+        they are told.
+      </p>
+    </li>
+  );
+}
 
 function TabButton({ active, onClick, count, icon: Icon, children }) {
   return (
@@ -117,6 +202,7 @@ function Inbox() {
 
   const [vouches, setVouches] = useState([]);
   const [asks, setAsks] = useState([]);
+  const [engagements, setEngagements] = useState([]);
   const [status, setStatus] = useState("loading");
 
   // Both lists are fetched up front rather than per tab, because the tab
@@ -126,9 +212,14 @@ function Inbox() {
     return Promise.all([
       fetchVouchRequests().catch(() => []),
       fetchMyAsks().catch(() => []),
-    ]).then(([vouchRows, askRows]) => {
+      fetchEngagements("pending").catch(() => []),
+    ]).then(([vouchRows, askRows, engagementRows]) => {
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
       setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
+      // Only the ones waiting on THIS member. A pending engagement they
+      // proposed is waiting on the other side and is not their work — the same
+      // rule the vouch filter above applies with waitingOn.
+      setEngagements(engagementRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
   }
@@ -138,10 +229,12 @@ function Inbox() {
     Promise.all([
       fetchVouchRequests().catch(() => []),
       fetchMyAsks().catch(() => []),
-    ]).then(([vouchRows, askRows]) => {
+      fetchEngagements("pending").catch(() => []),
+    ]).then(([vouchRows, askRows, engagementRows]) => {
       if (!live) return;
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
       setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
+      setEngagements(engagementRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
     return () => {
@@ -169,8 +262,10 @@ function Inbox() {
     vouches: status === "ready" ? vouches.length : vouchActionCount,
     connections: incoming.length,
     answers: status === "ready" ? asks.length : askActionCount,
+    engagements: engagements.length,
   };
-  const total = counts.vouches + counts.connections + counts.answers;
+  const total =
+    counts.vouches + counts.connections + counts.answers + counts.engagements;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -211,6 +306,14 @@ function Inbox() {
         >
           Answers
         </TabButton>
+        <TabButton
+          active={tab === "engagements"}
+          onClick={() => setTab("engagements")}
+          count={counts.engagements}
+          icon={Briefcase}
+        >
+          Engagements
+        </TabButton>
       </div>
 
       {status === "loading" && (
@@ -246,6 +349,27 @@ function Inbox() {
             incoming.map((connection) => (
               <RequestCard key={connection.id} connection={connection} />
             ))
+          )}
+        </div>
+      )}
+
+      {status === "ready" && tab === "engagements" && (
+        <div className="mt-6">
+          {engagements.length === 0 ? (
+            <Empty>
+              Nobody has said you worked together. When a business logs work
+              with you, it waits here for you to confirm.
+            </Empty>
+          ) : (
+            <ul className="flex flex-col gap-4">
+              {engagements.map((e) => (
+                <EngagementRequestCard
+                  key={e.id}
+                  engagement={e}
+                  onChanged={load}
+                />
+              ))}
+            </ul>
           )}
         </div>
       )}

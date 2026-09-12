@@ -194,6 +194,14 @@ model Business {
   profileViewsMade     ProfileView[] @relation("ProfileViewer")
   profileViewsReceived ProfileView[] @relation("ProfileViewTarget")
 
+  // Both ends of every engagement this business is part of, plus the ones it
+  // proposed. Three relations for the same reason Connection needs three: the
+  // pair is stored ordered by id, so "which end am I" is not derivable and
+  // "who proposed" is a separate fact again.
+  engagementsA        Engagement[] @relation("EngagementA")
+  engagementsB        Engagement[] @relation("EngagementB")
+  engagementsProposed Engagement[] @relation("EngagementProposer")
+
   // Browse without being named. Off by default, and that default is the
   // feature working at all: a network where most members start invisible has
   // a viewers screen that says "someone" forever.
@@ -729,6 +737,105 @@ model ProfileView {
   @@index([viewedId, lastViewedAt])
 }
 
+// Two businesses saying they worked together, on a date, on something.
+//
+// THE CHEAP RUNG BELOW A VOUCH, and that is the entire design goal. Ranked by
+// what a signal costs to fake, this product had the registry rung (SSM -> L2)
+// and the reputation rung (a vouch, which costs the giver prose and their own
+// name) with nothing in between — so the FIRST artifact it ever asked anyone
+// for was the most expensive one. That is why the vouch graph is thin. An
+// engagement costs one tap and a month.
+//
+// IT NEEDS THE OTHER SIDE'S AGREEMENT, for the reason Connection's own comment
+// gives about unilateral edges: "a CLAIM ABOUT A RELATIONSHIP... in a directory
+// built to make trust legible [a unilateral one] is a forgeable signal". The
+// asks board already demonstrates what happens without that check — 3 of its 4
+// accepted answers are self-nominations, which is one party talking about
+// itself.
+//
+// COLLUSION IS POSSIBLE AND ACCEPTED. Two businesses can confirm work that
+// never happened. That costs them a colluder, which is strictly more than a
+// self-nomination costs today, and the mitigation is visibility rather than
+// prevention: reads report DISTINCT COUNTERPARTIES, never a row count, so ten
+// engagements with one friend reads as one counterparty. See
+// engagementSummaryFor in lib/engagements.js — a ring is obvious when you can
+// see who, and invisible behind a single number.
+//
+// NOT A RATING. There is no score, stars or free-form testimonial here. A
+// vouch is the place to say someone is good; this only says you worked
+// together. Keeping it factual is what keeps it cheap enough to be created,
+// and what keeps it defensible — a dated fact survives a dispute in a way a
+// judgement does not.
+model Engagement {
+  id String @id @default(cuid())
+
+  // "pending"   — the counterparty's move
+  // "confirmed" — both agree. Terminal, and the ONLY status anyone else sees.
+  // "declined"  — the counterparty says it did not happen. Terminal, and
+  //               PRIVATE: only the proposer is told, it is shown to nobody
+  //               and counted nowhere. If declines were public, proposing
+  //               engagements a rival would obviously decline becomes a way to
+  //               damage them, which is a weapon rather than a record.
+  // "cancelled" — withdrawn by the proposer, or lapsed after 14 days untouched
+  //               (lib/engagements.js, the same lazy sweep vouches use).
+  status String @default("pending")
+
+  // The pair, ordered by id via orderedPair in lib/connections.js so one row
+  // serves both directions — the same storage Connection uses.
+  businessAId String
+  businessA   Business @relation("EngagementA", fields: [businessAId], references: [id])
+
+  businessBId String
+  businessB   Business @relation("EngagementB", fields: [businessBId], references: [id])
+
+  // Which end proposed. Not derivable from the ordered pair, and it decides
+  // who may confirm (the other one) and who may withdraw (this one). Same role
+  // and same reasoning as Connection.requestedById.
+  proposedById String
+  proposedBy   Business @relation("EngagementProposer", fields: [proposedById], references: [id])
+
+  // A canonical service from lib/serviceVocab.js, validated on write.
+  //
+  // THIS IS WHAT MAKES ENGAGEMENTS AGGREGATE. Because it is a catalogue value
+  // rather than typed text, "4 confirmed for SST advisory, from 3 different
+  // businesses" is answerable — and a profile can separate the services a
+  // business CLAIMS from the ones a counterparty has confirmed. Today anyone
+  // can tick all twelve services in their category and nothing checks it.
+  //
+  // Nullable: work that maps to no catalogue entry is still real work. Such a
+  // row is shown but never appears in a per-service aggregate, exactly the
+  // contract a custom service has on a profile.
+  service String?
+
+  // Free text, optional, and deliberately inert — never matched, never
+  // aggregated, never searched. It exists so a reader can tell two engagements
+  // for the same service apart.
+  note String?
+
+  // When the WORK happened, not when the row was written. Stored as the first
+  // of the month because that is the precision anyone can honestly remember,
+  // and a false day-level precision would invite disputes about the day.
+  occurredOn DateTime
+
+  // Optional provenance: the ask this came out of. Closes the asks ->
+  // track-record loop without making asks load-bearing for trust, and stays
+  // null for the engagements that began over lunch.
+  askId String?
+  ask   Ask?    @relation(fields: [askId], references: [id])
+
+  createdAt    DateTime  @default(now())
+  // Bumped on every transition; drives the 14-day lazy expiry.
+  lastActionAt DateTime  @default(now())
+  confirmedAt  DateTime?
+
+  // NO @@unique ON THE PAIR — the one deliberate difference from Connection,
+  // which allows exactly one edge per pair. Working together repeatedly is the
+  // strongest thing this model can record, so each engagement is its own row.
+  @@index([businessAId, status])
+  @@index([businessBId, status])
+  @@index([proposedById])
+}
+
 model NetworkEvent {
   id String @id @default(cuid())
 
@@ -1093,8 +1200,10 @@ model Ask {
   // does on Vouch.
   closedAt  DateTime?
 
-  answers AskAnswer[]
-  flags   AskFlag[]
+  answers     AskAnswer[]
+  flags       AskFlag[]
+  // Engagements that name this ask as where the work came from.
+  engagements Engagement[]
 
   // FK hygiene, the reason Connection carries @@index([requestedById]):
   // Postgres does not index a foreign key for you, and the RESTRICT check on

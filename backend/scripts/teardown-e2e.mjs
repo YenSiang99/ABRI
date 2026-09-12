@@ -67,6 +67,12 @@ const steps = [
   // blocks the business delete at the bottom of this list rather than being
   // cleaned up by it.
   ["profileView",   { OR: [{ viewerId: biz }, { viewedId: biz }] }],
+  // Both ends, plus anything proposed by an e2e business against a real one.
+  // Position in this list does not matter for the ask FK — Engagement.askId is
+  // SET NULL, so the ask delete above nulls it rather than being blocked by it.
+  // It DOES matter for the three business FKs, which are RESTRICT like every
+  // other relation here, so this has to run before the business delete.
+  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }] }],
   ["deferredConnection", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["emailVerificationToken", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["account",       { id: { in: accIds } }],

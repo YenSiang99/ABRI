@@ -54,6 +54,100 @@ function VouchCard({ vouch }) {
   );
 }
 
+// Who this business has actually worked with, confirmed by the other side.
+//
+// THE HEADLINE IS COUNTERPARTIES, NOT ENGAGEMENTS, and that is the anti-gaming
+// design rather than a wording choice. Two businesses can confirm work that
+// never happened — it costs them a colluder, which is more than a
+// self-nomination costs, but it is possible. Reporting "12 engagements" would
+// make the cheapest possible fake look like the strongest possible signal;
+// "12 engagements with 2 businesses" lets a reader judge it for themselves.
+// Never replace this with a single total.
+//
+// NOT A RATING, for the same reason the verification record is not a score.
+// These rows say two businesses worked together on a date. Whether the work
+// was any good is what a vouch is for, and conflating them would let the
+// cheaper artifact borrow the dearer one's meaning.
+function EngagementRecord({ entries, summary, businessName }) {
+  if (!entries || entries.length === 0) return null;
+
+  const top = summary?.services?.slice(0, 3) ?? [];
+  const shown = entries.slice(0, 5);
+  const rest = entries.length - shown.length;
+
+  return (
+    <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
+      <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
+        Worked with
+      </h2>
+      <p className="mt-1 text-sm text-grey-500 dark:text-muted-foreground">
+        Confirmed by the business on the other side, not self-reported.
+      </p>
+
+      {top.length > 0 && (
+        <ul className="mt-4 space-y-1.5">
+          {top.map((g) => (
+            <li
+              key={g.service}
+              className="text-sm text-ink dark:text-foreground"
+            >
+              <span className="font-semibold">{g.service}</span>
+              <span className="text-grey-500 dark:text-muted-foreground">
+                {" — "}
+                {g.engagements}{" "}
+                {g.engagements === 1 ? "engagement" : "engagements"} with{" "}
+                {g.counterparties}{" "}
+                {g.counterparties === 1 ? "business" : "different businesses"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ol className="mt-4 space-y-3 border-t border-grey-200 pt-4 dark:border-border">
+        {shown.map((e) => {
+          // Both ends are named on a public profile and no `counterparty` is
+          // resolved (the server sends null for an anonymous reader), so work
+          // out which end is the other one here.
+          const other =
+            e.businessA?.name === businessName ? e.businessB : e.businessA;
+          return (
+            <li key={e.id} className="flex gap-3 text-sm">
+              <span className="w-24 shrink-0 font-mono text-xs text-grey-500 dark:text-muted-foreground">
+                {new Date(e.occurredOn).toLocaleDateString(undefined, {
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+              <span className="min-w-0">
+                <span className="text-ink dark:text-foreground">
+                  {other?.name}
+                </span>
+                {e.service && (
+                  <span className="text-grey-500 dark:text-muted-foreground">
+                    {" "}
+                    · {e.service}
+                  </span>
+                )}
+                {e.note && (
+                  <span className="mt-0.5 block text-xs text-grey-500 dark:text-muted-foreground">
+                    {e.note}
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {rest > 0 && (
+        <p className="mt-3 text-xs text-grey-500 dark:text-muted-foreground">
+          and {rest} more
+        </p>
+      )}
+    </div>
+  );
+}
+
 // The verification record — what a registry said about this business, and when.
 //
 // THE ONE PANEL HERE THAT CAN SAY SOMETHING UNFLATTERING, and that is the
@@ -582,6 +676,15 @@ function BusinessProfile({ inApp = false }) {
               </p>
             </div>
             <VerificationTimeline entries={business.verificationTimeline} />
+            {/* Directly under the verification record: both are the factual
+                half of this profile — what a registry said, and what a
+                counterparty confirmed. The evaluative half (vouches,
+                recommendations) lives in its own tabs. */}
+            <EngagementRecord
+              entries={business.engagements}
+              summary={business.engagementSummary}
+              businessName={business.name}
+            />
             {/* No tier lock of its own here. On T0 this whole tab isn't
                 rendered (the unclaimed panel replaces it), and on T1 the
                 plan gate already covers it via reason "owner_plan". The
