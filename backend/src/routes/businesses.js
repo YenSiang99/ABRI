@@ -15,7 +15,7 @@ import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
-import { serviceCatalogueFor, splitServices } from "../lib/serviceVocab.js";
+import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -122,7 +122,24 @@ router.get(
   "/",
   optionalAuth,
   asyncHandler(async (req, res) => {
-    const { search, verificationLevel } = req.query;
+    const { search, verificationLevel, service } = req.query;
+
+    // Canonicalised, not trusted. A member typing "ssm filings" into a URL
+    // means the catalogue entry "SSM filings", and `has` is an exact array
+    // match — so an uncanonicalised value would silently return nothing and
+    // read as "no business does this" rather than "you typed it differently".
+    // That is the same silent miss lib/serviceVocab.js exists to remove.
+    //
+    // An unknown service is a 400 rather than an empty list, for the reason
+    // the comment below gives about silent filters: "no results" and "your
+    // filter was nonsense" must not look the same.
+    let canonicalServiceFilter = null;
+    if (service) {
+      canonicalServiceFilter = canonicalService(service);
+      if (!canonicalServiceFilter) {
+        return res.status(400).json({ error: `"${service}" isn't a service in the catalogue.` });
+      }
+    }
 
     // Clamped, not honoured. A limit is a courtesy to the client; the cap is
     // the thing that actually bounds the response.
@@ -141,6 +158,13 @@ router.get(
       // Renaming this param means renaming lib/api/businesses.js in the
       // same commit.
       ...(verificationLevel ? { verificationLevel } : {}),
+      // `has`, not `contains`: services is a String[] and this is an exact
+      // whole-element match against a canonical value. Substring matching here
+      // would let "Tax" match "Tax advisory" AND "Transfer pricing
+      // documentation" if the catalogue ever grows a service containing the
+      // word, which is the back door into free text that businessVocab.js
+      // warns against.
+      ...(canonicalServiceFilter ? { services: { has: canonicalServiceFilter } } : {}),
       // includeCategory: browsing "Accounting" must return every accountant.
       // That is the one thing this route matches on and the lookup does not.
       ...(search ? lookupWhere(search, { includeCategory: true }) : {}),

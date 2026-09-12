@@ -6,10 +6,13 @@ import { fetchBusinessPage } from "@/lib/api/businesses";
 import { Button } from "@/components/ui/button";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
+import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 
 function Directory() {
   const [query, setQuery] = useState("");
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [catalogue, setCatalogue] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
   const [page, setPage] = useState(1);
@@ -26,6 +29,7 @@ function Directory() {
       const data = await fetchBusinessPage({
         search: query.trim(),
         verificationLevel: filter,
+        service: serviceFilter || undefined,
         page,
       });
       setBusinesses((prev) =>
@@ -34,8 +38,18 @@ function Directory() {
       setHasMore(data.hasMore);
       setPage(data.page);
     },
-    [query, verificationLevelFilter],
+    [query, verificationLevelFilter, serviceFilter],
   );
+
+  useEffect(() => {
+    let live = true;
+    fetchServiceCatalogue()
+      .then((data) => live && setCatalogue(data))
+      .catch(() => live && setCatalogue({ others: [] }));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +108,49 @@ function Directory() {
           </button>
         ))}
       </div>
+
+      {/* PUBLIC, AND THAT IS THE POINT. This is the only filter on this page a
+          visitor who has never heard of ABRI would actually arrive with: they
+          do not want "a business", they want someone who does company
+          incorporation. The service vocabulary is what makes that answerable
+          — see backend/src/lib/serviceVocab.js — and this is the surface where
+          it earns its keep. */}
+      {catalogue && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="public-service-filter"
+            className="text-[13px] text-grey-600 dark:text-muted-foreground"
+          >
+            Doing
+          </label>
+          <select
+            id="public-service-filter"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+            className="rounded-lg border border-grey-300 bg-white px-3 py-1.5 text-[13px] text-ink outline-none focus:border-ink dark:border-border dark:bg-background dark:text-foreground dark:focus:border-ring"
+          >
+            <option value="">any service</option>
+            {(catalogue.others ?? []).map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.services.map((sv) => (
+                  <option key={sv} value={sv}>
+                    {sv}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {serviceFilter && (
+            <button
+              type="button"
+              onClick={() => setServiceFilter("")}
+              className="text-[13px] text-grey-600 underline underline-offset-4 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {status === "ready" && (
         <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">

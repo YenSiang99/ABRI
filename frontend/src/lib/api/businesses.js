@@ -20,12 +20,22 @@ function fetchBusinesses(options = {}) {
 // are missing, not zeroed. BusinessCard reads that absence as "log in to see
 // vouches", which is a different sentence from "no vouches yet"; zeroing them
 // here would silently turn every business into the latter.
-function fetchBusinessPage({ search, verificationLevel, page, limit } = {}) {
+function fetchBusinessPage({
+  search,
+  verificationLevel,
+  service,
+  page,
+  limit,
+} = {}) {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   // Key must match GET /businesses exactly: an unrecognised param there is
   // NO FILTER, not a 400, so a mismatch fails silently and wide.
   if (verificationLevel) params.set("verificationLevel", verificationLevel);
+  // `service` is the exception to that warning, and deliberately: the server
+  // 400s an unknown value rather than ignoring it, because "no results" and
+  // "your filter was nonsense" must not render identically.
+  if (service) params.set("service", service);
   if (page) params.set("page", String(page));
   if (limit) params.set("limit", String(limit));
   const qs = params.toString();

@@ -7,6 +7,7 @@ import { fetchBusinessPage } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
+import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { NoRecordPanel } from "@/components/business/InviteToClaim";
 import { NetworkOverlap } from "@/components/business/NetworkOverlap";
@@ -31,6 +32,8 @@ function AppDirectory() {
   const { connectionStateWith, connect } = useConnections();
   const [query, setQuery] = useState("");
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [catalogue, setCatalogue] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
   const [page, setPage] = useState(1);
@@ -66,6 +69,7 @@ function AppDirectory() {
       const data = await fetchBusinessPage({
         search: query.trim(),
         verificationLevel: filter,
+        service: serviceFilter || undefined,
         page,
       });
       // Your own business is never a search result — you cannot connect to,
@@ -77,8 +81,21 @@ function AppDirectory() {
       setHasMore(data.hasMore);
       setPage(data.page);
     },
-    [query, verificationLevelFilter, business.id],
+    [query, verificationLevelFilter, serviceFilter, business.id],
   );
+
+  // The whole catalogue, every category — this browse is not scoped to the
+  // member's own trade. Someone looking for a company secretary is not an
+  // accountant looking at accountants.
+  useEffect(() => {
+    let live = true;
+    fetchServiceCatalogue()
+      .then((data) => live && setCatalogue(data))
+      .catch(() => live && setCatalogue({ others: [] }));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +180,47 @@ function AppDirectory() {
           </button>
         ))}
       </div>
+
+      {/* SERVICES ARE A SELECT, NOT CHIPS, unlike the four above. There are
+          four verification levels and forty-odd services — rendering them the
+          same way would bury the level filter under three rows of chips and
+          make the cheaper filter look like the more important one. */}
+      {catalogue && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="service-filter"
+            className="text-[13px] text-muted-foreground"
+          >
+            Doing
+          </label>
+          <select
+            id="service-filter"
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-ring"
+          >
+            <option value="">any service</option>
+            {(catalogue.others ?? []).map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.services.map((sv) => (
+                  <option key={sv} value={sv}>
+                    {sv}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          {serviceFilter && (
+            <button
+              type="button"
+              onClick={() => setServiceFilter("")}
+              className="text-[13px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {status === "ready" && (
         <div className="mt-4 text-sm text-muted-foreground">
