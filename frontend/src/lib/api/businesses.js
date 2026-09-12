@@ -24,6 +24,7 @@ function fetchBusinessPage({
   search,
   verificationLevel,
   service,
+  confirmedOnly,
   page,
   limit,
 } = {}) {
@@ -36,6 +37,11 @@ function fetchBusinessPage({
   // 400s an unknown value rather than ignoring it, because "no results" and
   // "your filter was nonsense" must not render identically.
   if (service) params.set("service", service);
+  // Only meaningful alongside `service`. When it is set the list is also
+  // RANKED by how many different businesses have confirmed that service —
+  // see GET /businesses — so a caller that sets it is asking a different
+  // question, not just applying a narrower filter.
+  if (confirmedOnly) params.set("confirmedOnly", "true");
   if (page) params.set("page", String(page));
   if (limit) params.set("limit", String(limit));
   const qs = params.toString();

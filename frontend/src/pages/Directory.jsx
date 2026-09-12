@@ -8,10 +8,33 @@ import { BusinessCard } from "@/components/business/BusinessCard";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 
+// Why this business is where it is in the list.
+//
+// SHOWN EVEN WHEN ZERO, and that is the honest half. A ranked list whose
+// reasons are invisible is a list that looks arbitrary; one that shows only
+// the winners' numbers reads as a leaderboard. "Nobody has confirmed this yet"
+// is a real, useful answer about a business that says it does the work.
+//
+// Counts DIFFERENT businesses, never engagements — ten confirmations from one
+// friend is one counterparty. See engagementSummaryFor in
+// backend/src/lib/engagements.js.
+function ConfirmedForService({ confirmed }) {
+  if (!confirmed) return null;
+  const n = confirmed.counterparties;
+  return (
+    <p className="mt-1.5 text-xs text-grey-600 dark:text-muted-foreground">
+      {n === 0
+        ? `No confirmed ${confirmed.service.toLowerCase()} work yet`
+        : `${confirmed.service} confirmed by ${n} ${n === 1 ? "business" : "different businesses"}`}
+    </p>
+  );
+}
+
 function Directory() {
   const [query, setQuery] = useState("");
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("");
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [catalogue, setCatalogue] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -30,6 +53,7 @@ function Directory() {
         search: query.trim(),
         verificationLevel: filter,
         service: serviceFilter || undefined,
+        confirmedOnly: serviceFilter ? confirmedOnly : undefined,
         page,
       });
       setBusinesses((prev) =>
@@ -38,7 +62,7 @@ function Directory() {
       setHasMore(data.hasMore);
       setPage(data.page);
     },
-    [query, verificationLevelFilter, serviceFilter],
+    [query, verificationLevelFilter, serviceFilter, confirmedOnly],
   );
 
   useEffect(() => {
@@ -149,6 +173,23 @@ function Directory() {
               Clear
             </button>
           )}
+          {/* RANKING IS ALREADY ON whenever a service is chosen — this only
+              hides the unconfirmed tail. Off by default, because a directory
+              that showed only businesses somebody has confirmed would be
+              nearly empty today and would punish every new member for being
+              new. The count next to each card is the honest version; this is
+              for a reader who has decided they only want evidence. */}
+          {serviceFilter && (
+            <label className="inline-flex items-center gap-1.5 text-[13px] text-grey-600 dark:text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={confirmedOnly}
+                onChange={(e) => setConfirmedOnly(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Confirmed only
+            </label>
+          )}
         </div>
       )}
 
@@ -167,7 +208,10 @@ function Directory() {
         <>
           <div className="mt-6 grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((business) => (
-              <BusinessCard key={business.id} business={business} />
+              <div key={business.id} className="flex h-full flex-col">
+                <BusinessCard business={business} />
+                <ConfirmedForService confirmed={business.confirmedForService} />
+              </div>
             ))}
           </div>
           {hasMore && (

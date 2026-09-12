@@ -44,17 +44,20 @@ function BusinessCard({
       to={`${basePath}/${business.id}`}
       // h-full AND flex-col together, and neither is decoration.
       //
-      // h-full: a grid row stretches its ITEMS, and in the app directory the
-      // item is a wrapper <div> (it has to be — the watch button is positioned
-      // against it), so the stretch stopped at the wrapper and every card in a
-      // row ended at its own content height. A card whose location wrapped to
-      // two lines stood taller than its neighbours and the row looked ragged.
+      // flex-1, NOT h-full: a grid row stretches its ITEMS, and the item is a
+      // wrapper <div> in both directories (it has to be — the watch button is
+      // positioned against it, and the confirmed-for-service line sits under
+      // it), so the stretch stops at the wrapper. h-full made the card consume
+      // the WHOLE cell and pushed that line out of view; flex-1 makes it take
+      // what is left after the siblings, which is what equal-height rows
+      // actually needs. Both callers make the cell `flex h-full flex-col` —
+      // without that this has no effect and the cards go ragged again.
       //
       // flex-col + mt-auto on the actions: once the cards are equal height,
       // the shorter ones have slack, and slack has to go somewhere. Without
       // this it lands under the buttons and they float mid-card; with it the
       // buttons sit on the bottom edge and line up across the row.
-      className="flex h-full flex-col rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-border dark:bg-card"
+      className="flex min-h-0 flex-1 flex-col rounded-lg border border-grey-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-border dark:bg-card"
     >
       <div
         className={`flex items-start gap-4${reserveTopRight ? " pr-6" : ""}`}

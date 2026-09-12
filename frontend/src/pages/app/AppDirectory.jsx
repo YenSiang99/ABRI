@@ -27,12 +27,35 @@ import { UNCLAIMED } from "@/lib/verificationLevels";
 // them which to use — so this one learned the other's tricks and the other
 // was deleted. The public /check survives, because a stranger who cannot log
 // in still needs a door.
+// Why this business is where it is in the list.
+//
+// SHOWN EVEN WHEN ZERO, and that is the honest half. A ranked list whose
+// reasons are invisible is a list that looks arbitrary; one that shows only
+// the winners' numbers reads as a leaderboard. "Nobody has confirmed this yet"
+// is a real, useful answer about a business that says it does the work.
+//
+// Counts DIFFERENT businesses, never engagements — ten confirmations from one
+// friend is one counterparty. See engagementSummaryFor in
+// backend/src/lib/engagements.js.
+function ConfirmedForService({ confirmed }) {
+  if (!confirmed) return null;
+  const n = confirmed.counterparties;
+  return (
+    <p className="mt-1.5 text-xs text-muted-foreground">
+      {n === 0
+        ? `No confirmed ${confirmed.service.toLowerCase()} work yet`
+        : `${confirmed.service} confirmed by ${n} ${n === 1 ? "business" : "different businesses"}`}
+    </p>
+  );
+}
+
 function AppDirectory() {
   const { business } = useAuth();
   const { connectionStateWith, connect } = useConnections();
   const [query, setQuery] = useState("");
   const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
   const [serviceFilter, setServiceFilter] = useState("");
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [catalogue, setCatalogue] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
@@ -70,6 +93,7 @@ function AppDirectory() {
         search: query.trim(),
         verificationLevel: filter,
         service: serviceFilter || undefined,
+        confirmedOnly: serviceFilter ? confirmedOnly : undefined,
         page,
       });
       // Your own business is never a search result — you cannot connect to,
@@ -81,7 +105,7 @@ function AppDirectory() {
       setHasMore(data.hasMore);
       setPage(data.page);
     },
-    [query, verificationLevelFilter, serviceFilter, business.id],
+    [query, verificationLevelFilter, serviceFilter, confirmedOnly, business.id],
   );
 
   // The whole catalogue, every category — this browse is not scoped to the
@@ -219,6 +243,23 @@ function AppDirectory() {
               Clear
             </button>
           )}
+          {/* RANKING IS ALREADY ON whenever a service is chosen — this only
+              hides the unconfirmed tail. Off by default, because a directory
+              that showed only businesses somebody has confirmed would be
+              nearly empty today and would punish every new member for being
+              new. The count next to each card is the honest version; this is
+              for a reader who has decided they only want evidence. */}
+          {serviceFilter && (
+            <label className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={confirmedOnly}
+                onChange={(e) => setConfirmedOnly(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Confirmed only
+            </label>
+          )}
         </div>
       )}
 
@@ -242,7 +283,7 @@ function AppDirectory() {
               in each row matched. */}
           <div className="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {businesses.map((b) => (
-              <div key={b.id} className="relative">
+              <div key={b.id} className="relative flex h-full flex-col">
                 {/* Only when the member actually typed something, and only
                     above the card it explains. On an unfiltered browse every
                     row would carry "matched on name", which is noise. */}
@@ -266,6 +307,7 @@ function AppDirectory() {
                   vouchers={b.vouchersInYourNetwork}
                   basePath="/app/business"
                 />
+                <ConfirmedForService confirmed={b.confirmedForService} />
                 {/* Pro. STILL A SIBLING OF THE CARD, NOT A CHILD — BusinessCard
                     is a <Link>, and a button inside an anchor both navigates
                     and fires. It used to sit in its own row below the card,

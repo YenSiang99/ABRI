@@ -123,6 +123,9 @@ router.get(
   optionalAuth,
   asyncHandler(async (req, res) => {
     const { search, verificationLevel, service } = req.query;
+    // Only meaningful alongside `service` — there is no such thing as being
+    // confirmed in general, only confirmed for something.
+    const confirmedOnly = req.query.confirmedOnly === "true";
 
     // Canonicalised, not trusted. A member typing "ssm filings" into a URL
     // means the catalogue entry "SSM filings", and `has` is an exact array
@@ -170,28 +173,104 @@ router.get(
       ...(search ? lookupWhere(search, { includeCategory: true }) : {}),
     };
 
-    const rows = await prisma.business.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            vouchesReceived: { where: { status: "published" } },
-            // Needed for the top vouch level, which is 25 received AND 10
-            // given. Counting only one direction caps every business at
-            // "trusted" with nothing to show it happened.
-            vouchesGiven: { where: { status: "published" } },
-          },
+    const BUSINESS_INCLUDE = {
+      _count: {
+        select: {
+          vouchesReceived: { where: { status: "published" } },
+          // Needed for the top vouch level, which is 25 received AND 10
+          // given. Counting only one direction caps every business at
+          // "trusted" with nothing to show it happened.
+          vouchesGiven: { where: { status: "published" } },
         },
       },
-      orderBy: { name: "asc" },
-      skip: (page - 1) * limit,
-      // Over-fetch by one to learn whether there is a next page, rather than
-      // running a second count query against the same predicate.
-      take: limit + 1,
-    });
+    };
 
-    const hasMore = rows.length > limit;
-    const businesses = hasMore ? rows.slice(0, limit) : rows;
+    // RANKED BY EVIDENCE WHEN A SERVICE IS NAMED, and this is the query the
+    // whole service + engagement design exists to make answerable: not "who
+    // says they do company incorporation" but "who has had it CONFIRMED, and
+    // by how many different businesses".
+    //
+    // DISTINCT COUNTERPARTIES, NOT ROWS — the same rule engagementSummaryFor
+    // applies, and for the same reason. Ranking on row count would put a
+    // business with ten engagements from one friendly counterparty above one
+    // with three from three different firms, which inverts the signal.
+    //
+    // AGGREGATED BEFORE PAGING, which is why this branch exists at all rather
+    // than sorting the page after fetching it. A rank computed per page is not
+    // a rank: the best-evidenced business on page two would sort above the
+    // worst on page one and appear second. The id-only first query is what
+    // keeps that affordable — it reads one column for the businesses that
+    // already passed every other filter, and the service filter is the
+    // narrowing one.
+    let rows;
+    let hasMore;
+    let confirmedByBusiness = new Map();
+
+    if (canonicalServiceFilter) {
+      const candidates = await prisma.business.findMany({ where, select: { id: true } });
+      const candidateIds = candidates.map((c) => c.id);
+
+      const engagements = await prisma.engagement.findMany({
+        where: {
+          status: "confirmed",
+          service: canonicalServiceFilter,
+          OR: [{ businessAId: { in: candidateIds } }, { businessBId: { in: candidateIds } }],
+        },
+        select: { businessAId: true, businessBId: true },
+      });
+
+      // An engagement touches two businesses and only one of them is the
+      // candidate for any given row — which end, depends on the id ordering
+      // the pair is stored under, so both are checked.
+      const counterparties = new Map(candidateIds.map((id) => [id, new Set()]));
+      for (const e of engagements) {
+        if (counterparties.has(e.businessAId)) counterparties.get(e.businessAId).add(e.businessBId);
+        if (counterparties.has(e.businessBId)) counterparties.get(e.businessBId).add(e.businessAId);
+      }
+      confirmedByBusiness = new Map(
+        [...counterparties].map(([id, set]) => [id, set.size]),
+      );
+
+      let ordered = candidateIds
+        .map((id) => ({ id, confirmed: confirmedByBusiness.get(id) ?? 0 }))
+        // Name is the tiebreak so the order is stable across pages and reloads
+        // — without it Postgres may hand back equal-ranked rows in any order
+        // and a member reloading sees them shuffle.
+        .sort((a, b) => b.confirmed - a.confirmed || a.id.localeCompare(b.id));
+
+      // The sharp version of this query: only businesses somebody has actually
+      // confirmed for this service. Off by default — a directory that hides
+      // every business without engagements would be empty today and would
+      // punish new members for being new.
+      if (confirmedOnly) ordered = ordered.filter((o) => o.confirmed > 0);
+
+      const pageIds = ordered.slice((page - 1) * limit, page * limit + 1);
+      hasMore = pageIds.length > limit;
+      const idsForPage = (hasMore ? pageIds.slice(0, limit) : pageIds).map((o) => o.id);
+
+      const fetched = await prisma.business.findMany({
+        where: { id: { in: idsForPage } },
+        include: BUSINESS_INCLUDE,
+      });
+      // findMany does not preserve the order of an `in` list, and the order is
+      // the entire point of this branch.
+      const byId = new Map(fetched.map((b) => [b.id, b]));
+      rows = idsForPage.map((id) => byId.get(id)).filter(Boolean);
+    } else {
+      const fetched = await prisma.business.findMany({
+        where,
+        include: BUSINESS_INCLUDE,
+        orderBy: { name: "asc" },
+        skip: (page - 1) * limit,
+        // Over-fetch by one to learn whether there is a next page, rather than
+        // running a second count query against the same predicate.
+        take: limit + 1,
+      });
+      hasMore = fetched.length > limit;
+      rows = hasMore ? fetched.slice(0, limit) : fetched;
+    }
+
+    const businesses = rows;
 
     // Plus, and asked about the VIEWER's own business rather than the ones
     // being listed — the first gate in this file that runs that direction.
@@ -237,6 +316,20 @@ router.get(
         // strangers gets no empty arrays and the client can render on
         // presence. A Free member never gets the key at all.
         ...(overlap.has(business.id) ? { vouchersInYourNetwork: overlap.get(business.id) } : {}),
+        // Present only while a service filter is active, and ZERO IS SENT
+        // rather than omitted: "nobody has confirmed this yet" is a real
+        // answer on a screen that has just ranked by it, and leaving the key
+        // off would make it indistinguishable from a client that forgot to
+        // ask. Absent entirely without the filter, where it would mean
+        // nothing.
+        ...(canonicalServiceFilter
+          ? {
+              confirmedForService: {
+                service: canonicalServiceFilter,
+                counterparties: confirmedByBusiness.get(business.id) ?? 0,
+              },
+            }
+          : {}),
       })),
       page,
       hasMore,

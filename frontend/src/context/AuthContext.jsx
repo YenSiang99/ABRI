@@ -13,17 +13,43 @@ function AuthProvider({ children }) {
   // can't know synchronously on first render whether one exists.
   const [loading, setLoading] = useState(true);
 
+  // A NETWORK FAILURE IS NOT A LOGOUT, and conflating the two is what made
+  // this app sign people out whenever the backend blinked — a dev-server
+  // restart, a laptop waking up, a dropped wifi frame. lib/api/client.js
+  // already draws the distinction: `status: 0` means the request never got a
+  // response at all, while a real 401 means the server looked at the cookie
+  // and said no. Only the second is a logout.
+  //
+  // Retried once before giving up, because the overwhelmingly common cause is
+  // a backend that is a second from being back. On a genuine outage this ends
+  // in the same place it used to — signed out — just not on the first stumble.
   useEffect(() => {
-    getMe()
-      .then((data) => {
+    let cancelled = false;
+
+    async function bootstrap(attempt = 1) {
+      try {
+        const data = await getMe();
+        if (cancelled) return;
         setAccount(data.account);
         setBusiness(data.business);
-      })
-      .catch(() => {
+      } catch (err) {
+        if (cancelled) return;
+        if (err?.status === 0 && attempt === 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+          if (cancelled) return;
+          return bootstrap(2);
+        }
         setAccount(null);
         setBusiness(null);
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Re-fetches /auth/me without touching `loading` — for refreshing
@@ -36,7 +62,13 @@ function AuthProvider({ children }) {
       const data = await getMe();
       setAccount(data.account);
       setBusiness(data.business);
-    } catch {
+    } catch (err) {
+      // Same rule as the bootstrap above, and it matters more here: this runs
+      // after an action the member just took, so clearing a live session
+      // because one refresh could not reach the server would throw them out
+      // mid-task. An unreachable server leaves the state exactly as it was —
+      // possibly a moment stale, which is strictly better than wrong.
+      if (err?.status === 0) return;
       setAccount(null);
       setBusiness(null);
     }
