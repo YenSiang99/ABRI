@@ -25,6 +25,17 @@ const BUSINESS_CATEGORIES = [
   "Accounting & Tax",
   "Law",
   "IT Consulting",
+  // ADDED BECAUSE A REAL BUSINESS WAS ALREADY IN IT. This list gates new
+  // writes only, and one member registered under "Design" before that gate
+  // existed — which left them matchable by no ask and findable by no service
+  // filter, silently, which is the exact failure this file was written to
+  // stop. Recategorising somebody's own description of their business would
+  // have been the wrong fix.
+  //
+  // The four above are still the go-to-market focus (see the note there);
+  // this is a fifth the network already contains, not a widening of it. The
+  // value matches the stored column exactly, so no migration was needed.
+  "Design",
 ];
 
 // The six localities the seeded corridor covers.
@@ -45,6 +56,11 @@ const BUSINESS_LOCATIONS = [
   "Shah Alam",
   "Puchong",
   "Bangsar",
+  // Same story as "Design" above: a member had already registered here before
+  // the gate existed. This list was always going to grow — see the note above
+  // about the corridor SSM import — so this is the planned direction arriving
+  // one locality early rather than an exception to it.
+  "Ampang",
 ];
 
 const BUSINESS_CATEGORY_SET = new Set(BUSINESS_CATEGORIES);

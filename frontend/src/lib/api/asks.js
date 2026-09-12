@@ -49,15 +49,38 @@ function fetchAsk(id) {
 
 // Needs T2 (SSM-verified). The server answers 403, not 402 — this is a
 // verification gate, not a membership-tier gate, so there is no upgrade prompt to open.
-function postAsk({ category, matchCategory, matchLocation, title, detail }) {
+// `matchServices` narrows routing from "anyone in this trade" to "anyone who
+// does this specific thing", and an EMPTY array means the former — not
+// "nobody". `maxAnswers` is the asker's own clutter limit and is null unless
+// they set one; the server stopped defaulting it to 6 because a first-come cap
+// selects on speed rather than fit.
+function postAsk({
+  category,
+  matchCategory,
+  matchLocation,
+  matchServices,
+  maxAnswers,
+  title,
+  detail,
+}) {
   return apiFetch("/asks", {
     method: "POST",
-    body: { category, matchCategory, matchLocation, title, detail },
+    body: {
+      category,
+      matchCategory,
+      matchLocation,
+      matchServices,
+      maxAnswers,
+      title,
+      detail,
+    },
   }).then((data) => data.ask);
 }
 
 function closeAsk(id) {
-  return apiFetch(`/asks/${id}/close`, { method: "POST" }).then((data) => data.ask);
+  return apiFetch(`/asks/${id}/close`, { method: "POST" }).then(
+    (data) => data.ask,
+  );
 }
 
 // recommendedBusinessId may be an unclaimed (T0) listing — the recommendation
@@ -78,9 +101,9 @@ function withdrawAnswer(askId) {
 }
 
 function acceptAnswer(askId, answerId) {
-  return apiFetch(`/asks/${askId}/answers/${answerId}/accept`, { method: "POST" }).then(
-    (data) => data.ask,
-  );
+  return apiFetch(`/asks/${askId}/answers/${answerId}/accept`, {
+    method: "POST",
+  }).then((data) => data.ask);
 }
 
 // Reporting freezes live content and puts it in the admin queue. Reasons come
@@ -92,7 +115,10 @@ function acceptAnswer(askId, answerId) {
 // against the reporter and the reported for the repeat-offender signal, and
 // there is nothing left to stop.
 function flagAsk(id, { reason, note } = {}) {
-  return apiFetch(`/asks/${id}/flag`, { method: "POST", body: { reason, note } }).then((d) => d.flag);
+  return apiFetch(`/asks/${id}/flag`, {
+    method: "POST",
+    body: { reason, note },
+  }).then((d) => d.flag);
 }
 
 function flagAnswer(askId, answerId, { reason, note } = {}) {

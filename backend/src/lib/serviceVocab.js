@@ -73,6 +73,31 @@ const SERVICES_BY_CATEGORY = {
     "Shareholder agreements",
     "Licensing & regulatory",
   ],
+  // Added with the category itself — a category with no catalogue is a
+  // category whose members can never be found by service, which is most of
+  // what the category is for.
+  //
+  // The one member already here has "Design" and "Marketing" stored, and
+  // neither is in this list on purpose: they are too broad to distinguish two
+  // businesses, which is the whole job of a catalogue entry. They stay as
+  // CUSTOM services — rendered on the profile, matched by nothing — until the
+  // owner picks from this list, which the profile editor makes a two-click
+  // change. That is the hybrid model working as intended rather than an
+  // oversight; see the header.
+  Design: [
+    "Brand identity",
+    "Logo design",
+    "Marketing strategy",
+    "Social media management",
+    "Web design",
+    "Packaging design",
+    "Content production",
+    "Copywriting",
+    "Print & collateral",
+    "Campaign management",
+    "SEO",
+    "Video & photography",
+  ],
   "IT Consulting": [
     "Cloud migration",
     "Systems integration",

@@ -14,6 +14,9 @@ const BUSINESS_CATEGORIES = [
   "Accounting & Tax",
   "Law",
   "IT Consulting",
+  // See the backend copy for why this fifth one exists: a member had already
+  // registered under it before the vocabularies gated new writes.
+  "Design",
 ];
 
 const BUSINESS_LOCATIONS = [
@@ -23,6 +26,7 @@ const BUSINESS_LOCATIONS = [
   "Shah Alam",
   "Puchong",
   "Bangsar",
+  "Ampang",
 ];
 
 export { BUSINESS_CATEGORIES, BUSINESS_LOCATIONS };
