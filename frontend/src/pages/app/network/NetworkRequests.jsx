@@ -31,6 +31,11 @@ const FROM = { path: "requests", label: "Back to requests" };
 
 // One card for both directions, because it's one row and one delete route.
 // What changes is who's waiting, and therefore which buttons make sense.
+//
+// EXPORTED for /app/inbox, which renders the received half of this page in its
+// Connections tab. Shared rather than reimplemented: accept and decline are
+// two calls with real failure paths, and a second copy of them is a second
+// place for the two to disagree about what "Decline" does.
 function RequestCard({ connection }) {
   const { counterparty: business, id, requestedByYou } = connection;
   const { acceptConnection, disconnect } = useConnections();
@@ -194,4 +199,4 @@ function NetworkRequests() {
   );
 }
 
-export { NetworkRequests };
+export { NetworkRequests, RequestCard };

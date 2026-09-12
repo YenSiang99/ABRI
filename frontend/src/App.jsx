@@ -22,6 +22,7 @@ import { NetworkFollowing } from "@/pages/app/network/NetworkFollowing";
 import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Feed } from "@/pages/app/feed/Feed";
 import { CheckHistory } from "@/pages/app/CheckHistory";
+import { Inbox } from "@/pages/app/Inbox";
 import { AsksBoard } from "@/pages/app/asks/AsksBoard";
 import { AskDetail } from "@/pages/app/asks/AskDetail";
 import { Verify } from "@/pages/app/Verify";
@@ -65,6 +66,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="inbox" element={<Inbox />} />
             <Route path="profile" element={<Profile />} />
             <Route path="vouches" element={<Vouches />} />
             {/* Network is a section, not a page — the sidebar expands to
