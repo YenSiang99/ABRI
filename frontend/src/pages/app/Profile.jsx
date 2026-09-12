@@ -1,6 +1,13 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Pencil, Radio, MapPin, Building2 } from "lucide-react";
+import {
+  Pencil,
+  Radio,
+  MapPin,
+  Building2,
+  Briefcase,
+  Check,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +26,8 @@ import { VouchBadge } from "@/components/badge/VouchBadge";
 import { VouchListItem } from "@/components/app/VouchListItem";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
-import { updateMyBusiness } from "@/lib/api/businesses";
+import { updateMyBusiness, fetchBusinesses } from "@/lib/api/businesses";
+import { proposeEngagement } from "@/lib/api/engagements";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import { membershipTierAllows } from "@/lib/membershipTiers";
 import { toast } from "@/lib/toast";
@@ -72,6 +80,364 @@ const FIELDS = [
 // the Klang Valley. What the split buys is honesty about which ones match: the
 // catalogue ones do, a typed one is shown and searched but routed by nothing,
 // and the UI says so rather than letting an owner think they are covered.
+// Log work with another business.
+//
+// THE COUNTERPARTY IS PICKED, NEVER TYPED. An engagement is a claim about a
+// specific business that has to reach that business's Inbox to be confirmed —
+// a typed name has nobody to send it to. This searches the directory and
+// submits an id, which is also why an unclaimed listing cannot be chosen: the
+// server refuses one (nobody there could ever confirm) and offering it here
+// would produce a failure the member could not have predicted.
+function LogEngagementDialog({ business, onSaved }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [target, setTarget] = useState(null);
+  const [catalogue, setCatalogue] = useState(null);
+  const [service, setService] = useState("");
+  const [note, setNote] = useState("");
+  const [month, setMonth] = useState(() =>
+    new Date().toISOString().slice(0, 7),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  function reset() {
+    setQuery("");
+    setResults([]);
+    setTarget(null);
+    setService("");
+    setNote("");
+    setMonth(new Date().toISOString().slice(0, 7));
+    setError(null);
+  }
+
+  function onOpenChange(next) {
+    setOpen(next);
+    if (next) reset();
+  }
+
+  // The service list follows the TARGET's category, not the member's own. The
+  // work was delivered by whoever did it, and logging "SST advisory" against a
+  // law firm because the logger is an accountant would put a service on their
+  // profile they do not offer.
+  // Stores the category alongside the list rather than clearing it on target
+  // change. Clearing meant a synchronous setState in the effect body — the
+  // cascading-render pattern react-hooks/set-state-in-effect flags — and the
+  // stored key does the same job better: a list fetched for a previous target
+  // is simply not `forCategory`, so it is never rendered against the new one.
+  useEffect(() => {
+    if (!target) return undefined;
+    let live = true;
+    fetchServiceCatalogue(target.category)
+      .then(
+        (data) =>
+          live && setCatalogue({ forCategory: target.category, ...data }),
+      )
+      .catch(
+        () =>
+          live && setCatalogue({ forCategory: target.category, services: [] }),
+      );
+    return () => {
+      live = false;
+    };
+  }, [target]);
+
+  const catalogueReady = target && catalogue?.forCategory === target.category;
+
+  async function search(value) {
+    setQuery(value);
+    setTarget(null);
+    if (value.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    try {
+      const rows = await fetchBusinesses({ search: value.trim(), limit: 8 });
+      setResults(
+        rows
+          .filter((b) => b.id !== business.id && b.verificationLevel !== "L0")
+          .slice(0, 6),
+      );
+    } catch {
+      setResults([]);
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await proposeEngagement({
+        businessId: target.id,
+        service: service || undefined,
+        note: note.trim() || undefined,
+        // The server floors this to the first of the month; sending a day at
+        // all is an artefact of <input type="month"> needing one to parse.
+        occurredOn: `${month}-01T00:00:00.000Z`,
+      });
+      await onSaved();
+      toast.success(`Sent to ${target.name} to confirm`, {
+        description: "It appears on both profiles once they agree.",
+      });
+      setOpen(false);
+    } catch (err) {
+      setError(err.message ?? "Couldn't log that.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Briefcase className="h-3.5 w-3.5" /> Log work
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Log work with another business</DialogTitle>
+          <DialogDescription>
+            They have to confirm it before it appears on either profile.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Who did you work with?
+            </label>
+            {target ? (
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <span className="text-sm text-foreground">
+                  {target.name}
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {target.category}
+                  </span>
+                </span>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setTarget(null)}
+                >
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Input
+                  className="mt-2"
+                  placeholder="Search the directory"
+                  value={query}
+                  onChange={(e) => search(e.target.value)}
+                />
+                {results.length > 0 && (
+                  <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+                    {results.map((b) => (
+                      <li key={b.id}>
+                        <button
+                          type="button"
+                          onClick={() => setTarget(b)}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-secondary"
+                        >
+                          {b.name}
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {b.category}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              When
+            </label>
+            <Input
+              type="month"
+              className="mt-2"
+              value={month}
+              max={new Date().toISOString().slice(0, 7)}
+              onChange={(e) => setMonth(e.target.value)}
+            />
+            {/* Said plainly, because a member who expects day precision will
+                otherwise think the field is broken. */}
+            <p className="mt-1 text-xs text-muted-foreground">
+              Month is enough — nobody remembers the day, and pretending
+              otherwise invites arguments about it.
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              What was the work?
+            </label>
+            {!target ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Pick a business first.
+              </p>
+            ) : !catalogueReady ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Loading services…
+              </p>
+            ) : (
+              <>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {catalogue.services.map((sv) => (
+                    <button
+                      key={sv}
+                      type="button"
+                      onClick={() => setService(service === sv ? "" : sv)}
+                      aria-pressed={service === sv}
+                      className={
+                        "rounded-full border px-3 py-1.5 text-[13px] transition-colors " +
+                        (service === sv
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:text-foreground")
+                      }
+                    >
+                      {sv}
+                    </button>
+                  ))}
+                </div>
+                {/* Optional, and the consequence of leaving it out is stated
+                    rather than left to be discovered — an engagement with no
+                    service is real but appears in no aggregate. */}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Optional. Without one this still counts as work you did
+                  together, but it won&rsquo;t appear under any service on their
+                  profile.
+                </p>
+              </>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Note (optional)
+            </label>
+            <Textarea
+              className="mt-2"
+              rows={2}
+              maxLength={280}
+              placeholder="One line, so the two of you can tell it apart later."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={!target || saving}>
+            {saving ? "Sending…" : "Send to confirm"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// The owner's own "Worked with", plus the thing only they can see: which of
+// the services they CLAIM has anybody actually confirmed.
+//
+// THAT SECOND HALF IS THE POINT OF THIS PANEL. A business can tick every
+// service in its category and nothing checks it — this is the only surface in
+// the product that shows the owner the gap between what they advertise and
+// what a counterparty has stood behind. Shown to the owner alone, and framed
+// as something to go and collect rather than as a failing: an unconfirmed
+// service is not a lie, it is just unevidenced.
+function OwnEngagements({ business, onChanged }) {
+  const entries = business.engagements ?? [];
+  const summary = business.engagementSummary ?? { total: 0, services: [] };
+  const confirmedServices = new Set(summary.services.map((s) => s.service));
+  const claimed = business.services ?? [];
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            Worked with
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Confirmed by the other side. This is what visitors see.
+          </p>
+        </div>
+        <LogEngagementDialog business={business} onSaved={onChanged} />
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Nothing yet. Log work you&rsquo;ve done with another member — once
+          they confirm it, it shows on both your profiles.
+        </p>
+      ) : (
+        <ol className="mt-4 space-y-3">
+          {entries.slice(0, 6).map((e) => (
+            <li key={e.id} className="flex gap-3 text-sm">
+              <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">
+                {new Date(e.occurredOn).toLocaleDateString(undefined, {
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+              <span className="min-w-0">
+                <span className="text-foreground">{e.counterparty?.name}</span>
+                {e.service && (
+                  <span className="text-muted-foreground"> · {e.service}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {claimed.length > 0 && (
+        <div className="mt-6 border-t border-border pt-4">
+          <div className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+            Your services, and which are backed up
+          </div>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {claimed.map((sv) => {
+              const backed = confirmedServices.has(sv);
+              return (
+                <li
+                  key={sv}
+                  className={
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] " +
+                    (backed
+                      ? "border-border text-foreground"
+                      : "border-dashed border-border text-muted-foreground")
+                  }
+                >
+                  {backed && <Check className="h-3.5 w-3.5" />}
+                  {sv}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Ticked ones have at least one confirmed engagement behind them. The
+            rest are still just claims — only you see this.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The owner's view of a recommendation, deliberately shaped like
 // RecommendationCard in BusinessProfile.jsx and NOT like VouchListItem.
 //
@@ -591,6 +957,13 @@ function Profile() {
               {business.description}
             </p>
           </div>
+
+          {/* Directly under About, above contact. It is the factual record of
+              what this business has actually done, and the only place the
+              owner can see which of their claimed services anybody has stood
+              behind. */}
+          <OwnEngagements business={business} onChanged={refreshAccount} />
+
           {/* contactLocked false: this is the owner's own view, which is
               never gated. The upsell below is what tells them the public
               profile looks different. */}
