@@ -47,7 +47,7 @@ const vouchIds = (await db.vouch.findMany({
 })).map((v) => v.id);
 
 const steps = [
-  ["networkEvent",  { OR: [{ actorBusinessId: biz }, { subjectBusinessId: biz }, { vouchId: { in: vouchIds } }, { askAnswerId: { in: answerIds } }] }],
+  ["networkEvent",  { OR: [{ actorBusinessId: biz }, { subjectBusinessId: biz }, { vouchId: { in: vouchIds } }] }],
   ["askFlag",       { OR: [{ askId: { in: askIds } }, { answerId: { in: answerIds } }, { againstBusinessId: biz }, { raisedByBusinessId: biz }, { resolvedByAccountId: { in: accIds } }] }],
   ["askAnswer",     { id: { in: answerIds } }],
   ["ask",           { id: { in: askIds } }],

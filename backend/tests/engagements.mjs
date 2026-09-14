@@ -58,6 +58,9 @@ await db.$disconnect();
 const a2 = await login("a2");
 const a3 = await login("a3");
 const a4 = await login("a4");
+const a5 = await login("a5");
+const a6 = await login("a6");
+const a7 = await login("a7");
 
 const publicProfile = async (id) =>
   (await (await fetch(`${API}/businesses/${id}`)).json()).business;
@@ -201,5 +204,79 @@ assert.equal(r.status, 200);
 r = await a2("/engagements");
 assert.ok(!r.data.engagements.some((e) => e.id === pending), "withdrawn is gone, not archived");
 ok("only the proposer withdraws, and the row is deleted rather than kept");
+
+
+console.log("\n13. The repeat signal: a count of businesses that came back");
+// Built on a5, which no earlier step in this suite has touched, so the counts
+// below are absolute rather than deltas — the table was reset at the top and
+// only these rows reach this business.
+const MONTH = (back) => {
+  const n = new Date();
+  return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - back, 1)).toISOString();
+};
+const confirmWith = async (proposer, confirmer, targetKey, service, occurredOn = LAST_MONTH) => {
+  const p = await proposer("/engagements", { method: "POST", body: {
+    businessId: `${P}${targetKey}`, service, occurredOn,
+  }});
+  assert.equal(p.status, 201, JSON.stringify(p.data));
+  const c = await confirmer(`/engagements/${p.data.engagement.id}/confirm`, { method: "POST" });
+  assert.equal(c.status, 200, JSON.stringify(c.data));
+};
+const summaryOf = async (key) => (await publicProfile(`${P}${key}`)).engagementSummary;
+
+// One counterparty, once: nobody has come back.
+await confirmWith(a5, a6, "a6", SERVICE, MONTH(1));
+let sum = await summaryOf("a5");
+assert.equal(sum.counterparties, 1);
+assert.equal(sum.repeatCounterparties, 0, "a single engagement is nobody returning");
+assert.notStrictEqual(sum.repeatCounterparties, null, "the count is a number from the start");
+ok("one engagement: repeat count is 0, never null");
+
+// THE FIRST RETURN COUNTS IMMEDIATELY. No threshold on counterparties: the
+// whole point of dropping the ratio was that the figure should move the first
+// time somebody comes back, rather than waiting for a denominator.
+await confirmWith(a5, a6, "a6", "Payroll", MONTH(3));
+sum = await summaryOf("a5");
+assert.equal(sum.counterparties, 1, "still one counterparty");
+assert.equal(sum.repeatCounterparties, 1, "and that one has now come back");
+ok("a repeat shows at one counterparty — no threshold to clear");
+
+// SEVERAL SERVICES IN ONE MONTH IS NOT COMING BACK. The rule that keeps the
+// figure honest: a single project itemised as three service lines must not
+// read as a returning client.
+await confirmWith(a5, a7, "a7", SERVICE, MONTH(1));
+await confirmWith(a5, a7, "a7", "Audit support", MONTH(1));
+await confirmWith(a5, a7, "a7", "SST advisory", MONTH(1));
+sum = await summaryOf("a5");
+assert.equal(sum.counterparties, 2, "a7 is a second counterparty");
+assert.equal(sum.repeatCounterparties, 1, "three services in ONE month is not a return");
+ok("same-month rows add no repeat — distinct months, never row counts");
+
+// ...and a later month with that same business does.
+await confirmWith(a5, a7, "a7", SERVICE, MONTH(4));
+sum = await summaryOf("a5");
+assert.equal(sum.repeatCounterparties, 2, "a7 has now worked in a second month");
+ok("a genuinely later month raises the count");
+
+// A BUSINESS NOBODY RETURNED TO REPORTS ZERO, and reports it to everyone. The
+// client decides whether a zero is worth drawing (it is not, for a visitor);
+// the payload never withholds it, because every row it counts is already on
+// the public profile for anyone to tally by hand.
+await confirmWith(a2, a3, "a3", SERVICE, MONTH(1));
+await confirmWith(a2, a4, "a4", SERVICE, MONTH(2));
+sum = await summaryOf("a2");
+assert.ok(sum.counterparties >= 2, "at least two counterparties");
+assert.equal(sum.repeatCounterparties, 0, "nobody worked with a2 in two different months");
+ok("no returns reports 0 publicly, withheld from nobody");
+
+// The owner's payload carries the same number as the public one — there is no
+// owner-only variant of this figure any more, only owner-only WORDING.
+r = await a2("/auth/me");
+assert.equal(
+  r.data.business.engagementSummary.repeatCounterparties,
+  sum.repeatCounterparties,
+  "owner and visitor read the same count",
+);
+ok("owner and public payloads agree on the count");
 
 console.log(`\n${pass} checks passed.`);

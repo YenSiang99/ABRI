@@ -137,8 +137,8 @@ function AsksBoard() {
       if (tab === "answered") {
         return (
           <Empty icon={ClipboardList}>
-            You haven't answered anything yet. Answering is how the network works: recommend
-            somebody good and they find out who sent them.
+            You haven't answered anything yet. Answering is how the network works: point
+            somebody good at the work, or put yourself forward.
           </Empty>
         );
       }
@@ -187,7 +187,7 @@ function AsksBoard() {
           </div>
         }
       >
-        Somebody needs something. If it's your line of work, you can answer — by recommending a
+        Somebody needs something. If it's your line of work, you can answer — by suggesting a
         business you rate, or by putting yourself forward.
       </PageHeader>
 

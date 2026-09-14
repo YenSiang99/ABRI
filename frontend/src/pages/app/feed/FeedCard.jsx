@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Handshake, Sparkles, ShieldCheck, UserPlus } from "lucide-react";
+import { Handshake, ShieldCheck, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
@@ -60,7 +60,6 @@ function BusinessLink({ business }) {
 // that makes four kinds of news skimmable in one column.
 const PRESENTATION = {
   vouch_published: { icon: Handshake, tone: "text-foreground" },
-  recommendation_published: { icon: Sparkles, tone: "text-foreground" },
   business_claimed: { icon: UserPlus, tone: "text-muted-foreground" },
   business_verified: { icon: ShieldCheck, tone: "text-muted-foreground" },
 };
@@ -69,8 +68,7 @@ const PRESENTATION = {
 // names are links.
 //
 // Note who is `actor` and who is `subject` in each: the actor DID it, the
-// subject is what it is ABOUT. On a vouch that is giver and receiver; on a
-// recommendation it is the answerer and the business they named. The two
+// subject is what it is ABOUT. On a vouch that is giver and receiver. The two
 // level types have no actor at all — an admin approved them, and staff never
 // appear in a members' feed.
 function Sentence({ event }) {
@@ -80,13 +78,6 @@ function Sentence({ event }) {
     return (
       <>
         <BusinessLink business={actor} /> vouched for <BusinessLink business={subject} />
-      </>
-    );
-  }
-  if (type === "recommendation_published") {
-    return (
-      <>
-        <BusinessLink business={actor} /> recommended <BusinessLink business={subject} /> on an ask
       </>
     );
   }
@@ -132,9 +123,9 @@ function Sentence({ event }) {
 // would drag the entire moderation apparatus in behind it.
 //
 // The target is ALWAYS event.subject, never the actor. One rule, no per-type
-// branching: the subject is the vouch's receiver, the recommended business, or
-// the business that just claimed or verified, and in all four cases the row
-// reads "somebody else just found them credible — do you know them too?".
+// branching: the subject is the vouch's receiver, or the business that just
+// claimed or verified, and in every case the row reads "somebody else just
+// found them credible — do you know them too?".
 // Offering the actor as a second target would put two vouch buttons on one row
 // with nothing to tell them apart.
 function FeedActions({ event, onVouch }) {

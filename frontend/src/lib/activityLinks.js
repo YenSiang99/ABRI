@@ -81,15 +81,6 @@ function activityLink(event) {
   if (ASK_ASKER_TYPES.has(event.type)) return "/app/asks?tab=mine";
   if (ASK_ANSWERER_TYPES.has(event.type)) return "/app/asks?tab=answered";
 
-  // The one that leaves the Asks section entirely, because the thing it names
-  // is on the member's own profile, not on the board.
-  if (
-    event.type === "ask_recommendation_received" ||
-    event.type === "recommendations_waiting"
-  ) {
-    return "/app/profile?tab=recommendations";
-  }
-
   if (ENGAGEMENT_TYPES.has(event.type)) return "/app/inbox?tab=engagements";
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";

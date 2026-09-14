@@ -1,7 +1,6 @@
 import { prisma } from "../prisma.js";
 import { CATEGORY_SERVICES } from "./categoryServices.js";
 import { uniqueBusinessId } from "./slug.js";
-import { createActivityEvent } from "./activityEvents.js";
 import { CLAIMED, UNCLAIMED } from "./verificationLevels.js";
 import { createNetworkEvent } from "./networkEvents.js";
 import { normalizeSsm } from "./businessLookup.js";
@@ -110,12 +109,6 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
   // actorBusinessId stays null. An admin approved this, and an admin is not a
   // member — naming one would put staff into a members' feed. Same call
   // activityEvents.js makes on ask_expired.
-  //
-  // This is also the moment every recommendation this business collected as
-  // a T0 becomes visible in the feed, all at once and with nothing written
-  // here to do it: those rows have been sitting dark behind the
-  // verificationLevel check in visibleNetworkEventsWhere since the day they
-  // were accepted.
   await createNetworkEvent(prisma, {
     type: "business_claimed",
     subjectBusinessId: business.id,
@@ -124,34 +117,6 @@ async function approveClaimAndRejectRivals({ accountId, businessId, verification
   // checked a counterparty, found only a bare listing, and asked to be told
   // the moment somebody stood behind it.
   await notifyWatchers(business.id, { fromLevel: UNCLAIMED, toLevel: CLAIMED });
-
-  // Recommendations made while this business was still an unclaimed listing.
-  //
-  // They needed no "held" state to wait: BusinessProfile.jsx renders no tabs
-  // at all for a T0, so an accepted answer naming this business has simply
-  // been invisible. The level flip above is what publishes them, and this is
-  // the only moment anyone could be told — ask_recommendation_received
-  // couldn't fire at accept time because there was no owner to send it to.
-  //
-  // ONE summary event, not one per recommendation: a feed is capped at 50
-  // (ACTIVITY_KEEP_PER_BUSINESS), so a business recommended twenty times
-  // would arrive to a feed containing nothing else on its first day.
-  const heldRecommendations = await prisma.askAnswer.count({
-    where: {
-      recommendedBusinessId: businessId,
-      status: "accepted",
-      // A business that nominated itself before claiming hasn't been
-      // recommended by anyone — same filter the Recommendations tab uses.
-      answeredByBusinessId: { not: businessId },
-    },
-  });
-  if (heldRecommendations > 0) {
-    await createActivityEvent(prisma, {
-      businessId,
-      actorBusinessId: null,
-      type: "recommendations_waiting",
-    });
-  }
 
   return { account, business };
 }

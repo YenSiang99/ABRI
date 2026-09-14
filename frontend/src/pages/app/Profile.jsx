@@ -7,7 +7,12 @@ import {
   Building2,
   Briefcase,
   Check,
+  Gem,
 } from "lucide-react";
+import {
+  EngagementList,
+  RepeatSignal,
+} from "@/components/business/EngagementList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -360,7 +365,11 @@ function LogEngagementDialog({ business, onSaved }) {
 // service is not a lie, it is just unevidenced.
 function OwnEngagements({ business, onChanged }) {
   const entries = business.engagements ?? [];
-  const summary = business.engagementSummary ?? { total: 0, services: [] };
+  const summary = business.engagementSummary ?? {
+    total: 0,
+    services: [],
+    repeatCounterparties: null,
+  };
   const confirmedServices = new Set(summary.services.map((s) => s.service));
   const claimed = business.services ?? [];
 
@@ -378,36 +387,22 @@ function OwnEngagements({ business, onChanged }) {
         <LogEngagementDialog business={business} onSaved={onChanged} />
       </div>
 
+      <RepeatSignal repeatCounterparties={summary.repeatCounterparties} owner />
+
       {entries.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">
           Nothing yet. Log work you&rsquo;ve done with another member — once
           they confirm it, it shows on both your profiles.
         </p>
       ) : (
-        <ol className="mt-4 space-y-3">
-          {entries.slice(0, 6).map((e) => (
-            <li key={e.id} className="flex gap-3 text-sm">
-              <span className="w-24 shrink-0 font-mono text-xs text-muted-foreground">
-                {new Date(e.occurredOn).toLocaleDateString(undefined, {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-              <span className="min-w-0">
-                <span className="text-foreground">{e.counterparty?.name}</span>
-                {e.service && (
-                  <span className="text-muted-foreground"> · {e.service}</span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <EngagementList entries={entries} limit={6} className="mt-4" />
       )}
 
       {claimed.length > 0 && (
         <div className="mt-6 border-t border-border pt-4">
-          <div className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-            Your services, and which are backed up
+          <div className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+            <Gem className="h-3.5 w-3.5" />
+            All services, backed and verified by real businesses
           </div>
           <ul className="mt-3 flex flex-wrap gap-2">
             {claimed.map((sv) => {
@@ -438,35 +433,6 @@ function OwnEngagements({ business, onChanged }) {
   );
 }
 
-// The owner's view of a recommendation, deliberately shaped like
-// RecommendationCard in BusinessProfile.jsx and NOT like VouchListItem.
-//
-// Same reasoning as there: a vouch is two-party and unconditional, a
-// recommendation is three-party and answers a specific question. If the two
-// rendered alike on this page the weaker signal would borrow the stronger
-// one's credibility — and this is the page where an owner forms their idea of
-// what their profile is worth, so it is the worst place to blur them.
-function OwnRecommendationCard({ recommendation }) {
-  const { answeredBy, ask } = recommendation;
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="text-sm text-foreground">
-        <span className="font-semibold">{answeredBy.name}</span> recommended you
-        when <span className="font-semibold">{ask.askedByBusiness.name}</span>{" "}
-        asked for something.
-      </div>
-      <div className="mt-1 text-xs text-muted-foreground">
-        {ask.title}
-        {recommendation.acceptedAt
-          ? ` · ${new Date(recommendation.acceptedAt).toLocaleDateString()}`
-          : ""}
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        {recommendation.comment}
-      </p>
-    </div>
-  );
-}
 
 function ServicePicker({ category, selected, onChange }) {
   const [catalogue, setCatalogue] = useState(null);
@@ -936,15 +902,6 @@ function Profile() {
           <TabsTrigger value="vouches">
             Vouches ({locked ? 0 : business.vouchCount})
           </TabsTrigger>
-          {/* Mirrors the public profile's tab order for the reason given in
-              BusinessProfile.jsx: always AFTER Vouches, never first, because a
-              recommendation is the lighter of the two signals and the order is
-              where that has to be visible. This page was missing the tab
-              entirely, so an owner could not see the half of their own profile
-              that visitors could. */}
-          <TabsTrigger value="recommendations">
-            Recommendations ({locked ? 0 : (business.recommendationCount ?? 0)})
-          </TabsTrigger>
           <TabsTrigger value="card">NFC Card</TabsTrigger>
         </TabsList>
 
@@ -1048,34 +1005,6 @@ function Profile() {
           ) : (
             <p className="text-sm text-muted-foreground md:col-span-2">
               No vouches yet.
-            </p>
-          )}
-        </TabsContent>
-
-        <TabsContent
-          value="recommendations"
-          className="mt-6 grid gap-4 md:grid-cols-2"
-        >
-          {locked ? (
-            <div className="md:col-span-2">
-              <LockedFeature
-                title="Recommendations locked"
-                description="Recommendations will appear here once your SSM verification is complete."
-              />
-            </div>
-          ) : (business.recommendations ?? []).length > 0 ? (
-            (business.recommendations ?? []).map((r) => (
-              <OwnRecommendationCard key={r.id} recommendation={r} />
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground md:col-span-2">
-              {/* Says WHY it is empty, not just that it is. An owner whose
-                  own accepted answers are self-nominations would otherwise
-                  read this as a bug — which is exactly how it was reported.
-                  See the self-nomination note in routes/businesses.js. */}
-              No recommendations yet. These come from another member naming you
-              in an answer to someone&rsquo;s ask — putting yourself forward and
-              being accepted is not one, and never appears here.
             </p>
           )}
         </TabsContent>

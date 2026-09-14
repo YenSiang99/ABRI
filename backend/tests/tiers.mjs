@@ -289,8 +289,8 @@ ok("both routes read the session only; a target id changes nothing");
 
 // ── Clean up ──────────────────────────────────────────────────────────────
 //
-// This file builds a vouch graph on shared fixtures, and e2e-run asserts that
-// e2e-target has NO vouches ("recommendations must NOT count as vouches").
+// This file builds a vouch graph on shared fixtures, and asks.mjs asserts that
+// e2e-target's vouch count is unchanged by an accepted answer.
 // Leaving them behind makes that suite fail depending on the order the two
 // are run in — which is the worst kind of failure, because it looks like the
 // other file's bug.

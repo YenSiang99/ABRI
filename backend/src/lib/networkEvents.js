@@ -8,16 +8,15 @@
 // THE ONE INVARIANT IN THIS FILE, and the thing to preserve above all else:
 // a NetworkEvent is a POINTER, never a copy. It carries the ids of the two
 // businesses and a foreign key to the content — the testimonial text lives on
-// VouchRevision and the answer text on AskAnswer, and the feed joins through
-// for both. Nothing here is a second copy of anything that can be edited,
-// withdrawn, frozen or revoked.
+// VouchRevision and the feed joins through for it. Nothing here is a second
+// copy of anything that can be edited, withdrawn, frozen or revoked.
 //
 // That is what buys moderation for free. visibleNetworkEventsWhere below
 // requires each event's source to STILL be in a publishable state, so a
-// flagged vouch, an admin-removed answer or a revoked SSM verification drops
-// its own announcement out of the feed with no compensating write anywhere.
-// Nothing in routes/admin.js, routes/vouches.js or routes/asks.js has to know
-// this table exists in order to un-say something.
+// flagged vouch or a revoked SSM verification drops its own announcement out
+// of the feed with no compensating write anywhere. Nothing in routes/admin.js
+// or routes/vouches.js has to know this table exists in order to un-say
+// something.
 import {
   VERIFICATION_LEVELS,
   UNCLAIMED,
@@ -35,7 +34,6 @@ import {
 // are the same thing.
 const NETWORK_EVENT_TYPES = new Set([
   "vouch_published",
-  "recommendation_published",
   "business_claimed",
   "business_verified",
   // RECORDED BUT NEVER ANNOUNCED, and the asymmetry is deliberate.
@@ -93,17 +91,16 @@ const NETWORK_BUSINESS_SELECT = {
 
 // One include for every feed read.
 //
-// The two content relations are selected down to the single field the card
-// renders plus the status the `where` already filtered on. Explicit selects
-// rather than `include: true`, so widening Vouch or AskAnswer later cannot
-// push a new column into a public feed by default.
+// The content relation is selected down to the single field the card renders
+// plus the status the `where` already filtered on. An explicit select rather
+// than `include: true`, so widening Vouch later cannot push a new column into
+// a public feed by default.
 const NETWORK_EVENT_INCLUDE = {
   subjectBusiness: { select: NETWORK_BUSINESS_SELECT },
   actorBusiness: { select: NETWORK_BUSINESS_SELECT },
   vouch: {
     select: { status: true, currentRevision: { select: { comment: true } } },
   },
-  askAnswer: { select: { status: true, comment: true } },
 };
 
 // Returns an unawaited Prisma promise — pass `prisma` directly, or a `tx`
@@ -112,12 +109,12 @@ const NETWORK_EVENT_INCLUDE = {
 // can never drift apart. Exactly the contract createActivityEvent offers, and
 // for the same reason.
 //
-// The three optional ids are passed by name rather than positionally because
-// every type sets a different subset, and a positional signature would make
-// the two level types read as `(id, null, null, "L2")` at the call site.
+// The optional ids are passed by name rather than positionally because every
+// type sets a different subset, and a positional signature would make the two
+// level types read as `(id, null, null, "L2")` at the call site.
 function createNetworkEvent(
   client,
-  { type, subjectBusinessId, actorBusinessId = null, vouchId = null, askAnswerId = null },
+  { type, subjectBusinessId, actorBusinessId = null, vouchId = null },
 ) {
   return client.networkEvent.create({
     data: {
@@ -125,7 +122,6 @@ function createNetworkEvent(
       subjectBusinessId,
       actorBusinessId,
       vouchId,
-      askAnswerId,
       // Derived from the type, never passed in — the same call routes/admin.js
       // makes with a flag's `outcome`. A caller that could set this
       // independently could write a business_verified row announcing L1.
@@ -156,26 +152,6 @@ function visibleNetworkEventsWhere({ followedIds = null } = {}) {
   const live = {
     OR: [
       { type: "vouch_published", vouch: { is: { status: "published" } } },
-      {
-        type: "recommendation_published",
-        askAnswer: { is: { status: "accepted" } },
-        // The T0 rule, enforced HERE rather than at the write, and this is
-        // the second thing the pointer design buys.
-        //
-        // An accepted answer may name an unclaimed listing — the one place
-        // the asks board departs from "a T0 is refused every relational
-        // action" — and that recommendation is meant to WAIT, invisible,
-        // until they claim. Skipping the write would honour that once and
-        // then lose it: the recommendation would go live on their profile at
-        // claim time with nothing ever announcing it.
-        //
-        // Filtering instead means the row sits there dark and lights up by
-        // itself the moment the claim flips them off L0, with no second write
-        // and nothing in businessClaim.js needing to know this table exists.
-        // Same reason isRecommendationPublished in lib/asks.js is derived
-        // from verificationLevel rather than stored as a `published` column.
-        subjectBusiness: { is: { verificationLevel: { not: UNCLAIMED } } },
-      },
       ...VERIFICATION_LEVELS.map((level) => ({
         type: { in: LEVEL_EVENT_TYPES },
         toVerificationLevel: level,
@@ -226,7 +202,7 @@ function serializeNetworkEvent(event) {
     // anyone. `currentRevision` is optional on Vouch, so a published vouch
     // with no revision row (impossible today, cheap to survive) renders as a
     // quoteless card instead of throwing.
-    quote: event.vouch?.currentRevision?.comment ?? event.askAnswer?.comment ?? null,
+    quote: event.vouch?.currentRevision?.comment ?? null,
     // Only the level types carry this; the card reads it for its label so it
     // does not need a second copy of which type means which level.
     toVerificationLevel: event.toVerificationLevel ?? null,

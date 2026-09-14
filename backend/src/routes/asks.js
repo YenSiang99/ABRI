@@ -4,7 +4,6 @@ import { prisma } from "../prisma.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
-import { createNetworkEvent } from "../lib/networkEvents.js";
 import { applyExpiryIfNeeded, ASK_EXPIRY_DAYS } from "../lib/askExpiry.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
 import { canonicalService } from "../lib/serviceVocab.js";
@@ -18,7 +17,6 @@ import {
   ASK_DETAIL_INCLUDE,
   canPostAsks,
   matchingAsksWhere,
-  isRecommendationPublished,
   isSelfNomination,
   serializeAsk,
   serializeAnswer,
@@ -37,7 +35,7 @@ import {
 //       └──────── admin: close ───────────┘ ─► [ closed ]
 //
 //  ANSWER
-//    [ offered ] ── accept (asker) ──► [ accepted ]  publishes a Recommendation
+//    [ offered ] ── accept (asker) ──► [ accepted ]  settles the ask, publishes nothing
 //         │  │                              │
 //         │  ├── withdraw (answerer) ─► [ withdrawn ]  slot back to its author
 //         │  └── flag ─► [ under_review ] ◄─┘
@@ -132,8 +130,8 @@ router.get(
     const asks = await prisma.ask.findMany({
       where: {
         // "answered" is included so a settled thread stays readable — the
-        // archive of what people actually recommended is the part of this
-        // board worth keeping. "closed" is not: nothing was decided.
+        // archive of what people actually suggested is the part of this board
+        // worth keeping. "closed" is not: nothing was decided.
         //
         // "under_review" appears ONLY in its own asker's list, further down.
         // Frozen content is hidden from everyone else, but the asker has to
@@ -368,18 +366,19 @@ router.post(
 
     const { recommendedBusinessId, comment } = req.body ?? {};
     const cleanComment = comment?.trim();
-    if (!cleanComment) fail(400, "Say why you're recommending them.");
+    if (!cleanComment) fail(400, "Say why they're a good fit.");
     if (cleanComment.length > 300) fail(400, "Keep it under 300 characters.");
 
     const target = await prisma.business.findUnique({ where: { id: recommendedBusinessId } });
     if (!target) fail(404, "Business not found.");
 
     // NO T0 refusal here, unlike POST /connections and POST /follows. An
-    // answer is addressed to the ASKER, not to the business named, so
-    // recommending an unclaimed listing does nothing TO an absent owner —
-    // and once the corridor SSM import lands, the best answer will routinely
-    // be a business that hasn't claimed yet. The recommendation is simply
-    // invisible until they do; see isRecommendationPublished in lib/asks.js.
+    // answer is addressed to the ASKER, not to the business named, so naming
+    // an unclaimed listing does nothing TO an absent owner — and once the
+    // corridor SSM import lands, the best answer will routinely be a business
+    // that hasn't claimed yet. Since Sept 2026 an accepted answer publishes
+    // nothing anywhere, so a T0 here is not even a deferred write: the name
+    // reaches the asker and stops.
     //
     // NO can() call either. Answering is not plan-gated, on purpose: Pro buys
     // the alert, not the ability to act on one.
@@ -509,8 +508,8 @@ router.post(
     }
 
     // Two types rather than one with a branch — see ACTIVITY_MESSAGES. The
-    // asker meets the recommend/self-offer distinction on the ask page, and
-    // it has to read the same way in their notifications.
+    // asker meets the someone-else/self-offer distinction on the ask page,
+    // and it has to read the same way in their notifications.
     await createActivityEvent(prisma, {
       businessId: ask.askedByBusinessId,
       actorBusinessId: own.id,
@@ -579,25 +578,13 @@ router.post(
       // and no notification to the businesses who weren't picked — see the
       // header comment.
       //
-      // The network feed's copy of this, in the same transaction as the
-      // accept for the reason routes/vouches.js gives. Only the ONE condition
-      // here — a self-nomination is a pitch, and a pitch in a public feed is
-      // the advertisement the feed exists not to carry.
-      //
-      // The T0 case is deliberately NOT a condition on this write. An answer
-      // naming an unclaimed listing still gets its row; visibleNetworkEvents
-      // Where keeps it dark until they claim, at which point it lights up on
-      // its own. Gating here instead would lose the announcement forever.
-      ...(isSelfNomination(answer)
-        ? []
-        : [
-            createNetworkEvent(prisma, {
-              type: "recommendation_published",
-              subjectBusinessId: answer.recommendedBusinessId,
-              actorBusinessId: answer.answeredByBusinessId,
-              askAnswerId: answer.id,
-            }),
-          ]),
+      // ACCEPTING PUBLISHES NOTHING. Until Sept 2026 this transaction also
+      // wrote a recommendation_published network event, which put the named
+      // business on a Recommendations tab and announced it to the feed.
+      // Removed deliberately: accepting an answer is the ASKER settling their
+      // own question, and turning that private decision into a public artifact
+      // on a third party's profile made one member's choice into another
+      // member's credential. The ask closing is the whole effect.
     ]);
 
     await createActivityEvent(prisma, {
@@ -605,23 +592,6 @@ router.post(
       actorBusinessId: own.id,
       type: "ask_answer_accepted",
     });
-
-    // The third-party event, and the two conditions it must survive.
-    //
-    // Not for a self-nomination: the recommended business IS the answerer,
-    // and they'd be told what they just did. Not for a T0 listing: there is
-    // no owner to tell, and nothing is visible on an unclaimed profile
-    // anyway — that one fires as recommendations_waiting when they claim.
-    if (
-      !isSelfNomination(answer) &&
-      isRecommendationPublished(answer.recommendedBusiness)
-    ) {
-      await createActivityEvent(prisma, {
-        businessId: answer.recommendedBusinessId,
-        actorBusinessId: answer.answeredByBusinessId,
-        type: "ask_recommendation_received",
-      });
-    }
 
     const updated = await loadAsk(ask.id);
     res.json({ ask: serializeAsk(updated, own) });
@@ -672,9 +642,8 @@ router.post(
         },
       });
       // Freezes only while the ask is still live. Reporting a settled ask is
-      // tracking-only — there is nothing left to stop, and freezing an
-      // already-answered ask would retract a recommendation somebody earned.
-      // Same split as POST /vouches/:id/flag-unfair-cancel.
+      // tracking-only: there is nothing left to stop once the asker has
+      // decided. Same split as POST /vouches/:id/flag-unfair-cancel.
       if (ask.status === "open") {
         await tx.ask.update({ where: { id: ask.id }, data: { status: "under_review" } });
       }
@@ -718,7 +687,7 @@ router.post(
           askId: ask.id,
           answerId: answer.id,
           raisedByBusinessId: own.id,
-          // The ANSWERER, never the recommended business — being named in
+          // The ANSWERER, never the business they named — being named in
           // somebody else's answer is not something you did.
           againstBusinessId: answer.answeredByBusinessId,
           reason,

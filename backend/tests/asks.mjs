@@ -57,7 +57,7 @@ r = await t1(`/asks/${askId}/answers`, { method: "POST",
   body: { recommendedBusinessId: `${P}target`, comment: "They handled ours last year." } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
 assert.equal(r.data.answer.isSelfNomination, false);
-ok("T1 answered and it is a recommendation, not a self-nomination");
+ok("T1 answered and it names someone else, not a self-nomination");
 
 console.log("\n3. Second answer from the same business is refused");
 r = await t1(`/asks/${askId}/answers`, { method: "POST",
@@ -68,7 +68,7 @@ ok(`one answer per business (409: "${r.data.error}")`);
 console.log("\n4. Fill the asker's own cap of 6, then a seventh is refused");
 for (const k of ["a2","a3","a4","a5"]) {
   r = await answerers[k](`/asks/${askId}/answers`, { method: "POST",
-    body: { recommendedBusinessId: `${P}target`, comment: `Recommending from ${k}.` } });
+    body: { recommendedBusinessId: `${P}target`, comment: `Suggesting from ${k}.` } });
   assert.equal(r.status, 201, `${k}: ${JSON.stringify(r.data)}`);
 }
 // 6th: a self-nomination, which also covers step 5.
@@ -104,19 +104,27 @@ const chosen = r.data.ask.answers.find((a) => a.answeredBy.id === `${P}a2`);
 r = await asker(`/asks/${askId}/answers/${chosen.id}/accept`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
 assert.equal(r.data.ask.status, "answered");
-ok("ask moved to 'answered'; accepted answer published");
+ok("ask moved to 'answered' — accepting settles it");
 
-console.log("\n7. Recommendation renders on the recommended business's profile");
+console.log("\n7. Accepting publishes NOTHING to the business that was named");
+// The whole point of the Sept 2026 removal, asserted rather than assumed.
+// Accepting an answer used to put a Recommendation on the named business's
+// profile and a recommendation_published row in the network feed; a reader
+// could arrive at e2e-target's page and find a credential they had no part in
+// creating. Now the asker's decision stops with the asker.
 const prof = (await (await fetch(`${API}/businesses/${P}target`)).json()).business;
-assert.equal(prof.recommendationCount, before.recommendationCount + 1, "exactly one new recommendation");
-assert.ok(prof.recommendationsReceived.some((x) => x.ask.id === askId && x.answeredBy.id === `${P}a2`),
-  "this ask's accepted answer is on the profile, attributed to its author");
-assert.equal(prof.vouchCount, 0, "recommendations must NOT count as vouches");
-ok(`Recommendations ${before.recommendationCount} -> ${prof.recommendationCount}; vouchCount still 0 — never summed`);
-// Only ACCEPTED answers publish. The other five on this ask stay offered.
-assert.ok(!prof.recommendationsReceived.some((x) => x.ask.id === askId && x.answeredBy.id === `${P}a3`),
-  "an offered-but-not-accepted answer must not appear");
-ok("unaccepted answers do not publish");
+assert.equal(prof.recommendationCount, undefined, "no recommendationCount on the payload");
+assert.equal(prof.recommendationsReceived, undefined, "no recommendations list on the payload");
+assert.equal(prof.vouchCount, before.vouchCount, "and an accepted answer is not a vouch either");
+ok("accepted answer leaves the named business's profile untouched");
+
+// The answer itself still records who was named — that half survived, because
+// it is how the ASKER knows who to call.
+r = await asker(`/asks/${askId}`);
+const accepted = r.data.ask.answers.find((a) => a.id === chosen.id);
+assert.equal(accepted.status, "accepted");
+assert.equal(accepted.recommended.id, `${P}target`, "the asker can still see who was named");
+ok("the named business survives on the answer, for the asker");
 
 console.log("\n8. Posting is refused below T2");
 r = await t1("/asks", { method: "POST", body: {

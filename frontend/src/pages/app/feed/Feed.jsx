@@ -11,7 +11,7 @@ import { fetchFeed } from "@/lib/api/feed";
 import { FeedRow, Empty, PageHeader } from "./FeedCard";
 
 // The network's trust activity, in one column: vouches published,
-// recommendations accepted, listings claimed and businesses verified.
+// listings claimed and businesses verified.
 //
 // WHAT THIS SCREEN IS FOR. Today trust is invisible until you open a specific
 // profile, which means a member has to already be looking for it to find any.
@@ -150,7 +150,7 @@ function Feed() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <PageHeader eyebrow="Feed" title="The network">
-        Every vouch published, every recommendation accepted, and every business that joins or gets
+        Every vouch published, and every business that joins or gets
         verified. Nobody posts here — this is what the network did.
       </PageHeader>
 

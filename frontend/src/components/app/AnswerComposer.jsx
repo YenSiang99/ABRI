@@ -13,11 +13,17 @@ import { UNCLAIMED } from "@/lib/verificationLevels";
 // Inline on the ask page, not a dialog: a modal over the thing you are
 // answering hides the thing you are answering.
 //
-// The mode toggle at the top is the anti-self-promotion mechanism's UI half.
-// Both modes are legitimate — blocking self-nomination in a cluster this size
-// would be absurd, since the accountant who sees "looking for an accountant"
-// should be able to say so — but they produce structurally different answers
-// (see AskAnswer in schema.prisma) and must never look alike.
+// The mode toggle at the top keeps two different claims apart. Both modes are
+// legitimate — blocking self-nomination in a cluster this size would be
+// absurd, since the accountant who sees "looking for an accountant" should be
+// able to say so — but "I can do this" and "these people can do this" are not
+// the same answer and must never look alike to the asker weighing them.
+//
+// The toggle is no longer a GATE on anything. Until Sept 2026 an accepted
+// answer published a recommendation on the named business's profile, and the
+// two modes existed to keep a pitch from escaping onto a third party's page.
+// Nothing publishes now, so the distinction survives purely as information for
+// the asker — which is why it stayed when the rest of that feature went.
 
 function ModeChip({ active, onClick, children }) {
   return (
@@ -37,7 +43,7 @@ function ModeChip({ active, onClick, children }) {
 
 function AnswerComposer({ ask, businesses, onSuccess }) {
   const { business } = useAuth();
-  const [mode, setMode] = useState("recommend");
+  const [mode, setMode] = useState("suggest");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [comment, setComment] = useState("");
@@ -46,11 +52,11 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
   const isSelf = mode === "self";
 
   // T0 listings are deliberately INCLUDED. An answer is addressed to the
-  // asker, not to the business named, so recommending an unclaimed listing
-  // does nothing to an absent owner — and once the corridor SSM import lands,
-  // the best answer will routinely be a business that hasn't claimed yet.
-  // Excluded instead: the asker (recommending them to themselves is noise)
-  // and yourself (that's what the other mode is for).
+  // asker, not to the business named, so naming an unclaimed listing does
+  // nothing to an absent owner — and once the corridor SSM import lands, the
+  // best answer will routinely be a business that hasn't claimed yet.
+  // Excluded instead: the asker (naming them to themselves is noise) and
+  // yourself (that's what the other mode is for).
   const filtered = !businesses
     ? []
     : businesses
@@ -71,7 +77,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
     try {
       await answerAsk(ask.id, { recommendedBusinessId: target.id, comment });
       toast.success(
-        isSelf ? "Answer posted — listed as your own services." : `Recommended ${target.name}.`,
+        isSelf ? "Answer posted — listed as your own services." : `Suggested ${target.name}.`,
       );
       setComment("");
       setSelected(null);
@@ -89,8 +95,8 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
       <div className="text-sm font-semibold text-foreground">Answer this ask</div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <ModeChip active={!isSelf} onClick={() => setMode("recommend")}>
-          Recommend someone else
+        <ModeChip active={!isSelf} onClick={() => setMode("suggest")}>
+          Suggest someone else
         </ModeChip>
         <ModeChip active={isSelf} onClick={() => setMode("self")}>
           Offer my own services
@@ -102,7 +108,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
         // a trap somebody discovers after posting.
         <p className="mt-4 rounded-lg border border-border bg-secondary p-3 text-xs text-muted-foreground">
           You'll be listed as offering your own services. That's fine — it's just labelled
-          differently, and it doesn't count as a recommendation on your profile.
+          differently, so the asker can tell a pitch from a third-party suggestion.
         </p>
       ) : (
         <div className="mt-4">
@@ -150,13 +156,13 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
               )}
             </div>
           )}
-          {/* Told up front, not discovered afterwards: an unclaimed listing
-              can be recommended, the recommendation is real, and it appears
-              on their profile when they claim it. */}
+          {/* Told up front, not discovered afterwards: the asker gets the
+              name either way, but an unclaimed listing has no owner reading
+              anything, so nobody there will follow up. */}
           {selected?.verificationLevel === UNCLAIMED && (
             <p className="mt-2 text-xs text-muted-foreground">
-              {selected.name} hasn't claimed their listing yet — your recommendation appears on
-              their profile when they do.
+              {selected.name} hasn't claimed their listing yet — the asker will still see your
+              answer, but nobody there is reading ABRI.
             </p>
           )}
         </div>
@@ -164,7 +170,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
 
       <div className="mt-4">
         <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {isSelf ? "Why are you the right fit?" : "Why should they use them?"}
+          {isSelf ? "Why are you the right fit?" : "Why are they a good fit?"}
         </label>
         <Textarea
           className="mt-2"

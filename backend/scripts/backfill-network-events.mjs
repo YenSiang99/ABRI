@@ -38,44 +38,9 @@ async function main() {
     });
   }
 
-  // ── recommendation_published ───────────────────────────────────────────
-  // Self-nominations are excluded here for the same reason the live write
-  // excludes them: a pitch in a public feed is an advertisement.
-  //
-  // T0 recommendations ARE backfilled. They stay invisible behind the
-  // verificationLevel check in visibleNetworkEventsWhere until the business
-  // claims, exactly as a freshly written one would.
-  const answers = await prisma.askAnswer.findMany({
-    where: { status: "accepted", networkEvents: { none: {} } },
-    select: {
-      id: true,
-      answeredByBusinessId: true,
-      recommendedBusinessId: true,
-      acceptedAt: true,
-      createdAt: true,
-    },
-  });
-
-  let recommendations = 0;
-  for (const answer of answers) {
-    if (answer.recommendedBusinessId === answer.answeredByBusinessId) continue;
-    await prisma.networkEvent.create({
-      data: {
-        type: "recommendation_published",
-        subjectBusinessId: answer.recommendedBusinessId,
-        actorBusinessId: answer.answeredByBusinessId,
-        askAnswerId: answer.id,
-        createdAt: answer.acceptedAt ?? answer.createdAt,
-      },
-    });
-    recommendations += 1;
-  }
-
+  console.log(`Backfilled ${vouches.length} vouch_published events.`);
   console.log(
-    `Backfilled ${vouches.length} vouch_published and ${recommendations} recommendation_published events.`,
-  );
-  console.log(
-    `Skipped ${answers.length - recommendations} self-nomination(s). Level events cannot be backfilled — see the note at the top of this file.`,
+    "Level events cannot be backfilled — see the note at the top of this file.",
   );
 }
 

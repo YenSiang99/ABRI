@@ -76,10 +76,9 @@ router.get(
       where: visibleNetworkEventsWhere({ followedIds }),
       include: NETWORK_EVENT_INCLUDE,
       // id is in the sort, not decoration: two events written inside the same
-      // millisecond — approving a claim writes one while the recommendations
-      // it unblocks write more — would otherwise be free to swap places
-      // between two pages and hand the reader a duplicate. Matches the
-      // @@index([createdAt, id]) declared for exactly this query.
+      // millisecond would otherwise be free to swap places between two pages
+      // and hand the reader a duplicate. Matches the @@index([createdAt, id])
+      // declared for exactly this query.
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       // Over-fetch by one to learn whether there IS a next page, rather than
       // running a second count query against the same predicate.

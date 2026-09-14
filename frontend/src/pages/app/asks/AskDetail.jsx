@@ -80,7 +80,7 @@ function AskDetail() {
       const updated = await acceptAnswer(id, answerId);
       setAsk(updated);
       refreshAskActions();
-      toast.success("Answer accepted — it's a recommendation on their profile now.");
+      toast.success("Answer accepted — your ask is settled.");
     } catch (err) {
       toast.error(err.message);
     } finally {

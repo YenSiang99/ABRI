@@ -19,6 +19,10 @@ import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
+import {
+  EngagementList,
+  RepeatSignal,
+} from "@/components/business/EngagementList";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
@@ -72,8 +76,6 @@ function EngagementRecord({ entries, summary, businessName }) {
   if (!entries || entries.length === 0) return null;
 
   const top = summary?.services?.slice(0, 3) ?? [];
-  const shown = entries.slice(0, 5);
-  const rest = entries.length - shown.length;
 
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
@@ -84,6 +86,8 @@ function EngagementRecord({ entries, summary, businessName }) {
         Confirmed by the business on the other side, not self-reported.
       </p>
 
+      <RepeatSignal repeatCounterparties={summary?.repeatCounterparties} />
+
       {top.length > 0 && (
         <ul className="mt-4 space-y-1.5">
           {top.map((g) => (
@@ -93,7 +97,7 @@ function EngagementRecord({ entries, summary, businessName }) {
             >
               <span className="font-semibold">{g.service}</span>
               <span className="text-grey-500 dark:text-muted-foreground">
-                {" — "}
+                {" \u2014 "}
                 {g.engagements}{" "}
                 {g.engagements === 1 ? "engagement" : "engagements"} with{" "}
                 {g.counterparties}{" "}
@@ -104,46 +108,11 @@ function EngagementRecord({ entries, summary, businessName }) {
         </ul>
       )}
 
-      <ol className="mt-4 space-y-3 border-t border-grey-200 pt-4 dark:border-border">
-        {shown.map((e) => {
-          // Both ends are named on a public profile and no `counterparty` is
-          // resolved (the server sends null for an anonymous reader), so work
-          // out which end is the other one here.
-          const other =
-            e.businessA?.name === businessName ? e.businessB : e.businessA;
-          return (
-            <li key={e.id} className="flex gap-3 text-sm">
-              <span className="w-24 shrink-0 font-mono text-xs text-grey-500 dark:text-muted-foreground">
-                {new Date(e.occurredOn).toLocaleDateString(undefined, {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </span>
-              <span className="min-w-0">
-                <span className="text-ink dark:text-foreground">
-                  {other?.name}
-                </span>
-                {e.service && (
-                  <span className="text-grey-500 dark:text-muted-foreground">
-                    {" "}
-                    · {e.service}
-                  </span>
-                )}
-                {e.note && (
-                  <span className="mt-0.5 block text-xs text-grey-500 dark:text-muted-foreground">
-                    {e.note}
-                  </span>
-                )}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {rest > 0 && (
-        <p className="mt-3 text-xs text-grey-500 dark:text-muted-foreground">
-          and {rest} more
-        </p>
-      )}
+      <EngagementList
+        entries={entries}
+        businessName={businessName}
+        className="mt-4 border-t border-grey-200 pt-4 dark:border-border"
+      />
     </div>
   );
 }
@@ -152,7 +121,7 @@ function EngagementRecord({ entries, summary, businessName }) {
 //
 // THE ONE PANEL HERE THAT CAN SAY SOMETHING UNFLATTERING, and that is the
 // point of it. Every other surface on this page shows what is currently true:
-// the badge, the vouch count, the recommendations. A counterparty deciding
+// the badge, the vouch count. A counterparty deciding
 // whether to trust this business with work needs the other half — that the
 // SSM verification they can see today was granted in April, or that one they
 // cannot see was lost in August. No other directory will print that.
@@ -225,39 +194,6 @@ function VerificationTimeline({ entries }) {
   );
 }
 
-// Deliberately NOT shaped like VouchCard above.
-//
-// A vouch is two-party and unconditional: one business staking its own
-// reputation on another, in italics behind the yellow left rule that is the
-// vouch's visual signature. A recommendation is three-party and answers a
-// specific question — X told Y about this business when Y asked for something.
-//
-// So: no yellow rule, no italics, and all three parties named. If the two
-// rendered alike they would be read as the same claim, and the weaker one
-// would quietly borrow the stronger one's credibility.
-function RecommendationCard({ recommendation }) {
-  const { answeredBy, ask } = recommendation;
-  return (
-    <div className="rounded-2xl border border-grey-200 bg-white p-5 dark:border-border dark:bg-card">
-      <div className="text-sm text-ink dark:text-foreground">
-        <span className="font-semibold">{answeredBy.name}</span> recommended
-        them when{" "}
-        <span className="font-semibold">{ask.askedByBusiness.name}</span> asked
-        for something.
-      </div>
-      <div className="mt-1 text-xs text-grey-500 dark:text-muted-foreground">
-        {ask.title} ·{" "}
-        {recommendation.acceptedAt
-          ? new Date(recommendation.acceptedAt).toLocaleDateString()
-          : null}
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-grey-600 dark:text-muted-foreground">
-        {recommendation.comment}
-      </p>
-    </div>
-  );
-}
-
 // Arriving via a Link that set state={{ from, label }} (the NFC tap page,
 // the Network tab) returns you there instead of always dropping back to
 // the directory — a bookmark or direct visit has no such state, so it
@@ -277,12 +213,11 @@ function BusinessProfile({ inApp = false }) {
   const { connectionStateWith, connect, disconnect } = useConnections();
   const { isFollowing, follow, unfollow } = useFollows();
   const [vouchOpen, setVouchOpen] = useState(false);
-  // Controlled rather than defaultValue, so ?tab=recommendations is a link
-  // target — which is where the ask_recommendation_received activity event
-  // points. Same shape Vouches.jsx uses: unknown values fall back, and the
-  // default tab omits the param entirely.
+  // Controlled rather than defaultValue, so ?tab=vouches is a link target.
+  // Same shape Vouches.jsx uses: unknown values fall back, and the default tab
+  // omits the param entirely.
   const [tabParams, setTabParams] = useSearchParams();
-  const PROFILE_TABS = ["overview", "vouches", "recommendations", "card"];
+  const PROFILE_TABS = ["overview", "vouches", "card"];
   const tab = PROFILE_TABS.includes(tabParams.get("tab"))
     ? tabParams.get("tab")
     : "overview";
@@ -451,8 +386,6 @@ function BusinessProfile({ inApp = false }) {
   const { contactLocked, contactLockedReason } = business;
   // Defaulted, because this profile is also rendered from the NFC tap page
   // and by the app-side route, and an older cached payload has neither key.
-  const recommendationCount = business.recommendationCount ?? 0;
-  const recommendations = business.recommendationsReceived ?? [];
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -564,22 +497,6 @@ function BusinessProfile({ inApp = false }) {
 
           {isUnclaimed && (
             <div className="text-right">
-              {/* The growth loop, and its only piece of UI. Members can
-                  recommend an unclaimed listing — the recommendation is real
-                  and waiting, it just has nowhere to render until this
-                  business claims. Naming the COUNT and withholding the NAMES
-                  is the whole pull; the outbound invite that would push it
-                  needs a messaging pipe that doesn't exist yet. */}
-              {recommendationCount > 0 && (
-                <p className="mb-2 max-w-64 text-sm text-grey-600 dark:text-muted-foreground">
-                  <span className="font-semibold text-ink dark:text-foreground">
-                    {recommendationCount}{" "}
-                    {recommendationCount === 1 ? "member has" : "members have"}
-                  </span>{" "}
-                  recommended this business. Claim your listing to see who, and
-                  why.
-                </p>
-              )}
               <Button
                 render={<Link to={`/register?business=${business.id}`} />}
                 nativeButton={false}
@@ -654,15 +571,6 @@ function BusinessProfile({ inApp = false }) {
             <TabsTrigger value="vouches">
               Vouches ({isPendingVerification ? 0 : vouchCount})
             </TabsTrigger>
-            {/* Always AFTER Vouches, never first and never the default. A
-                recommendation is the lighter of the two signals and the tab
-                order is where that has to be visible. It gets no cell in the
-                stat grid above and no badge anywhere — that grid is the trust
-                grid, and a fourth number in it would read as a fourth trust
-                signal. */}
-            <TabsTrigger value="recommendations">
-              Recommendations ({recommendationCount})
-            </TabsTrigger>
             <TabsTrigger value="card">NFC Card</TabsTrigger>
           </TabsList>
 
@@ -678,8 +586,8 @@ function BusinessProfile({ inApp = false }) {
             <VerificationTimeline entries={business.verificationTimeline} />
             {/* Directly under the verification record: both are the factual
                 half of this profile — what a registry said, and what a
-                counterparty confirmed. The evaluative half (vouches,
-                recommendations) lives in its own tabs. */}
+                counterparty confirmed. The evaluative half (vouches) lives in
+                its own tab. */}
             <EngagementRecord
               entries={business.engagements}
               summary={business.engagementSummary}
@@ -746,30 +654,6 @@ function BusinessProfile({ inApp = false }) {
             ) : (
               <p className="text-sm text-grey-500 dark:text-muted-foreground">
                 No vouches yet.
-              </p>
-            )}
-          </TabsContent>
-
-          {/* Not plan-gated, unlike the vouches tab above. Withholding this
-              would punish the RECOMMENDER, whose work would vanish because of
-              somebody else's billing — and it feeds neither vouchCount nor
-              the vouch level, so a downgrade has nothing to take away. */}
-          <TabsContent
-            value="recommendations"
-            className="mt-6 grid gap-4 md:grid-cols-2"
-          >
-            {recommendations.length > 0 ? (
-              recommendations.map((r) => (
-                <RecommendationCard key={r.id} recommendation={r} />
-              ))
-            ) : (
-              // Says the difference out loud, because this is the one place a
-              // reader might otherwise conclude the two words mean the same.
-              <p className="text-sm text-grey-500 md:col-span-2 dark:text-muted-foreground">
-                No recommendations yet. Recommendations come from members
-                answering someone's ask — they're not vouches. A vouch is a peer
-                staking their own reputation on this business; a recommendation
-                is a peer pointing someone towards them.
               </p>
             )}
           </TabsContent>

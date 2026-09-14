@@ -29,7 +29,7 @@ const ASK_REASONS = [
 ];
 
 const ANSWER_REASONS = [
-  { value: "self_promotion", label: "Self-promotion dressed as a recommendation" },
+  { value: "self_promotion", label: "Self-promotion dressed as a neutral answer" },
   { value: "irrelevant", label: "Irrelevant to the ask" },
   { value: "abusive_content", label: "Abusive content" },
   { value: "other", label: "Something else" },

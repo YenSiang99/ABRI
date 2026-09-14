@@ -839,10 +839,9 @@ model Engagement {
 model NetworkEvent {
   id String @id @default(cuid())
 
-  // "vouch_published"          — a testimonial went live on a profile
-  // "recommendation_published" — an asker accepted somebody else's answer
-  // "business_claimed"         — an L0 listing became a member (L0 -> L1)
-  // "business_verified"        — SSM verification granted (L1 -> L2)
+  // "vouch_published"   — a testimonial went live on a profile
+  // "business_claimed"  — an L0 listing became a member (L0 -> L1)
+  // "business_verified" — SSM verification granted (L1 -> L2)
   //
   // String, not a Prisma enum — this schema has none. NETWORK_EVENT_TYPES in
   // lib/networkEvents.js is the only thing constraining it.
@@ -852,8 +851,8 @@ model NetworkEvent {
   // giving the network copy a second name would hide that.
   type String
 
-  // Who the event is ABOUT. Always set — the vouch's receiver, the recommended
-  // business, the business that claimed or got verified.
+  // Who the event is ABOUT. Always set — the vouch's receiver, or the business
+  // that claimed or got verified.
   subjectBusinessId String
   subjectBusiness   Business @relation("NetworkEventSubject", fields: [subjectBusinessId], references: [id])
 
@@ -864,26 +863,24 @@ model NetworkEvent {
   actorBusinessId String?
   actorBusiness   Business? @relation("NetworkEventActor", fields: [actorBusinessId], references: [id])
 
-  // POINTERS, never copies — exactly the shape Vouch.currentRevisionId uses,
+  // A POINTER, never a copy — exactly the shape Vouch.currentRevisionId uses,
   // and for the same reason its comment gives: a denormalized copy of the
-  // testimonial is where history goes to die. The feed joins through these for
+  // testimonial is where history goes to die. The feed joins through this for
   // the text, so an edited or withdrawn one changes here with no second write.
   //
-  // Exactly one is set on the two content types; both are null on the two
-  // level types. Nullable rather than a polymorphic subjectId + subjectType
-  // pair, which would be two columns that can disagree about what they point
-  // at, with no foreign key on either.
+  // Set on the one content type, null on the two level types.
+  //
+  // There was a second pointer here until Sept 2026, askAnswerId, carrying
+  // "recommendation_published". That feature is gone — accepting an answer now
+  // settles the ask and publishes nothing — and the column went with it rather
+  // than being left nullable and unwritten, which is how a schema accumulates
+  // fields nobody can explain.
   //
   // Cascade on delete, unlike every Business key in this schema. A pointer has
-  // nothing to unwind: delete the vouch or the answer and the announcement is
-  // about something that no longer exists. It is also required rather than
-  // merely tidy — routes/asks.js deletes an AskAnswer outright as the
-  // compensating step when one loses the maxAnswers race, and a RESTRICT here
-  // would let the feed wedge that path.
-  vouchId     String?
-  vouch       Vouch?     @relation(fields: [vouchId], references: [id], onDelete: Cascade)
-  askAnswerId String?
-  askAnswer   AskAnswer? @relation(fields: [askAnswerId], references: [id], onDelete: Cascade)
+  // nothing to unwind: delete the vouch and the announcement is about
+  // something that no longer exists.
+  vouchId String?
+  vouch   Vouch?  @relation(fields: [vouchId], references: [id], onDelete: Cascade)
 
   // The level REACHED, for the two level types. Stored because it is a fact
   // about the PAST, and Business.verificationLevel can no longer answer it
@@ -896,10 +893,8 @@ model NetworkEvent {
   createdAt DateTime @default(now())
 
   // The feed's only ordering. Paired with id in the ORDER BY so the cursor is
-  // total — two events written inside the same millisecond (a claim approval
-  // writes one while publishing held recommendations writes others) would
-  // otherwise be able to swap places between two pages and hand the reader a
-  // duplicate.
+  // total — two events written inside the same millisecond would otherwise be
+  // able to swap places between two pages and hand the reader a duplicate.
   @@index([createdAt, id])
   // Both ends of the "Following" scope, which filters on actor OR subject.
   // Also FK hygiene, the reason Connection carries @@index([requestedById]):
@@ -909,7 +904,6 @@ model NetworkEvent {
   @@index([subjectBusinessId])
   // Serves the backfill's idempotence check and nothing else on the hot path.
   @@index([vouchId])
-  @@index([askAnswerId])
 }
 
 // A mutual edge — connecting via a tap (or in-app connect) links both
@@ -1247,10 +1241,9 @@ model AskAnswer {
   answeredByBusinessId String
   answeredByBusiness   Business @relation("AskAnswerAuthor", fields: [answeredByBusinessId], references: [id])
 
-  // Must be a real Business row, never free text: the payoff of an accepted
-  // answer is a Recommendation on a profile, and a profile is something only
-  // a Business has — an off-directory name would be an unverifiable string
-  // in a product whose whole claim is that its names are checked.
+  // Must be a real Business row, never free text: an off-directory name would
+  // be an unverifiable string in a product whose whole claim is that its names
+  // are checked, and the asker could not look it up.
   //
   // MAY be T0, and this is the one place the board departs from "an
   // unclaimed listing is refused every relational action" (POST /connections,
@@ -1260,11 +1253,10 @@ model AskAnswer {
   // lands, the most useful answer will routinely be a business that hasn't
   // claimed yet, so refusing would make most real answers illegal.
   //
-  // It needs no "held" or "published" column. BusinessProfile.jsx wraps the
-  // whole tab block in {!isUnclaimed && ...}, so a T0 profile has no
-  // Recommendations tab to render into — the recommendation is simply
-  // invisible until the claim flips the business to T1, at which point it is
-  // already there. Publication is derived: recommendedBusiness.verificationLevel != "L0".
+  // NOTHING IS PUBLISHED FROM THIS COLUMN ANY MORE. It used to feed a
+  // Recommendations tab on the named business's profile; that went in Sept
+  // 2026. What remains is its original job — telling the ASKER who to call —
+  // which is why the column stayed when the feature around it did not.
   recommendedBusinessId String
   recommendedBusiness   Business @relation("AskAnswerRecommended", fields: [recommendedBusinessId], references: [id])
 
@@ -1273,8 +1265,11 @@ model AskAnswer {
   comment String
 
   // "offered"      — live, in front of the asker
-  // "accepted"     — the asker picked it. The ONLY status that publishes
-  //                  anything (see the Recommendations tab).
+  // "accepted"     — the asker picked it, which settles the ask. Publishes
+  //                  nothing: until Sept 2026 this put a Recommendation on the
+  //                  named business's profile and announced it to the feed,
+  //                  and both were removed. Accepting is the asker answering
+  //                  their own question, not a credential for anybody else.
   // "withdrawn"    — the answerer took it back. Terminal, but the row is
   //                  reusable: a fresh answer on the same ask resets THIS row
   //                  in place rather than deleting and recreating, exactly as
@@ -1291,18 +1286,18 @@ model AskAnswer {
   createdAt  DateTime  @default(now())
   acceptedAt DateTime?
 
-  flags         AskFlag[]
-  // Back-relation only — see the note on Vouch.networkEvents.
-  networkEvents NetworkEvent[]
+  flags AskFlag[]
 
   // The anti-piling-on rule, enforced by the database rather than by a check
   // every caller has to remember. Note what it does NOT constrain: two
   // different businesses recommending the SAME business on one ask is left
   // legal, because two independent recommendations are a signal, not spam.
   @@unique([askId, answeredByBusinessId])
-  // The Recommendations tab: where recommendedBusinessId = X, status =
-  // "accepted". A lookup by a column that leads no other index, so this one
-  // earns its place — and it is FK hygiene at the same time.
+  // FK hygiene: Postgres does not index a foreign key for you, and the
+  // RESTRICT check on a Business delete is otherwise a sequential scan. The
+  // status half is a leftover from the Recommendations tab this used to serve
+  // and is kept only because a composite covers the FK either way — if this
+  // index is ever revisited, plain @@index([recommendedBusinessId]) is enough.
   @@index([recommendedBusinessId, status])
   // FK hygiene, plus GET /asks/answered. askId needs no index of its own:
   // the @@unique above already leads with it.

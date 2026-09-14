@@ -25,9 +25,9 @@ import { verificationLevelsAtOrAbove, UNCLAIMED } from "./verificationLevels.js"
 // defensible in a way a judgement is not.
 
 // The types that describe a move on the verification ladder, in the order they
-// would be read. Content events (vouches, recommendations) are deliberately
-// absent — they belong to their own tabs, and mixing them in would turn a
-// verification record into a general activity log.
+// would be read. Content events (vouches) are deliberately absent — they
+// belong to their own tab, and mixing them in would turn a verification
+// record into a general activity log.
 const TIMELINE_TYPES = ["business_claimed", "business_verified", "business_verification_revoked"];
 
 // Whether an announcement still holds, using the rule visibleNetworkEventsWhere

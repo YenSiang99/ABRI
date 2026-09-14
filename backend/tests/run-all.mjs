@@ -24,9 +24,9 @@ const FIXTURES = "fixtures.mjs";
 //
 //   tiers.mjs BEFORE OR AFTER asks.mjs — either is fine, but only because
 //     tiers.mjs cleans up the vouch graph it builds on e2e-target. asks.mjs
-//     asserts that business has NO vouches ("recommendations must NOT count
-//     as vouches"), so a tiers.mjs that skipped its teardown would fail a
-//     suite it never touches, and the failure would look like asks' bug.
+//     asserts that business's vouch count is unchanged by accepting an answer,
+//     so a tiers.mjs that skipped its teardown would fail a suite it never
+//     touches, and the failure would look like asks' bug.
 //
 //   lookup.mjs EXHAUSTS ITS OWN RATE-LIMIT BUDGET. Its last step fires 40
 //     anonymous lookups to prove the limiter trips — that is the assertion.
@@ -41,7 +41,6 @@ const SUITES = [
   "asks.mjs",
   "ask-alerts.mjs",
   "ask-moderation.mjs",
-  "unclaimed-recommendations.mjs",
   "feed.mjs",
   "ssm-verification.mjs",
   "lookup.mjs",

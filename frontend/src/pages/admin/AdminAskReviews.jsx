@@ -304,7 +304,7 @@ function AdminAskReviews() {
                     <span className="font-semibold">{answer.answeredBy.name}</span>{" "}
                     {answer.isSelfNomination
                       ? "offered their own services"
-                      : `recommended ${answer.recommended.name}`}
+                      : `suggested ${answer.recommended.name}`}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{answer.comment}</p>
                   <div className="mt-3 flex flex-wrap gap-2">

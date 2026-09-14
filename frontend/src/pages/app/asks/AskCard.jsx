@@ -32,8 +32,8 @@ function Pill({ icon: Icon, children, muted = true }) {
 // AppSidebar.jsx. Used for exactly one thing here: marking an answer as a
 // self-nomination. A DIFFERENT SHAPE, not just different words, because a
 // rounded pill reading "own services" would be skimmed as the same kind of
-// thing as a recommendation — which is precisely the confusion the two-column
-// answer model exists to prevent.
+// thing as a third-party suggestion — which is precisely the confusion the
+// two-column answer model exists to prevent.
 function MonoChip({ children }) {
   return (
     <span className="inline-flex items-center rounded-sm border border-border bg-secondary px-2 py-1 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -123,12 +123,13 @@ function AskListCard({ ask }) {
   );
 }
 
-// One answer. The whole anti-self-promotion mechanism's visual half.
+// One answer, and the distinction the asker reads it by.
 //
-// A recommendation names two businesses and reads as a third-party
-// endorsement. A self-nomination names one and says so plainly, in a
-// different-shaped chip. Both are legitimate — blocking self-nomination in a
-// cluster this size would be absurd — but they must never look alike.
+// A suggestion names two businesses: somebody pointing at somebody else. A
+// self-nomination names one and says so plainly, in a different-shaped chip.
+// Both are legitimate — blocking self-nomination in a cluster this size would
+// be absurd — but they carry different weight to an asker choosing, so they
+// must never look alike.
 function AnswerCard({ answer, actions }) {
   const subject = answer.isSelfNomination ? answer.answeredBy : answer.recommended;
   return (
@@ -146,7 +147,7 @@ function AnswerCard({ answer, actions }) {
               </>
             ) : (
               <>
-                <span className="font-semibold">{answer.answeredBy.name}</span> recommended{" "}
+                <span className="font-semibold">{answer.answeredBy.name}</span> suggested{" "}
                 <Link
                   to={`/app/business/${answer.recommended.id}`}
                   state={{ from: "/app/asks", label: "Back to asks" }}
@@ -167,14 +168,8 @@ function AnswerCard({ answer, actions }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <AppVerificationBadge verificationLevel={subject.verificationLevel} />
-        {answer.isSelfNomination ? <MonoChip>Own services</MonoChip> : <Pill>Recommendation</Pill>}
+        {answer.isSelfNomination ? <MonoChip>Own services</MonoChip> : <Pill>Suggestion</Pill>}
         {answer.status === "accepted" && <Pill muted={false}>Accepted</Pill>}
-        {/* An accepted answer naming an unclaimed listing is real but not yet
-            visible — there is no profile to show it on until they claim.
-            Saying so stops it reading as a bug. */}
-        {answer.status === "accepted" && answer.visibleOnProfile === false && (
-          <Pill>Shows on their profile once they claim it</Pill>
-        )}
       </div>
 
       {actions && <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3">{actions}</div>}

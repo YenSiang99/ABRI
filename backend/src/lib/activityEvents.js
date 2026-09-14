@@ -110,37 +110,19 @@ const ACTIVITY_MESSAGES = {
 
   // ─── Asks ────────────────────────────────────────────────────────────────
   // Two answer events rather than one with a branch, and the reason is that
-  // this map takes only an actor name: "recommended someone" and "offered
-  // their own services" are the whole anti-self-promotion mechanism, and a
-  // mechanism that is visible on the ask page but invisible in the
+  // this map takes only an actor name: "named someone else" and "offered
+  // their own services" are different claims to an asker weighing them, and a
+  // distinction that is visible on the ask page but flattened in the
   // notification is one the asker meets twice and reads two different ways.
-  // Separate types is the right shape anyway — it makes the two countable
-  // apart later without reading back through AskAnswer.
-  ask_answered: (actorName) => `${actorName} recommended a business for your ask.`,
+  //
+  // Both are now only ever read BY THE ASKER. Nothing here reaches the
+  // business that was named — accepting an answer stopped publishing anything
+  // to a third party's profile in Sept 2026, so there is no longer a profile
+  // change anyone needs to be told about.
+  ask_answered: (actorName) => `${actorName} suggested a business for your ask.`,
   ask_self_offered: (actorName) => `${actorName} offered their own services on your ask.`,
 
   ask_answer_accepted: (actorName) => `${actorName} accepted your answer on their ask.`,
-
-  // The only event here that goes to somebody who was neither the actor nor
-  // the addressee of the action. It has to: an accepted answer puts a
-  // recommendation on this business's PUBLIC page, and finding out your own
-  // profile changed by happening to look at it is not acceptable.
-  //
-  // Never fired for a self-nomination — the recommended business IS the
-  // actor there, and telling someone what they just did is the noise the
-  // "only the party who didn't press the button" rule exists to prevent.
-  // Never fired at accept time when the target is T0 either: there is no
-  // owner yet and nothing is visible. It fires at claim approval instead,
-  // as recommendations_waiting below.
-  ask_recommendation_received: (actorName) =>
-    `${actorName} recommended you when answering an ask — it's on your profile now.`,
-
-  // Fired once when a business claims a listing that was recommended while
-  // it was still unclaimed. ONE summary event, not one per recommendation:
-  // ACTIVITY_KEEP_PER_BUSINESS caps a feed at 50, so a business recommended
-  // twenty times would arrive to a feed containing nothing else.
-  recommendations_waiting: () =>
-    "Members recommended you before you claimed this business. They're on your profile now.",
 
   // No actor: nobody closed this, it lapsed. Names a next step, which is what
   // makes an event about something nobody did worth sending at all. "30 days"

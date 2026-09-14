@@ -113,7 +113,12 @@ assert.ok(events.some((e) => e.id === vouchEvent.id), "and it comes back when th
 ok("feed follows the vouch's status both ways; its row never moves");
 
 // ─────────────────────────────────────────────────────────────────────────
-console.log("\n3. An accepted recommendation appears; a self-nomination never does");
+console.log("\n3. Accepting an ask answer writes nothing to the feed");
+// Until Sept 2026 this wrote recommendation_published and the accepted answer
+// appeared here. The feature was removed: accepting is the asker settling
+// their own question, and broadcasting it made one member's private choice
+// into a public credential for another. Asserted rather than assumed, because
+// "no row was written" is exactly the kind of absence that quietly comes back.
 r = await asker("/asks", { method: "POST", body: {
   category: "Service requirement", matchCategory: "Accounting & Tax",
   matchLocation: "Petaling Jaya", title: "Feed test — need an accountant" } });
@@ -123,53 +128,21 @@ const askId = r.data.ask.id;
 r = await a2(`/asks/${askId}/answers`, { method: "POST",
   body: { recommendedBusinessId: `${P}target`, comment: "They did our annual returns." } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
-const recAnswerId = r.data.answer.id;
-r = await a3(`/asks/${askId}/answers`, { method: "POST",
-  body: { recommendedBusinessId: `${P}a3`, comment: "We can take this on ourselves." } });
-assert.equal(r.status, 201, JSON.stringify(r.data));
-const selfAnswerId = r.data.answer.id;
+const answerId = r.data.answer.id;
 
-r = await asker(`/asks/${askId}/answers/${recAnswerId}/accept`, { method: "POST" });
+const feedBefore = (await feed(asker)).length;
+r = await asker(`/asks/${askId}/answers/${answerId}/accept`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.ask.status, "answered", "the ask is settled");
 
 events = await feed(asker);
-const rec = events.find((e) => e.type === "recommendation_published" && e.subject.id === `${P}target`);
-assert.ok(rec, "accepted recommendation is in the feed");
-assert.equal(rec.actor.id, `${P}a2`, "actor is the answerer, not the asker");
-assert.equal(rec.quote, "They did our annual returns.");
-assert.equal(await db.networkEvent.count({ where: { askAnswerId: selfAnswerId } }), 0,
-  "a self-nomination gets no NetworkEvent at all — a pitch is not feed content");
-ok("recommendation_published in feed; self-nomination written nowhere");
-
-// ─────────────────────────────────────────────────────────────────────────
-console.log("\n4. An admin removing that answer retracts it");
-r = await asker(`/asks/${askId}/answers/${recAnswerId}/flag`, { method: "POST", body: { reason: "irrelevant" } });
-assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.data));
-events = await feed(asker);
-assert.ok(!events.some((e) => e.id === rec.id), "frozen answer is gone from the feed");
-ok("frozen recommendation drops out, matching how it leaves a profile");
-
-// ─────────────────────────────────────────────────────────────────────────
-console.log("\n5. A T0 recommendation stays dark until the listing is claimed");
-// Set the precondition rather than assume it — e2e-t0.mjs claims this same
-// listing as part of its own run, so whether it is L0 depends on suite order.
-await db.business.update({ where: { id: `${P}t0` }, data: { verificationLevel: "L0" } });
-await db.networkEvent.deleteMany({ where: { subjectBusinessId: `${P}t0` } });
-const t0Answer = await db.askAnswer.create({ data: {
-  askId, answeredByBusinessId: `${P}a4`, recommendedBusinessId: `${P}t0`,
-  comment: "Worth a look once they're on here.", status: "accepted", acceptedAt: new Date() } });
-await db.networkEvent.create({ data: {
-  type: "recommendation_published", subjectBusinessId: `${P}t0`,
-  actorBusinessId: `${P}a4`, askAnswerId: t0Answer.id } });
-
-events = await feed(asker);
-assert.ok(!events.some((e) => e.subject.id === `${P}t0`), "T0 recommendation is invisible");
-await db.business.update({ where: { id: `${P}t0` }, data: { verificationLevel: "L1" } });
-events = await feed(asker);
-assert.ok(events.some((e) => e.subject.id === `${P}t0`),
-  "the same row lights up on claim, with nothing written to make it");
-ok("T0 recommendation waits, then publishes itself when the listing is claimed");
-await db.business.update({ where: { id: `${P}t0` }, data: { verificationLevel: "L0" } });
+assert.equal(events.length, feedBefore, "the feed did not grow");
+assert.equal(
+  await db.networkEvent.count({ where: { subjectBusinessId: `${P}target`, type: "recommendation_published" } }),
+  0,
+  "no recommendation_published row exists for the named business",
+);
+ok("accepting settles the ask and writes no network event");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n6. Verification is announced, and revoking it retracts the announcement");

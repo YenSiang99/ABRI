@@ -148,7 +148,7 @@ const f2 = await db.askFlag.findFirst({ where: { askId, raisedByBusinessId: `${P
 assert.equal(f2.outcome, "upheld");
 ok("closed with a note; that report upheld");
 
-console.log("\nG. Removing an ACCEPTED answer unpublishes it and settles the ask honestly");
+console.log("\nG. Removing an ACCEPTED answer settles the ask honestly");
 r = await asker("/asks", { method: "POST", body: {
   category: "Service requirement", matchCategory: "Accounting & Tax",
   matchLocation: "Petaling Jaya", title: "moderation: accepted answer gets removed" } });
@@ -158,27 +158,25 @@ r = await a2(`/asks/${ask2}/answers`, { method: "POST",
 const ansId = r.data.answer.id;
 await asker(`/asks/${ask2}/answers/${ansId}/accept`, { method: "POST" });
 
-const beforeCount = (await (await fetch(`${API}/businesses/${P}target`)).json()).business.recommendationCount;
 r = await a3(`/asks/${ask2}/answers/${ansId}/flag`, { method: "POST", body: { reason: "self_promotion" } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
-ok("an accepted answer is still reportable — it is live public content");
+ok("an accepted answer is still reportable — it is live board content");
 
-const afterFreeze = (await (await fetch(`${API}/businesses/${P}target`)).json()).business.recommendationCount;
-assert.equal(afterFreeze, beforeCount - 1, "freezing pulls it off the profile immediately");
-ok("frozen recommendation disappears from the profile");
+// Freezing takes it off the BOARD. There is no profile half to check any
+// more: accepting stopped publishing anything in Sept 2026, so the answer
+// only ever existed on the ask.
+const frozen = await db.askAnswer.findUnique({ where: { id: ansId } });
+assert.equal(frozen.status, "under_review", "freezing stops the answer where it stands");
+ok("frozen answer is held for an admin");
 
 r = await admin(`/admin/ask-reviews/answers/${ansId}/decide`, {
-  method: "POST", body: { decision: "remove", note: "Self-promotion dressed as a recommendation." } });
+  method: "POST", body: { decision: "remove", note: "Self-promotion dressed as a neutral answer." } });
 assert.equal(r.status, 200, JSON.stringify(r.data));
 const removed = await db.askAnswer.findUnique({ where: { id: ansId } });
 assert.equal(removed.status, "removed");
 const parent = await db.ask.findUnique({ where: { id: ask2 } });
 assert.equal(parent.status, "closed", "an ask cannot stay 'answered' with no standing accepted answer");
 ok("answer removed and the ask settled to 'closed', not left lying as 'answered'");
-
-const finalCount = (await (await fetch(`${API}/businesses/${P}target`)).json()).business.recommendationCount;
-assert.equal(finalCount, beforeCount - 1, "and it stays off the profile");
-ok("removed recommendation stays unpublished");
 
 console.log("\nH. A removed answer's slot is not reusable by its author");
 r = await a2(`/asks/${ask2}/answers`, { method: "POST",

@@ -132,7 +132,7 @@ function Dashboard() {
   const [needsYouCount, setNeedsYouCount] = useState(0);
   const [asksNeedingYou, setAsksNeedingYou] = useState(0);
   const [askAlerts, setAskAlerts] = useState(null);
-  const [recommendationsGiven, setRecommendationsGiven] = useState(0);
+  const [answersAccepted, setAnswersAccepted] = useState(0);
   const [activity, setActivity] = useState([]);
 
   // Derived from the feed rather than the context's unreadCount, which
@@ -196,20 +196,21 @@ function Dashboard() {
     // Guarded client-side so a member below Pro never fires a request the
     // server will answer 402 — the useUpgradeGate doctrine: the client check
     // is the UX, the server is the enforcement.
-    // The give-first number, and the ONLY reporting surface for the rule that
-    // only recommending SOMEBODY ELSE counts. A self-nomination is a
-    // legitimate answer and it is not a contribution to anyone but yourself,
-    // so it is excluded here — which is what stops this stat becoming a
-    // scoreboard you can climb by pitching yourself.
+    // The give-first number: answers of yours that an asker actually picked.
+    // Self-nominations are excluded, and that exclusion is the whole point —
+    // pitching yourself is a legitimate answer and it is not a contribution to
+    // anyone but yourself, so counting it would make this a scoreboard you can
+    // climb by advertising.
     //
-    // Note the asymmetry with recommendations RECEIVED, which deliberately
-    // gets no stat card and no badge: received is a trust signal and would
-    // read as a fourth one beside the verification level, the vouch level
-    // and the membership tier. Given is a
-    // contribution signal, and sits beside "Vouches given" where it belongs.
+    // A CONTRIBUTION SIGNAL, NOT A TRUST ONE, which is why it sits beside
+    // "Vouches given" and appears on nobody's public profile. Accepting an
+    // answer stopped publishing anything to the answerer's profile in Sept
+    // 2026; this card is the private half that survived, and it must stay
+    // private — a public count of accepted answers would be the recommendation
+    // artifact rebuilt under another name.
     fetchAnsweredAsks()
       .then((asks) =>
-        setRecommendationsGiven(
+        setAnswersAccepted(
           asks.filter((a) => {
             const mine = a.answers?.[0];
             return mine?.status === "accepted" && !mine.isSelfNomination;
@@ -317,7 +318,7 @@ function Dashboard() {
                   : `${asksNeedingYou} of your asks have answers waiting`}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Accept one and it becomes a recommendation on their profile.
+                Pick one and your ask is settled.
               </p>
             </div>
           </div>
@@ -381,9 +382,9 @@ function Dashboard() {
           icon={TrendingUp}
         />
         <StatCard
-          label="Recommendations given"
-          value={recommendationsGiven}
-          hint="Answers of yours an asker accepted"
+          label="Answers accepted"
+          value={answersAccepted}
+          hint="Asks you helped settle"
           icon={ClipboardList}
         />
         <StatCard

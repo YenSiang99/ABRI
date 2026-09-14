@@ -33,7 +33,6 @@ prints the failing output at the end. It exits non-zero if any suite failed.
 | `ask-alerts.mjs` | the Pro `askAlerts` gate, and that a Free member can still read the board |
 | `ask-moderation.mjs` | report → freeze → admin decision, and that frozen content 404s for everyone but its owner |
 | `ask-concurrency.mjs` | 8 simultaneous answers against a 6-answer cap |
-| `unclaimed-recommendations.mjs` | the T0 growth loop — a recommendation waits, invisible, until the listing is claimed |
 | `feed.mjs` | the trust feed, and that a retracted source removes its own feed row |
 | `ssm-verification.mjs` | submission → review → verified, and that an unverified number stays private |
 | `lookup.mjs` | check a business — identifier matching, the honest miss, the rate limit |
@@ -59,7 +58,7 @@ Ten businesses prefixed `e2e-`, all with the password `e2e-password-123`:
 - `e2e-asker` (Law, PJ, L2) — the poster in most ask suites
 - `e2e-t1` (L1) — the only claimed-but-unverified business; used for gate tests
 - `e2e-a2` … `e2e-a7` (Accounting & Tax, various locations, L2) — answerers
-- `e2e-target` (L2) — the business that gets recommended and vouched for
+- `e2e-target` (L2) — the business that gets named in answers and vouched for
 - `e2e-t0` (L0) — the unclaimed listing
 
 Suites that need an admin create `e2e-admin@e2e.test` themselves. Nothing here

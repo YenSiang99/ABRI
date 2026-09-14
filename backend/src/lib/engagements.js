@@ -107,6 +107,86 @@ async function confirmedEngagementsFor(businessId, { limit = 50 } = {}) {
   });
 }
 
+// HOW MANY OF THE BUSINESSES THAT WORKED WITH THEM CAME BACK.
+//
+// The only negative-capable signal in the product that is derived purely from
+// facts both sides already confirmed. Every other signal on a profile is
+// positive-only by construction — a vouch has to be accepted, an engagement
+// has to be confirmed — so absence is the
+// only bad news a reader can currently get, and absence is indistinguishable
+// from being new. "Six businesses worked with them and one came back" is bad
+// news that nobody wrote, nobody can deny, and nobody can sue over.
+//
+// It is the reading the schema was already built for: Engagement deliberately
+// carries no @@unique on the pair, unlike Connection, precisely because repeat
+// work is the strongest thing this model records. Until now nothing read it.
+//
+// COUNTS DISTINCT MONTHS, NOT ROWS, and that distinction is the whole
+// difference between a fact and an advertisement. An engagement is one piece
+// of work, and a single project is routinely logged as several — four services
+// with one business in one August is one relationship, not four returns. Row
+// counting called that a repeat customer, which made the one number on the
+// page that is meant to be unfakeable the easiest thing on it to inflate, and
+// needing no colluder to do it. Two engagements in two different months is
+// somebody coming back; two in the same month is somebody itemising.
+//
+// The cost is real and deliberately accepted: two genuinely separate projects
+// inside one month count once. That understates a good record rather than
+// overstating it, which is the only direction this figure can afford to err.
+//
+// A COUNT, NOT A RATIO, and that is a deliberate reversal worth recording.
+// This shipped as "1 of 3 businesses came back" and the denominator is gone on
+// purpose: a rate is only readable once a business has enough counterparties
+// for the fraction to mean something, and at this network's size almost nobody
+// does. A count rises the first time anyone returns, which is the behaviour the
+// product wants to encourage — logging work — rather than a verdict on a
+// sample of four.
+//
+// The honest cost, so nobody rediscovers it as a bug: three-of-four and
+// three-of-forty now read identically. This figure therefore does NOT say
+// anything unflattering any more, and must not be described as though it does.
+// The ratio is a read over the same rows and can come back once there is
+// density to support it — nothing here needs to change for that, only the
+// serializer and the copy.
+//
+// Still never a score and still never a rank: DO NOT sort the directory by it,
+// do not average it into anything, and do not put it on a card beside
+// businesses from another category, where a trade whose work does not recur
+// (you incorporate a company once) would look worse than one that bills
+// annually for reasons that have nothing to do with either being any good.
+// The month an engagement happened in, as "2026-08". occurredOn is a month a
+// member picked from a control, never a timestamp, so this throws away no
+// precision the data ever had. UTC to match how the routes store it — a local
+// reading would move a 1st-of-the-month engagement into the previous month for
+// anyone west of Greenwich and invent a repeat out of nothing.
+function monthKey(occurredOn) {
+  const d = new Date(occurredOn);
+  return `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+}
+
+function repeatSignalFor(rows, businessId) {
+  const monthsPer = new Map();
+  for (const row of rows) {
+    const other = row.businessAId === businessId ? row.businessBId : row.businessAId;
+    if (!monthsPer.has(other)) monthsPer.set(other, new Set());
+    monthsPer.get(other).add(monthKey(row.occurredOn));
+  }
+
+  const counterparties = monthsPer.size;
+
+  let repeatCounterparties = 0;
+  for (const months of monthsPer.values()) {
+    if (months.size > 1) repeatCounterparties += 1;
+  }
+
+  // Both numbers always cross the wire, zeros included. Nothing here is
+  // withheld: every row this counts is already on the public profile, so a
+  // reader could tally it by hand. WHETHER a zero is worth drawing is the
+  // client's call — see RepeatSignal, which shows it to the owner as a prompt
+  // and to a visitor not at all.
+  return { counterparties, repeatCounterparties };
+}
+
 // Confirmed engagements grouped by service.
 //
 // COUNTS DISTINCT COUNTERPARTIES, NEVER ROWS, and that is the anti-collusion
@@ -123,7 +203,7 @@ async function engagementSummaryFor(businessId) {
       status: PUBLIC_STATUS,
       OR: [{ businessAId: businessId }, { businessBId: businessId }],
     },
-    select: { service: true, businessAId: true, businessBId: true },
+    select: { service: true, businessAId: true, businessBId: true, occurredOn: true },
   });
 
   const byService = new Map();
@@ -140,6 +220,7 @@ async function engagementSummaryFor(businessId) {
 
   return {
     total: rows.length,
+    ...repeatSignalFor(rows, businessId),
     // Sorted by distinct counterparties, then volume: the service the most
     // DIFFERENT businesses have confirmed is the most defensible claim this
     // business has, so it leads.

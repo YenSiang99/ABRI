@@ -15,7 +15,7 @@
 //
 // Fixed rather than free text because §7 is explicit about why: "matching is
 // tag overlap, so the tags have to be a closed list both sides pick from."
-import { ASK_POSTING_VERIFICATION_LEVELS, UNCLAIMED } from "./verificationLevels.js";
+import { ASK_POSTING_VERIFICATION_LEVELS } from "./verificationLevels.js";
 
 const ASK_CATEGORIES = [
   "Customer requirement",
@@ -201,22 +201,18 @@ function matchingAsksWhere(business, { strength = "category" } = {}) {
   };
 }
 
-// Whether an accepted answer is publicly visible yet.
-//
-// Derived, never a column. An answer may name a T0 (unclaimed) listing — the
-// one place this feature departs from "unclaimed businesses are refused every
-// relational action" — and the recommendation simply waits: BusinessProfile
-// .jsx renders no tabs at all for a T0, so there is nowhere for it to appear
-// until the claim flips the business to T1, at which point it is already
-// there. A stored `published` flag would be a second copy of verificationLevel that could
-// disagree with it.
-function isRecommendationPublished(recommendedBusiness) {
-  return recommendedBusiness.verificationLevel !== UNCLAIMED;
-}
-
 // A self-nomination is exactly "the author named themselves". There is no
 // `kind` column saying so, on purpose: two foreign keys already carry the
 // fact, and a third column restating it is one that can disagree with them.
+//
+// STILL LABELLED, EVEN THOUGH NOTHING PUBLISHES ANY MORE. Accepting an answer
+// stopped producing a public recommendation in Sept 2026 (see routes/asks.js),
+// which removed the reason self-nomination was ever GATED — a pitch can no
+// longer escape onto a third party's profile because nothing reaches a profile
+// at all. What it did not remove is the asker's need to tell the two apart:
+// "this firm says they can do it" and "an unrelated member says they can" are
+// different claims, and the second is the one worth more. So this survives as
+// a labelling rule on the answer card, and nowhere else.
 function isSelfNomination(answer) {
   return answer.recommendedBusinessId === answer.answeredByBusinessId;
 }
@@ -230,13 +226,9 @@ function serializeAnswer(answer) {
     acceptedAt: answer.acceptedAt,
     answeredBy: answer.answeredByBusiness,
     recommended: answer.recommendedBusiness,
-    // Resolved server-side so no client has to re-derive either rule. The
-    // first drives which of two sentences the card renders; the second tells
-    // an asker why an accepted answer isn't showing on a profile yet.
+    // Resolved server-side so no client has to re-derive the rule: it drives
+    // which of two sentences the answer card renders.
     isSelfNomination: isSelfNomination(answer),
-    visibleOnProfile: answer.recommendedBusiness
-      ? isRecommendationPublished(answer.recommendedBusiness)
-      : null,
   };
 }
 
@@ -297,7 +289,6 @@ export {
   canPostAsks,
   matchStrengthFor,
   matchingAsksWhere,
-  isRecommendationPublished,
   isSelfNomination,
   serializeAsk,
   serializeAnswer,

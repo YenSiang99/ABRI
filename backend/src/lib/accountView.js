@@ -165,7 +165,7 @@ function publicBusinessView(business, { showContact = false } = {}) {
 // special case anywhere else. Reached only via loadAccountView, i.e. /login,
 // /auth/me and /verify-claim.
 function serializeBusiness(business) {
-  const { vouchesReceived, vouchesGiven, recommendationsReceived, ...rest } = business;
+  const { vouchesReceived, vouchesGiven, ...rest } = business;
   const published = vouchesReceived.filter((v) => v.status === "published");
   const vouchCount = published.length;
   // Both directions, because the top vouch level ("leader") is the one rung
@@ -173,26 +173,8 @@ function serializeBusiness(business) {
   // count silently caps every business at "trusted", which is exactly how
   // that rung went unreachable for months.
   const vouchesGivenPublished = (vouchesGiven ?? []).filter((v) => v.status === "published").length;
-  // The self-nomination half of the public filter, applied here because the
-  // query could not express it — see the note on the include. `answeredBy ===
-  // this business` IS "they nominated themselves": every row in this relation
-  // already has recommendedBusinessId equal to this business, so no second
-  // field comparison is needed. Same rule, same spelling, as the public query
-  // in routes/businesses.js.
-  const recommendations = (recommendationsReceived ?? []).filter(
-    (r) => r.answeredByBusinessId !== business.id,
-  );
-
   return {
     ...rest,
-    recommendationCount: recommendations.length,
-    recommendations: recommendations.map((r) => ({
-      id: r.id,
-      comment: r.comment,
-      acceptedAt: r.acceptedAt,
-      answeredBy: r.answeredByBusiness,
-      ask: r.ask,
-    })),
     vouchCount,
     vouchLevel: vouchLevelFor({ received: vouchCount, given: vouchesGivenPublished }),
     // Who this business already has a vouch OUT to, and where it stands.
@@ -241,42 +223,6 @@ async function loadAccountView(accountId) {
           // else. The testimonials on this side belong to /vouches/given.
           vouchesGiven: { select: { toBusinessId: true, status: true } },
 
-          // The owner's own Recommendations tab, loaded with the SAME predicate
-          // GET /businesses/:id uses for the public one — accepted only, and
-          // never the owner's own self-nominations.
-          //
-          // MATCHING THE PUBLIC FILTER IS THE POINT. This page's job is to show
-          // an owner what visitors see, plus an explanation wherever something
-          // is being withheld (that is what the vouches tab's LockedFeature is
-          // for). An owner's tab that counted rows no visitor could see would
-          // make this page lie in the one direction that matters — telling
-          // someone their profile carries proof it does not.
-          //
-          // The self-nomination exclusion is spelled the same way here and
-          // there: "the author is this business". See the comment on the
-          // public query in routes/businesses.js for why letting one through
-          // would turn the tab into a self-promotion surface.
-          recommendationsReceived: {
-            // Only "accepted" can be expressed here. The self-nomination
-            // exclusion needs this business's own id to compare against, and a
-            // nested include's `where` has no reference to the parent row — so
-            // it happens in serializeBusiness below, where the id is in scope.
-            where: { status: "accepted" },
-            include: {
-              answeredByBusiness: {
-                select: { id: true, name: true, category: true, verificationLevel: true },
-              },
-              ask: {
-                select: {
-                  id: true,
-                  title: true,
-                  category: true,
-                  askedByBusiness: { select: { id: true, name: true } },
-                },
-              },
-            },
-            orderBy: { acceptedAt: "desc" },
-          },
         },
       },
     },
@@ -295,7 +241,7 @@ async function loadAccountView(accountId) {
   //
   // Confirmed only, matching what GET /businesses/:id shows. An owner's page
   // that counted rows no visitor can see would tell them their profile carries
-  // proof it does not — the same reasoning as the recommendations filter.
+  // proof it does not.
   const [engagementRows, engagementSummary] = await Promise.all([
     confirmedEngagementsFor(business.id),
     engagementSummaryFor(business.id),

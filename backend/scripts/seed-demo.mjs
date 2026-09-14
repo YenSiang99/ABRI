@@ -22,8 +22,8 @@
 // and never touches a business it doesn't.
 //
 // NOT FOR PRODUCTION. It writes published vouches nobody wrote and accepted
-// recommendations nobody made. On a real database that is fabricated trust
-// evidence, which is the one thing this product cannot contain. The guard at
+// answers nobody gave. On a real database that is fabricated trust evidence,
+// which is the one thing this product cannot contain. The guard at
 // the bottom of main() refuses to run against a non-local database unless
 // ABRI_SEED_DEMO_CONFIRM is set.
 
@@ -312,10 +312,9 @@ const FOLLOWS = [
 // ── Asks ──────────────────────────────────────────────────────────────────
 //
 // Every poster is L2+, mirroring canPostAsks(). Two asks carry an accepted
-// answer, which is what writes a recommendation_published row into the feed —
-// and one of those recommends an UNCLAIMED listing, so the T0 rule in
-// visibleNetworkEventsWhere has a live example: that row exists and stays
-// invisible until somebody claims the listing.
+// answer, which settles them — accepting publishes nothing anywhere, so these
+// exist to give the board a realistic mix of open and settled threads rather
+// than to seed anything on a profile.
 const ASKS = [
   {
     id: "demo-ask-restructure-cosec",
@@ -472,7 +471,7 @@ async function main() {
   if (!isLocal && !process.env.ABRI_SEED_DEMO_CONFIRM) {
     console.error(
       "Refusing to run against a non-local database.\n" +
-        "This writes published vouches and accepted recommendations that nobody made.\n" +
+        "This writes published vouches and accepted answers that nobody made.\n" +
         "If you really mean to seed a shared environment, re-run with:\n" +
         "  ABRI_SEED_DEMO_CONFIRM=1 node scripts/seed-demo.mjs",
     );
@@ -701,17 +700,6 @@ async function main() {
       };
       await prisma.askAnswer.upsert({ where: { id }, update: data, create: { id, ...data } });
       answerCount += 1;
-
-      if (ans.accepted) {
-        await upsertEvent({
-          id: `demo-ev-rec-${id}`,
-          type: "recommendation_published",
-          subjectBusinessId: ans.recommends,
-          actorBusinessId: ask.by,
-          askAnswerId: id,
-          at: data.acceptedAt,
-        });
-      }
     }
   }
 

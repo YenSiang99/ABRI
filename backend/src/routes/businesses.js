@@ -521,37 +521,6 @@ router.get(
             currentRevision: { select: { comment: true } },
           },
         },
-        // Accepted answers naming this business — the Recommendations tab.
-        //
-        // Filtered to "accepted" here, defensively, for the same reason
-        // vouchesReceived is filtered to "published": an offered answer is a
-        // suggestion nobody agreed to, and an under_review one is frozen.
-        //
-        // `answeredByBusinessId: { not: id }` is what keeps self-nomination
-        // off this tab. Every row in this relation already has
-        // recommendedBusinessId equal to this business, so "the author is
-        // this business" IS "they nominated themselves" — no field
-        // comparison needed. Letting one through would turn the tab into
-        // exactly the self-promotion surface the answer model was shaped to
-        // prevent.
-        recommendationsReceived: {
-          where: {
-            status: "accepted",
-            answeredByBusinessId: { not: req.params.id },
-          },
-          include: {
-            answeredByBusiness: { select: { id: true, name: true, category: true, verificationLevel: true } },
-            ask: {
-              select: {
-                id: true,
-                title: true,
-                category: true,
-                askedByBusiness: { select: { id: true, name: true } },
-              },
-            },
-          },
-          orderBy: { acceptedAt: "desc" },
-        },
       },
     });
     if (!business) return res.status(404).json({ error: "Business not found." });
@@ -675,40 +644,6 @@ router.get(
               testimonial: currentRevision?.comment ?? null,
             }))
           : [],
-        // NOT plan-gated, unlike testimonials right above, and that is a
-        // decision rather than an omission. Three reasons:
-        //   - Testimonials are Plus's headline asset. A recommendation is a
-        //     different asset with a different author, and pricing it here
-        //     would be a second paywall on the same page.
-        //   - Withholding it punishes the RECOMMENDER, whose work would
-        //     vanish because of somebody else's billing status.
-        //   - It never feeds vouchCount or vouchLevelFor(), so a downgrade has
-        //     nothing to take away — which is the entire justification the
-        //     testimonials gate rests on.
-        //
-        // The count ships for T0 listings TOO, even though the tab that
-        // would display them is absent on an unclaimed profile. That is the
-        // whole growth loop: the claim CTA reads "3 members have recommended
-        // this business", names withheld, and claiming is what reveals them.
-        recommendationCount: business.recommendationsReceived.length,
-        // Withheld on an UNCLAIMED listing, keys absent rather than nulled —
-        // the same shape testimonials use when they're withheld.
-        //
-        // The count is the pull ("3 members have recommended this business")
-        // and the names are what claiming reveals. The profile page renders no
-        // tabs for a T0 so nothing would have displayed them anyway, but
-        // shipping them in the payload would have made "claim your listing to
-        // see who" false for anyone who opened the network tab.
-        recommendationsReceived:
-          business.verificationLevel === UNCLAIMED
-            ? []
-            : business.recommendationsReceived.map((r) => ({
-                id: r.id,
-                comment: r.comment,
-                acceptedAt: r.acceptedAt,
-                answeredBy: r.answeredByBusiness,
-                ask: r.ask,
-              })),
       },
     });
   }),
@@ -898,8 +833,7 @@ router.patch(
 //
 // A status column would be a second copy of a fact verificationLevel already
 // carries, and the disagreeing case — "approved" beside L1 — is precisely the
-// one that would show a badge nobody granted. Same call
-// isRecommendationPublished makes in lib/asks.js.
+// one that would show a badge nobody granted.
 router.post(
   "/me/ssm",
   requireAuth,

@@ -24,8 +24,9 @@ const VERIFICATION_LEVELS = ["L0", "L1", "L2", "L3", "L4"];
 // UNCLAIMED is the one that carries a rule rather than a label: a business at
 // this level has no owner, which is why it is refused every relational action
 // (POST /connections, POST /follows) — there is nobody on the other end. The
-// one deliberate exception is being RECOMMENDED on the asks board, where the
-// answer is addressed to the asker rather than to the business named.
+// one deliberate exception is being NAMED in an answer on the asks board,
+// where the answer is addressed to the asker rather than to the business
+// named — so it needs nobody on the other end to receive it.
 const UNCLAIMED = VERIFICATION_LEVELS[0];
 const CLAIMED = VERIFICATION_LEVELS[1];
 const SSM_VERIFIED = VERIFICATION_LEVELS[2];
