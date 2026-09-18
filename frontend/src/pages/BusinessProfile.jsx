@@ -21,7 +21,6 @@ import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import {
   EngagementList,
-  RepeatSignal,
 } from "@/components/business/EngagementList";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
@@ -85,8 +84,6 @@ function EngagementRecord({ entries, summary, businessName, businessId }) {
       <p className="mt-1 text-sm text-grey-500 dark:text-muted-foreground">
         Confirmed by the business on the other side, not self-reported.
       </p>
-
-      <RepeatSignal repeatCounterparties={summary?.repeatCounterparties} />
 
       {top.length > 0 && (
         <ul className="mt-4 space-y-1.5">

@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import {
   EngagementList,
-  RepeatSignal,
 } from "@/components/business/EngagementList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -369,7 +368,6 @@ function OwnEngagements({ business, onChanged }) {
   const summary = business.engagementSummary ?? {
     total: 0,
     services: [],
-    repeatCounterparties: null,
   };
   const confirmedServices = new Set(summary.services.map((s) => s.service));
   const claimed = business.services ?? [];
@@ -387,8 +385,6 @@ function OwnEngagements({ business, onChanged }) {
         </div>
         <LogEngagementDialog business={business} onSaved={onChanged} />
       </div>
-
-      <RepeatSignal repeatCounterparties={summary.repeatCounterparties} owner />
 
       {entries.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">

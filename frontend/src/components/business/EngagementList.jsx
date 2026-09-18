@@ -1,4 +1,4 @@
-import { Gem, Repeat } from "lucide-react";
+import { Gem } from "lucide-react";
 
 import { BusinessAvatar } from "@/components/business/BusinessAvatar";
 
@@ -121,63 +121,6 @@ function EngagementGroup({ group, businessId }) {
     </li>
   );
 }
-// "2 businesses came back for more work."
-//
-// A COUNT, NOT A RATIO. This had a denominator for a day; see the note on
-// repeatSignalFor in backend/src/lib/engagements.js for why it lost one. The
-// short version: a rate needs more counterparties than anyone in this network
-// has, and it read as a verdict on a sample of four, where a count reads as
-// something that grows the next time somebody logs work.
-//
-// ZERO IS NOT DRAWN FOR A VISITOR. There is no "0 businesses came back" line,
-// because a count that starts at zero for every new member would put a null
-// result on most profiles in the product and say nothing about any of them —
-// it is the absence of evidence, and the panel above it already shows exactly
-// how much evidence there is. The owner is the exception: for them a zero is
-// the prompt, so `owner` turns it into one.
-function RepeatSignal({ repeatCounterparties, owner = false }) {
-  if (repeatCounterparties === null || repeatCounterparties === undefined) return null;
-  if (!repeatCounterparties && !owner) return null;
-
-  const businesses = `${repeatCounterparties} ${
-    repeatCounterparties === 1 ? "business" : "businesses"
-  }`;
-
-  if (owner) {
-    return (
-      <div className="mt-3 rounded-xl border border-dashed border-grey-200 px-4 py-3 dark:border-border">
-        <div className="flex items-start gap-2 text-sm text-ink dark:text-foreground">
-          <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-grey-500 dark:text-muted-foreground" />
-          <span>
-            {repeatCounterparties === 0 ? (
-              <>
-                No business has worked with you twice yet.{" "}
-                <span className="text-grey-500 dark:text-muted-foreground">
-                  When one comes back, visitors see it here.
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-medium">{businesses}</span> came back for
-                more work.{" "}
-                <span className="text-grey-500 dark:text-muted-foreground">
-                  Visitors see this on your profile.
-                </span>
-              </>
-            )}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 flex items-start gap-2 rounded-xl bg-grey-100/60 px-4 py-3 text-sm font-medium text-ink dark:bg-muted/40 dark:text-foreground">
-      <Repeat className="mt-0.5 h-4 w-4 shrink-0 text-grey-500 dark:text-muted-foreground" />
-      <span>{businesses} came back for more work</span>
-    </div>
-  );
-}
 
 // The list itself. `businessName` is only needed on the public profile, where
 // the server sends both ends and no resolved counterparty; the owner's view
@@ -210,4 +153,4 @@ function EngagementList({ entries, businessName, businessId, limit = 5, classNam
   );
 }
 
-export { EngagementList, EngagementGroup, RepeatSignal };
+export { EngagementList, EngagementGroup };
