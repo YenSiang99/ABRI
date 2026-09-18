@@ -33,6 +33,31 @@ const businesses = [
   { id: "puchong-corp-sec-hub", name: "Puchong Corp Sec Hub", category: "Corporate Secretarial", location: "Puchong", domain: "puchongcorpsechub.my", description: "Company secretarial firm listed from public registry data. Not yet claimed by an owner." },
   { id: "bangsar-south-accounting", name: "Bangsar South Accounting", category: "Accounting & Tax", location: "Kuala Lumpur", domain: "bangsarsouthaccounting.my", description: "Accounting and tax advisory firm with a client base of professional-services SMEs." },
   { id: "petaling-jaya-corp-registry", name: "Petaling Jaya Corp Registry", category: "Corporate Secretarial", location: "Petaling Jaya", domain: "petalingjayacorpregistry.my", description: "Company secretarial firm listed from public registry data. Not yet claimed by an owner." },
+
+  // ── The everyday SMEs ───────────────────────────────────────────────────
+  //
+  // THE OTHER HALF OF THE NETWORK. The 22 above all SELL professional
+  // services, which made every seeded ask read "professional-services firm
+  // needs professional-services firm" — the most common real transaction in
+  // the corridor, a bakery needing an accountant, could not be seeded because
+  // neither the category nor the business existed.
+  //
+  // These are the buyers. They are what makes the directory legible at a
+  // glance: a reader scanning a board of asks can tell a kopitiam chain from a
+  // furniture maker instantly, and could not tell two company secretaries
+  // apart at all.
+  { id: "roti-sawan-bakery", name: "Roti Sawan Bakery", category: "Food & Beverage", location: "Petaling Jaya", domain: "rotisawan.my", description: "Neighbourhood bakery running four outlets across PJ and Subang, with a central kitchen supplying cafes and offices.", phone: "03-7877 4412", whatsapp: "60127877441", email: "hello@rotisawan.my", website: "https://rotisawan.my", address: "12 Jalan SS2/24, 47300 Petaling Jaya, Selangor", openingHours: "Mon–Sat 7am–7pm\nSun 7am–2pm" },
+  { id: "kopi-lengkap-group", name: "Kopi Lengkap Group", category: "Food & Beverage", location: "Kuala Lumpur", domain: "kopilengkap.my", description: "Kopitiam chain with nine outlets in the Klang Valley and a growing corporate catering arm.", phone: "03-2141 9080", whatsapp: "60321419080", email: "admin@kopilengkap.my", website: "https://kopilengkap.my", address: "Lot 3-11, Jalan Sultan Ismail, 50250 Kuala Lumpur", openingHours: "Daily 7am–10pm" },
+  { id: "hartaco-furniture", name: "Hartaco Furniture", category: "Manufacturing", location: "Shah Alam", domain: "hartaco.my", description: "Contract furniture maker producing office and hospitality fit-outs for developers and interior firms.", phone: "03-5122 8867", whatsapp: "60351228867", email: "sales@hartaco.my", website: "https://hartaco.my", address: "Lot 8, Jalan Utas 15/7, Seksyen 15, 40200 Shah Alam, Selangor", openingHours: "Mon–Fri 8.30am–6pm\nSat 8.30am–1pm" },
+  { id: "cetak-murni-press", name: "Cetak Murni Press", category: "Manufacturing", location: "Puchong", domain: "cetakmurni.my", description: "Commercial printer handling packaging, corporate collateral and short-run label work.", phone: "03-8060 3321", whatsapp: "60380603321", email: "print@cetakmurni.my", website: "https://cetakmurni.my", address: "23 Jalan Puteri 4/6, Bandar Puteri, 47100 Puchong, Selangor", openingHours: "Mon–Fri 9am–6pm" },
+  { id: "seri-murni-catering", name: "Seri Murni Catering", category: "Food & Beverage", location: "Ampang", domain: "serimurni.my", description: "Event and corporate caterer serving offices, weddings and government functions across the Klang Valley." },
+  { id: "laju-logistics", name: "Laju Logistics", category: "Logistics", location: "Shah Alam", domain: "lajulogistics.my", description: "Last-mile and B2B delivery operator with a 40-vehicle fleet and two Klang Valley warehouses.", phone: "03-5510 7788", whatsapp: "60355107788", email: "ops@lajulogistics.my", website: "https://lajulogistics.my", address: "Warehouse 4, Jalan Pelabur 23/1, Seksyen 23, 40300 Shah Alam, Selangor", openingHours: "Mon–Sat 8am–8pm" },
+  { id: "taman-desa-dental", name: "Taman Desa Dental", category: "Health & Wellness", location: "Kuala Lumpur", domain: "tamandesadental.my", description: "Two-surgery dental practice with a corporate panel arrangement for nearby offices." },
+  { id: "brightpath-tuition", name: "Brightpath Learning Centre", category: "Education", location: "Subang Jaya", domain: "brightpath.my", description: "Enrichment and tuition centre running three branches, expanding into corporate language training." },
+  { id: "kiara-aircond-services", name: "Kiara Aircond Services", category: "Construction & Trades", location: "Kuala Lumpur", domain: "kiaraaircond.my", description: "Air-conditioning installation and maintenance contractor working mainly on commercial maintenance contracts." },
+  { id: "sinar-retail-supply", name: "Sinar Retail Supply", category: "Retail", location: "Petaling Jaya", domain: "sinarretail.my", description: "Wholesale supplier of packaging, disposables and consumables to F&B and retail operators." },
+  { id: "anggun-events", name: "Anggun Events", category: "Marketing & Media", location: "Bangsar", domain: "anggunevents.my", description: "Event management and brand activation agency working with F&B and retail brands." },
+  { id: "lembah-property-management", name: "Lembah Property Management", category: "Property", location: "Petaling Jaya", domain: "lembahproperty.my", description: "Manages commercial and mixed-use buildings across PJ and Subang, listed from public registry data. Not yet claimed by an owner." },
 ];
 
 // Only some rows above carry contact details, on purpose: the gate in

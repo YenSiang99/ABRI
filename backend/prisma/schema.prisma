@@ -202,6 +202,11 @@ model Business {
   engagementsB        Engagement[] @relation("EngagementB")
   engagementsProposed Engagement[] @relation("EngagementProposer")
 
+  // A fourth engagement relation, and unlike the three above it is not about
+  // which end of the pair this business sits on — it is about which end
+  // DELIVERED the service. See Engagement.serviceProvidedById.
+  engagementsProvided Engagement[] @relation("EngagementServiceProvider")
+
   // Browse without being named. Off by default, and that default is the
   // feature working at all: a network where most members start invisible has
   // a viewers screen that says "someone" forever.
@@ -807,6 +812,26 @@ model Engagement {
   // contract a custom service has on a profile.
   service String?
 
+  // WHICH END DELIVERED the service above, and the column that stops one
+  // business being credited with the other's work.
+  //
+  // Without it, engagementSummaryFor credits `service` to BOTH ends of the
+  // pair, because the pair is stored unordered and nothing said who did what.
+  // A bakery that logged "SST advisory" against its accountant therefore
+  // carried "SST advisory" on its own public profile — a service it does not
+  // offer, on the one panel this product sells as unfakeable.
+  //
+  // NULL MEANS UNRECORDED, NOT "NEITHER", and that distinction is load-bearing
+  // rather than leniency: a null-provider row is credited to both ends, which
+  // is exactly the behaviour every row written before Sept 2026 has always
+  // had. Do not "tighten" that check — it would silently empty every profile
+  // the backfill could not speak for, with nothing in the logs.
+  //
+  // Deliberately not expressible as a cheap DB constraint: this is always
+  // businessAId or businessBId, never a third business.
+  serviceProvidedById String?
+  serviceProvidedBy   Business? @relation("EngagementServiceProvider", fields: [serviceProvidedById], references: [id])
+
   // Free text, optional, and deliberately inert — never matched, never
   // aggregated, never searched. It exists so a reader can tell two engagements
   // for the same service apart.
@@ -834,6 +859,10 @@ model Engagement {
   @@index([businessAId, status])
   @@index([businessBId, status])
   @@index([proposedById])
+  // FK hygiene, the reason every other business key here carries one:
+  // Postgres does not index a foreign key for you, and the RESTRICT check on
+  // a Business delete is otherwise a sequential scan.
+  @@index([serviceProvidedById])
 }
 
 model NetworkEvent {

@@ -111,6 +111,111 @@ const SERVICES_BY_CATEGORY = {
     "Backup & disaster recovery",
     "IT policy & compliance",
   ],
+
+  // ── The everyday SMEs ─────────────────────────────────────────────────
+  //
+  // Added with the categories themselves, for the reason the Design comment
+  // above gives: a category with no catalogue is a category whose members can
+  // never be found by service, which is most of what a category is for.
+  //
+  // These read differently from the five above and should. A professional
+  // firm's services are what it SELLS to other businesses; an SME's are what
+  // it makes or does, and the useful entry is the one a counterparty would
+  // name when confirming work — "Catering", "Bulk & corporate orders" — not
+  // "Food". Anything too broad to tell two businesses apart stays out and
+  // lives as a custom service instead.
+  "Food & Beverage": [
+    "Catering",
+    "Bulk & corporate orders",
+    "Cafe & dine-in",
+    "Bakery & pastry",
+    "Central kitchen production",
+    "Food manufacturing",
+    "Event catering",
+    "Franchise operations",
+    "Halal certification support",
+  ],
+  Retail: [
+    "Wholesale supply",
+    "Retail distribution",
+    "E-commerce fulfilment",
+    "Corporate gifting",
+    "Stock & inventory supply",
+    "Consignment",
+    "Point-of-sale setup",
+  ],
+  Manufacturing: [
+    "Contract manufacturing",
+    "OEM production",
+    "Packaging & labelling",
+    "Metal fabrication",
+    "Plastic injection moulding",
+    "Textile & garment production",
+    "Furniture making",
+    "Quality inspection",
+    "Tooling & moulds",
+  ],
+  "Construction & Trades": [
+    "Renovation",
+    "Interior fit-out",
+    "Electrical works",
+    "Plumbing",
+    "Air-conditioning & ventilation",
+    "Civil works",
+    "Painting & finishing",
+    "Site supervision",
+    "Maintenance contracts",
+  ],
+  Logistics: [
+    "Last-mile delivery",
+    "Freight forwarding",
+    "Warehousing",
+    "Cold chain",
+    "Customs clearance",
+    "Courier services",
+    "Fleet management",
+  ],
+  Property: [
+    "Property management",
+    "Leasing & tenancy",
+    "Valuation",
+    "Facilities management",
+    "Real estate agency",
+    "Building maintenance",
+  ],
+  Education: [
+    "Corporate training",
+    "Tuition & enrichment",
+    "Language training",
+    "Vocational courses",
+    "E-learning development",
+    "Childcare & early years",
+  ],
+  "Health & Wellness": [
+    "Clinic services",
+    "Occupational health screening",
+    "Dental services",
+    "Physiotherapy",
+    "Wellness programmes",
+    "Medical supplies",
+  ],
+  "Marketing & Media": [
+    "Advertising",
+    "Public relations",
+    "Event management",
+    "Media buying",
+    "Influencer marketing",
+    "Market research",
+    "Exhibition & booth build",
+  ],
+  "Professional Training": [
+    "HRD Corp claimable training",
+    "Leadership development",
+    "Compliance training",
+    "Safety & health training",
+    "Sales training",
+    "Coaching & facilitation",
+  ],
 };
 
 // Every canonical service across every category, for the membership test. A

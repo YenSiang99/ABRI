@@ -66,7 +66,7 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const own = await ownBusiness(req);
-    const { businessId, service, note, occurredOn, askId } = req.body ?? {};
+    const { businessId, service, note, occurredOn, askId, serviceProvidedById } = req.body ?? {};
 
     if (!businessId) fail(400, "Say which business you worked with.");
     if (businessId === own.id) fail(400, "You can't log working with yourself.");
@@ -87,6 +87,28 @@ router.post(
     if (service !== undefined && service !== null && service !== "") {
       canonical = canonicalService(service);
       if (!canonical) fail(400, `"${service}" isn't a service we can record work against.`);
+    }
+
+    // WHICH END DELIVERED IT. Defaults to the OTHER business rather than the
+    // caller, because that is what this flow has always meant: the dialog only
+    // ever offered services from the target's catalogue ("logging 'SST
+    // advisory' against a law firm because the logger is an accountant would
+    // put a service on their profile they do not offer"). The default keeps
+    // every existing client correct without a change; the explicit value is
+    // for the logger who did the work themselves.
+    //
+    // Constrained to the two parties, never a third business — the invariant
+    // the column comment states and the DB cannot cheaply enforce.
+    let provider = null;
+    if (canonical) {
+      provider = serviceProvidedById ?? other.id;
+      if (provider !== own.id && provider !== other.id) {
+        fail(400, "Only the two businesses on an engagement can have delivered it.");
+      }
+    } else if (serviceProvidedById) {
+      // Naming a provider with no service to provide is a contradiction, and
+      // silently dropping it would leave the caller thinking it stuck.
+      fail(400, "Say which service was delivered before saying who delivered it.");
     }
 
     // Month precision, normalised to the first of the month. See the column
@@ -126,6 +148,7 @@ router.post(
         ...orderedPair(own.id, other.id),
         proposedById: own.id,
         service: canonical,
+        serviceProvidedById: provider,
         note: typeof note === "string" && note.trim() ? note.trim() : null,
         occurredOn: month,
         askId: linkedAskId,

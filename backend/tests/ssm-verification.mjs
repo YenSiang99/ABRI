@@ -8,10 +8,9 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
 import assert from "node:assert";
-import fs from "node:fs";
-const url = fs.readFileSync(new URL("../.env", import.meta.url), "utf8").match(/^DIRECT_URL=(.*)$/m)[1].trim().replace(/^"|"$/g,"");
+import { API, TEST_DATABASE_URL } from "./env.mjs";
+const url = TEST_DATABASE_URL;
 const db = new PrismaClient({ datasourceUrl: url });
-const API = "http://localhost:4000";
 const P = "e2e-";
 let pass = 0; const ok = (m) => { console.log("  ✓", m); pass++; };
 for (let i = 1; i <= 6; i++) { try { await db.$queryRaw`select 1`; break; } catch { await new Promise(r=>setTimeout(r,4000)); } }

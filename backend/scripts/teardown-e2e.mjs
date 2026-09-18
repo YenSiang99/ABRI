@@ -72,7 +72,7 @@ const steps = [
   // SET NULL, so the ask delete above nulls it rather than being blocked by it.
   // It DOES matter for the three business FKs, which are RESTRICT like every
   // other relation here, so this has to run before the business delete.
-  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }] }],
+  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }, { serviceProvidedById: biz }] }],
   ["deferredConnection", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["emailVerificationToken", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["account",       { id: { in: accIds } }],

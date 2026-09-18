@@ -216,16 +216,29 @@ router.get(
           service: canonicalServiceFilter,
           OR: [{ businessAId: { in: candidateIds } }, { businessBId: { in: candidateIds } }],
         },
-        select: { businessAId: true, businessBId: true },
+        select: { businessAId: true, businessBId: true, serviceProvidedById: true },
       });
 
       // An engagement touches two businesses and only one of them is the
       // candidate for any given row — which end, depends on the id ordering
       // the pair is stored under, so both are checked.
+      //
+      // THE SECOND READER OF THE PROVIDER RULE. engagementSummaryFor is the
+      // first; this is the one members actually see, because it decides who
+      // ranks top of a service search. Without the same guard, a business that
+      // BOUGHT "SST advisory" outranks the firm that delivered it — the
+      // credited-to-both-ends bug at its most visible. A null provider still
+      // counts for both ends, exactly as it does there, and for the same
+      // reason: those rows never recorded who did the work.
       const counterparties = new Map(candidateIds.map((id) => [id, new Set()]));
       for (const e of engagements) {
-        if (counterparties.has(e.businessAId)) counterparties.get(e.businessAId).add(e.businessBId);
-        if (counterparties.has(e.businessBId)) counterparties.get(e.businessBId).add(e.businessAId);
+        const provider = e.serviceProvidedById;
+        if (counterparties.has(e.businessAId) && (!provider || provider === e.businessAId)) {
+          counterparties.get(e.businessAId).add(e.businessBId);
+        }
+        if (counterparties.has(e.businessBId) && (!provider || provider === e.businessBId)) {
+          counterparties.get(e.businessBId).add(e.businessAId);
+        }
       }
       confirmedByBusiness = new Map(
         [...counterparties].map(([id, set]) => [id, set.size]),

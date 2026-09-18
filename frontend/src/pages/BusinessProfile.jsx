@@ -72,7 +72,7 @@ function VouchCard({ vouch }) {
 // These rows say two businesses worked together on a date. Whether the work
 // was any good is what a vouch is for, and conflating them would let the
 // cheaper artifact borrow the dearer one's meaning.
-function EngagementRecord({ entries, summary, businessName }) {
+function EngagementRecord({ entries, summary, businessName, businessId }) {
   if (!entries || entries.length === 0) return null;
 
   const top = summary?.services?.slice(0, 3) ?? [];
@@ -111,6 +111,7 @@ function EngagementRecord({ entries, summary, businessName }) {
       <EngagementList
         entries={entries}
         businessName={businessName}
+        businessId={businessId}
         className="mt-4 border-t border-grey-200 pt-4 dark:border-border"
       />
     </div>
@@ -592,6 +593,7 @@ function BusinessProfile({ inApp = false }) {
               entries={business.engagements}
               summary={business.engagementSummary}
               businessName={business.name}
+              businessId={business.id}
             />
             {/* No tier lock of its own here. On T0 this whole tab isn't
                 rendered (the unclaimed panel replaces it), and on T1 the

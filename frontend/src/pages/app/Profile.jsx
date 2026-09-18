@@ -395,7 +395,12 @@ function OwnEngagements({ business, onChanged }) {
           they confirm it, it shows on both your profiles.
         </p>
       ) : (
-        <EngagementList entries={entries} limit={6} className="mt-4" />
+        <EngagementList
+          entries={entries}
+          businessId={business.id}
+          limit={6}
+          className="mt-4"
+        />
       )}
 
       {claimed.length > 0 && (

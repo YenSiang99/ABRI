@@ -80,6 +80,9 @@ function serializeEngagement(engagement, viewerBusinessId = null) {
     id: engagement.id,
     status: engagement.status,
     service: engagement.service,
+    // Which end delivered it, so the client can label the record instead of
+    // implying both sides do this work. Null means nobody recorded it.
+    serviceProvidedById: engagement.serviceProvidedById,
     note: engagement.note,
     occurredOn: engagement.occurredOn,
     createdAt: engagement.createdAt,
@@ -203,12 +206,28 @@ async function engagementSummaryFor(businessId) {
       status: PUBLIC_STATUS,
       OR: [{ businessAId: businessId }, { businessBId: businessId }],
     },
-    select: { service: true, businessAId: true, businessBId: true, occurredOn: true },
+    select: {
+      service: true,
+      serviceProvidedById: true,
+      businessAId: true,
+      businessBId: true,
+      occurredOn: true,
+    },
   });
 
   const byService = new Map();
   for (const row of rows) {
     if (!row.service) continue;
+    // A SERVICE IS CREDITED TO WHOEVER DELIVERED IT, once anybody has said who
+    // that was. Before serviceProvidedById existed nothing asked, so both ends
+    // of the pair were credited — which put "SST advisory" on the public
+    // profile of a bakery whose only involvement was paying for it.
+    //
+    // A NULL PROVIDER IS CREDITED TO BOTH ENDS, and that is a RULE rather than
+    // leniency towards old rows. Do not "tighten" it: every row the backfill
+    // could not speak for would silently vanish from its own profile, with
+    // nothing failing and nothing in the logs. See the column comment.
+    if (row.serviceProvidedById && row.serviceProvidedById !== businessId) continue;
     const other = row.businessAId === businessId ? row.businessBId : row.businessAId;
     if (!byService.has(row.service)) {
       byService.set(row.service, { service: row.service, engagements: 0, counterparties: new Set() });
