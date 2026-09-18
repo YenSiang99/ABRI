@@ -393,9 +393,9 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
 
         <div>
           <label className={labelClass}>Location</label>
-          {/* A select, not a text input. The Asks board reaches a business by
-              joining on this column exactly, so "PJ" and "Petaling  Jaya" are
-              businesses no ask can ever route to — and they'd never find out.
+          {/* A select, not a text input. The directory filters on this column
+              by equality, so "PJ" and "Petaling  Jaya" are businesses no search
+              can ever return — and they'd never find out.
               The list is in lib/businessVocab.js, mirrored from the server. */}
           <select
             value={form.location}
