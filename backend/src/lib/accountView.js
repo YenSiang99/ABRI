@@ -3,10 +3,10 @@ import { VOUCHABLE_VERIFICATION_LEVELS } from "./verificationLevels.js";
 import { serializeAccount } from "./serialize.js";
 import { vouchLevelFor } from "./vouchLevel.js";
 import {
-  confirmedEngagementsFor,
-  engagementSummaryFor,
-  serializeEngagement,
-} from "./engagements.js";
+  confirmedPortfolioFor,
+  portfolioSummaryFor,
+  serializePortfolioEntry,
+} from "./portfolio.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
 // the frontend expects: vouchCount/vouchLevel derived at read time (never
@@ -235,24 +235,24 @@ async function loadAccountView(accountId) {
   }
 
   // Fetched here rather than as a nested include, because the summary needs a
-  // GROUPED read over the same rows and lib/engagements.js already owns that
+  // GROUPED read over the same rows and lib/portfolio.js already owns that
   // shape — inlining an include would mean a second implementation of the
   // distinct-counterparty rule that could disagree with the public profile's.
   //
   // Confirmed only, matching what GET /businesses/:id shows. An owner's page
   // that counted rows no visitor can see would tell them their profile carries
   // proof it does not.
-  const [engagementRows, engagementSummary] = await Promise.all([
-    confirmedEngagementsFor(business.id),
-    engagementSummaryFor(business.id),
+  const [portfolioRows, portfolioSummary] = await Promise.all([
+    confirmedPortfolioFor(business.id),
+    portfolioSummaryFor(business.id),
   ]);
 
   return {
     account: serializeAccount(accountFields),
     business: {
       ...serializeBusiness(business),
-      engagements: engagementRows.map((e) => serializeEngagement(e, business.id)),
-      engagementSummary,
+      entries: portfolioRows.map((e) => serializePortfolioEntry(e, business.id)),
+      portfolioSummary,
     },
   };
 }

@@ -2,7 +2,7 @@ import { Gem } from "lucide-react";
 
 import { BusinessAvatar } from "@/components/business/BusinessAvatar";
 
-// One business's engagement rows, shaped like an experience section: a square
+// One business's portfolio entry rows, shaped like an experience section: a square
 // tile, the counterparty's name, the period, and a services line beneath.
 //
 // SHARED BY BOTH PROFILES ON PURPOSE. The owner's page (pages/app/Profile.jsx)
@@ -16,10 +16,10 @@ import { BusinessAvatar } from "@/components/business/BusinessAvatar";
 //
 // This is the anti-gaming rule made visual, not just a layout choice. The
 // panel's headline has always counted distinct counterparties rather than
-// rows, for the reason in the comment above; rendering one row per engagement
-// worked against that, because ten engagements with a single friendly business
+// rows, for the reason in the comment above; rendering one row per portfolio entry
+// worked against that, because ten portfolio entries with a single friendly business
 // drew ten lines and looked like the fullest record on the page. Grouped, that
-// same collusion draws ONE tile with "10 engagements" inside it, and a record
+// same collusion draws ONE tile with "10 portfolio entries" inside it, and a record
 // built from ten different businesses draws ten tiles. The shape of the panel
 // now says what the numbers say.
 //
@@ -54,7 +54,7 @@ function monthYear(value) {
 
 // The span a group covers, in the "Oct 2023 - Present" idiom. Collapses to a
 // single date when first and last fall in the same month, which is every group
-// holding one engagement — a range of "Mar 2026 - Mar 2026" reads as a bug.
+// holding one portfolio entry — a range of "Mar 2026 - Mar 2026" reads as a bug.
 function periodFor(entries) {
   const dates = entries
     .map((e) => new Date(e.occurredOn))
@@ -68,11 +68,11 @@ function periodFor(entries) {
 // worked. Rendered on its own line under the dates with a small mark beside
 // it, the way a skills line sits under a role.
 //
-// ONLY THE SERVICES THIS BUSINESS DELIVERED. An engagement row is shared by
+// ONLY THE SERVICES THIS BUSINESS DELIVERED. A portfolio entry row is shared by
 // both ends, and its service describes the work one of them did — so without
 // `businessId` this line credited a bakery with the "SST advisory" it had
 // bought from its accountant. Mirrors the same rule in
-// backend/src/lib/engagements.js, including the fallback: a row with NO
+// backend/src/lib/portfolio.js, including the fallback: a row with NO
 // recorded provider predates that column and is shown to both ends, exactly as
 // it always has been.
 function servicesFor(entries, businessId) {
@@ -85,12 +85,12 @@ function servicesFor(entries, businessId) {
   return seen;
 }
 
-function EngagementGroup({ group, businessId }) {
+function PortfolioGroup({ group, businessId }) {
   const { business, entries } = group;
   const services = servicesFor(entries, businessId);
   const count = entries.length;
-  // Notes belong to single engagements, so only show one when the group holds
-  // a single engagement — attributing one row's note to a group of four would
+  // Notes belong to single portfolio entries, so only show one when the group holds
+  // a single portfolio entry — attributing one row's note to a group of four would
   // describe work it was not written about.
   const note = count === 1 ? entries[0].note : null;
 
@@ -102,7 +102,7 @@ function EngagementGroup({ group, businessId }) {
           {business.name}
         </div>
         <div className="mt-0.5 text-sm text-grey-500 dark:text-muted-foreground">
-          {count === 1 ? "1 engagement" : `${count} engagements`}
+          {count === 1 ? "1 job" : `${count} jobs`}
           {" · "}
           {periodFor(entries)}
         </div>
@@ -129,7 +129,7 @@ function EngagementGroup({ group, businessId }) {
 // `businessId` is separate from it and is needed on BOTH views: grouping is by
 // name because that is what a public row gives us, but service CREDIT is by id,
 // because names are not what the provider column stores. See servicesFor.
-function EngagementList({ entries, businessName, businessId, limit = 5, className = "" }) {
+function PortfolioList({ entries, businessName, businessId, limit = 5, className = "" }) {
   const groups = groupByCounterparty(entries, businessName);
   const shown = limit ? groups.slice(0, limit) : groups;
   const rest = groups.length - shown.length;
@@ -141,7 +141,7 @@ function EngagementList({ entries, businessName, businessId, limit = 5, classNam
           section uses to say so. */}
       <ul className="divide-y divide-grey-200 dark:divide-border">
         {shown.map((group) => (
-          <EngagementGroup key={group.business.id} group={group} businessId={businessId} />
+          <PortfolioGroup key={group.business.id} group={group} businessId={businessId} />
         ))}
       </ul>
       {rest > 0 && (
@@ -153,4 +153,4 @@ function EngagementList({ entries, businessName, businessId, limit = 5, classNam
   );
 }
 
-export { EngagementList, EngagementGroup };
+export { PortfolioList, PortfolioGroup };

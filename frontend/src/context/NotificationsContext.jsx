@@ -12,7 +12,7 @@ import {
   markOneActivityRead,
 } from "@/lib/api/activity";
 import { fetchVouchRequests } from "@/lib/api/vouches";
-import { fetchEngagements } from "@/lib/api/engagements";
+import { fetchPortfolio } from "@/lib/api/portfolio";
 import { useAuth } from "./AuthContext";
 
 // The two numbers the sidebar puts on nav items: unread activity, and vouches
@@ -52,20 +52,20 @@ function NotificationsProvider({ children }) {
       fetchVouchRequests()
         .then((vouches) => vouches.filter((v) => v.waitingOn === "you").length)
         .catch(() => 0),
-      // Only the ones waiting on THIS member. An engagement they proposed is
+      // Only the ones waiting on THIS member. A portfolio entry they proposed is
       // waiting on the other side, and counting it would nag them about work
       // that is not theirs — the same rule the vouch count applies with
       // waitingOn, and the reason the Sent connection tab has no badge.
-      fetchEngagements("pending")
+      fetchPortfolio("pending")
         .then((rows) => rows.filter((e) => !e.proposedByYou).length)
         .catch(() => 0),
-    ]).then(([unread, vouchActions, engagementActions]) => {
+    ]).then(([unread, vouchActions, portfolioActions]) => {
       if (!cancelled)
         setLoaded({
           businessId,
           unread,
           vouchActions,
-          engagementActions,
+          portfolioActions,
         });
     });
 
@@ -82,7 +82,7 @@ function NotificationsProvider({ children }) {
   const isCurrent = Boolean(businessId) && loaded.businessId === businessId;
   const unreadCount = isCurrent ? loaded.unread : 0;
   const vouchActionCount = isCurrent ? loaded.vouchActions : 0;
-  const engagementCount = isCurrent ? loaded.engagementActions : 0;
+  const portfolioCount = isCurrent ? loaded.portfolioActions : 0;
 
   // Opening a notification clears that one. Decrements rather than refetching
   // because the click is usually a navigation away from the dashboard — the
@@ -144,7 +144,7 @@ function NotificationsProvider({ children }) {
       value={{
         unreadCount,
         vouchActionCount,
-        engagementCount,
+        portfolioCount,
         markOneRead,
         markAllRead,
         refreshVouchActions,

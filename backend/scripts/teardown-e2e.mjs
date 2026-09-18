@@ -62,7 +62,7 @@ const steps = [
   // Both ends, plus anything proposed by an e2e business against a real one.
   // Position matters: all four business FKs are RESTRICT like every other
   // relation here, so this has to run before the business delete.
-  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }, { serviceProvidedById: biz }] }],
+  ["portfolioEntry",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }, { serviceProvidedById: biz }] }],
   ["deferredConnection", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["emailVerificationToken", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["account",       { id: { in: accIds } }],

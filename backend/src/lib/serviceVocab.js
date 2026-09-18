@@ -9,7 +9,7 @@ import { BUSINESS_CATEGORIES } from "./businessVocab.js";
 // text entered as a comma-separated string, so "SSM filings", "SSM filing" and
 // "Filing with SSM" are three unrelated values, and nothing can aggregate any
 // of them. A canonical value is also what lets a portfolio entry be credited
-// to a service at all — see Engagement.service.
+// to a service at all — see PortfolioEntry.service.
 //
 // HYBRID, NOT CLOSED, and that is the one place this departs from
 // businessVocab.js. Google Business Profile — the model this follows — closes its

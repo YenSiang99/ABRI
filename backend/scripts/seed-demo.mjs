@@ -57,8 +57,8 @@ const DEMO_PASSWORD = "Demo1234!";
 
 const now = Date.now();
 const daysAgo = (n, hour = 10) => new Date(now - n * 86_400_000 + hour * 3_600_000);
-// First of the month, UTC — the precision Engagement.occurredOn stores, and
-// the same flooring routes/engagements.js applies. Seeding a day-level date
+// First of the month, UTC — the precision PortfolioEntry.occurredOn stores, and
+// the same flooring routes/portfolio.js applies. Seeding a day-level date
 // here would put demo rows in a shape the product itself cannot produce.
 const monthFloor = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 
@@ -394,8 +394,8 @@ const FOLLOWS = [
 // `provider` IS THE POINT OF THE SERVICE-PROVIDER COLUMN. It names which end
 // delivered the service, so the other end is not credited with work it only
 // bought. One row below leaves it null on purpose — that is the pre-Sept-2026
-// shape, credited to both ends, and engagementSummaryFor must keep handling it.
-const ENGAGEMENTS = [
+// shape, credited to both ends, and portfolioSummaryFor must keep handling it.
+const PORTFOLIO = [
   // Confirmed, and the bulk of what a visitor sees.
   {
     id: "demo-eng-bakery-books",
@@ -799,7 +799,7 @@ async function main() {
   // pair is stored ordered by id, and a seed that ignored that would produce
   // rows the product itself cannot write — which then read correctly on one
   // profile and not on the other.
-  for (const e of ENGAGEMENTS) {
+  for (const e of PORTFOLIO) {
     const occurredOn = monthFloor(daysAgo(e.monthsAgo * 30));
     const confirmed = e.status === "confirmed";
     const data = {
@@ -812,7 +812,7 @@ async function main() {
       occurredOn,
       confirmedAt: confirmed ? daysAgo(e.monthsAgo * 30 - 2) : null,
     };
-    await prisma.engagement.upsert({ where: { id: e.id }, update: data, create: { id: e.id, ...data } });
+    await prisma.portfolioEntry.upsert({ where: { id: e.id }, update: data, create: { id: e.id, ...data } });
   }
 
   const events = await prisma.networkEvent.count({ where: { id: { startsWith: "demo-ev-" } } });
@@ -823,7 +823,7 @@ async function main() {
       `  ${PENDING_SSM.length} awaiting SSM review · ${CLAIMED_ONLY.length} claimed, no number yet`,
       `  ${VOUCHES.length} published vouches`,
       `  ${CONNECTIONS.length} connections · ${FOLLOWS.length} follows`,
-      `  ${ENGAGEMENTS.length} portfolio entries`,
+      `  ${PORTFOLIO.length} portfolio entries`,
       `  ${events} feed events`,
       "",
       `  Log in as any owner with: ${DEMO_PASSWORD}`,

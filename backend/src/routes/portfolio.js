@@ -7,21 +7,21 @@ import { createActivityEvent } from "../lib/activityEvents.js";
 import { canonicalService } from "../lib/serviceVocab.js";
 import { UNCLAIMED } from "../lib/verificationLevels.js";
 import {
-  ENGAGEMENT_INCLUDE,
+  PORTFOLIO_INCLUDE,
   applyExpiryIfNeeded,
   counterpartyIdOf,
-  serializeEngagement,
+  serializePortfolioEntry,
   orderedPair,
-} from "../lib/engagements.js";
+} from "../lib/portfolio.js";
 
 const router = Router();
 
-// Engagements — "we worked together" records, confirmed by both sides.
+// Portfolio entries — "we worked together" records, confirmed by both sides.
 //
-// THE WHOLE FILE TURNS ON ONE RULE: the business that PROPOSED an engagement
+// THE WHOLE FILE TURNS ON ONE RULE: the business that PROPOSED a portfolio entry
 // can never be the one that confirms it. Every route below re-derives that
-// from Engagement.proposedById rather than trusting anything the client sends,
-// because an engagement a business can confirm alone is a self-nomination with
+// from PortfolioEntry.proposedById rather than trusting anything the client sends,
+// because a portfolio entry a business can confirm alone is a self-nomination with
 // extra steps, and a self-nomination is exactly what this record must not be.
 
 function fail(status, message) {
@@ -31,7 +31,7 @@ function fail(status, message) {
 // The caller's own business, refused unless it is claimed.
 //
 // An L0 listing has no account and therefore nobody who could ever confirm,
-// so an engagement naming one would sit pending until it lapsed. Refusing at
+// so a portfolio entry naming one would sit pending until it lapsed. Refusing at
 // the door is the honest version of that.
 async function ownBusiness(req) {
   if (!req.account.businessId) fail(400, "You need a claimed business to do this.");
@@ -43,18 +43,18 @@ async function ownBusiness(req) {
   return business;
 }
 
-// Loads an engagement the caller is actually part of, expiry swept first.
+// Loads a portfolio entry the caller is actually part of, expiry swept first.
 // Returns 404 rather than 403 for one the caller has no part in: whether a
-// given engagement exists between two other businesses is not this caller's
+// given portfolio entry exists between two other businesses is not this caller's
 // business, and a 403 would confirm it does.
-async function ownEngagement(req, own) {
-  const row = await prisma.engagement.findUnique({
+async function ownPortfolioEntry(req, own) {
+  const row = await prisma.portfolioEntry.findUnique({
     where: { id: req.params.id },
-    include: ENGAGEMENT_INCLUDE,
+    include: PORTFOLIO_INCLUDE,
   });
-  if (!row) fail(404, "Engagement not found.");
+  if (!row) fail(404, "That work record doesn't exist.");
   if (row.businessAId !== own.id && row.businessBId !== own.id) {
-    fail(404, "Engagement not found.");
+    fail(404, "That work record doesn't exist.");
   }
   return applyExpiryIfNeeded(row);
 }
@@ -100,7 +100,7 @@ router.post(
     if (canonical) {
       provider = serviceProvidedById ?? other.id;
       if (provider !== own.id && provider !== other.id) {
-        fail(400, "Only the two businesses on an engagement can have delivered it.");
+        fail(400, "Only the two businesses on a piece of work can have delivered it.");
       }
     } else if (serviceProvidedById) {
       // Naming a provider with no service to provide is a contradiction, and
@@ -124,7 +124,7 @@ router.post(
     }
 
 
-    const engagement = await prisma.engagement.create({
+    const entry = await prisma.portfolioEntry.create({
       data: {
         ...orderedPair(own.id, other.id),
         proposedById: own.id,
@@ -133,16 +133,16 @@ router.post(
         note: typeof note === "string" && note.trim() ? note.trim() : null,
         occurredOn: month,
       },
-      include: ENGAGEMENT_INCLUDE,
+      include: PORTFOLIO_INCLUDE,
     });
 
     await createActivityEvent(prisma, {
       businessId: other.id,
       actorBusinessId: own.id,
-      type: "engagement_proposed",
+      type: "portfolio_proposed",
     });
 
-    res.status(201).json({ engagement: serializeEngagement(engagement, own.id) });
+    res.status(201).json({ entry: serializePortfolioEntry(entry, own.id) });
   }),
 );
 
@@ -152,27 +152,27 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const own = await ownBusiness(req);
-    const engagement = await ownEngagement(req, own);
+    const entry = await ownPortfolioEntry(req, own);
 
-    if (engagement.proposedById === own.id) {
+    if (entry.proposedById === own.id) {
       fail(403, "The other business has to confirm this one.");
     }
-    if (engagement.status !== "pending") {
-      fail(409, `This engagement is already ${engagement.status}.`);
+    if (entry.status !== "pending") {
+      fail(409, `This work record is already ${entry.status}.`);
     }
 
-    const updated = await prisma.engagement.update({
-      where: { id: engagement.id },
+    const updated = await prisma.portfolioEntry.update({
+      where: { id: entry.id },
       data: { status: "confirmed", confirmedAt: new Date(), lastActionAt: new Date() },
-      include: ENGAGEMENT_INCLUDE,
+      include: PORTFOLIO_INCLUDE,
     });
     await createActivityEvent(prisma, {
-      businessId: engagement.proposedById,
+      businessId: entry.proposedById,
       actorBusinessId: own.id,
-      type: "engagement_confirmed",
+      type: "portfolio_confirmed",
     });
 
-    res.json({ engagement: serializeEngagement(updated, own.id) });
+    res.json({ entry: serializePortfolioEntry(updated, own.id) });
   }),
 );
 
@@ -183,27 +183,27 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const own = await ownBusiness(req);
-    const engagement = await ownEngagement(req, own);
+    const entry = await ownPortfolioEntry(req, own);
 
-    if (engagement.proposedById === own.id) {
+    if (entry.proposedById === own.id) {
       fail(403, "You proposed this one — withdraw it instead.");
     }
-    if (engagement.status !== "pending") {
-      fail(409, `This engagement is already ${engagement.status}.`);
+    if (entry.status !== "pending") {
+      fail(409, `This work record is already ${entry.status}.`);
     }
 
-    const updated = await prisma.engagement.update({
-      where: { id: engagement.id },
+    const updated = await prisma.portfolioEntry.update({
+      where: { id: entry.id },
       data: { status: "declined", lastActionAt: new Date() },
-      include: ENGAGEMENT_INCLUDE,
+      include: PORTFOLIO_INCLUDE,
     });
     await createActivityEvent(prisma, {
-      businessId: engagement.proposedById,
+      businessId: entry.proposedById,
       actorBusinessId: own.id,
-      type: "engagement_declined",
+      type: "portfolio_declined",
     });
 
-    res.json({ engagement: serializeEngagement(updated, own.id) });
+    res.json({ entry: serializePortfolioEntry(updated, own.id) });
   }),
 );
 
@@ -218,16 +218,16 @@ router.delete(
   requireAuth,
   asyncHandler(async (req, res) => {
     const own = await ownBusiness(req);
-    const engagement = await ownEngagement(req, own);
+    const entry = await ownPortfolioEntry(req, own);
 
-    if (engagement.proposedById !== own.id) {
+    if (entry.proposedById !== own.id) {
       fail(403, "Only the business that proposed this can withdraw it.");
     }
-    if (engagement.status !== "pending") {
-      fail(409, `This engagement is already ${engagement.status}.`);
+    if (entry.status !== "pending") {
+      fail(409, `This work record is already ${entry.status}.`);
     }
 
-    await prisma.engagement.delete({ where: { id: engagement.id } });
+    await prisma.portfolioEntry.delete({ where: { id: entry.id } });
     res.json({ ok: true });
   }),
 );
@@ -242,20 +242,20 @@ router.get(
     const own = await ownBusiness(req);
     const { status } = req.query;
 
-    const rows = await prisma.engagement.findMany({
+    const rows = await prisma.portfolioEntry.findMany({
       where: {
         OR: [{ businessAId: own.id }, { businessBId: own.id }],
         ...(status ? { status } : {}),
       },
-      include: ENGAGEMENT_INCLUDE,
+      include: PORTFOLIO_INCLUDE,
       orderBy: [{ lastActionAt: "desc" }, { id: "desc" }],
     });
 
     // Swept on read, the same shape routes/vouches.js uses:
     // there is no cron, so the list read is where a lapse gets noticed.
     const swept = await Promise.all(rows.map(applyExpiryIfNeeded));
-    res.json({ engagements: swept.map((e) => serializeEngagement(e, own.id)) });
+    res.json({ entries: swept.map((e) => serializePortfolioEntry(e, own.id)) });
   }),
 );
 
-export { router as engagementRouter };
+export { router as portfolioRouter };

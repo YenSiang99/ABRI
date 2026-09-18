@@ -30,7 +30,7 @@ async function login(key) {
 
 // RESETS ITS OWN TABLE FIRST, using Prisma directly the way fixtures.mjs does.
 //
-// Engagements accumulate: the HTTP surface deliberately offers no way to
+// Portfolio entries accumulate: the HTTP surface deliberately offers no way to
 // delete a CONFIRMED one (a confirmed record is a fact both parties agreed to,
 // not a draft), so a second run of this suite would find a4 already counted as
 // a counterparty and step 9's "breadth rises by one" would be false. That is a
@@ -39,7 +39,7 @@ async function login(key) {
 // Scoped to the e2e businesses, so it can never touch real rows.
 const url = TEST_DATABASE_URL;
 const db = new PrismaClient({ datasourceUrl: url });
-await db.engagement.deleteMany({
+await db.portfolioEntry.deleteMany({
   where: {
     OR: [
       { businessAId: { startsWith: P } },
@@ -67,59 +67,59 @@ const SERVICE = "Bookkeeping";
 const LAST_MONTH = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1))
   .toISOString();
 
-console.log("\n1. Propose an engagement");
-let r = await a2("/engagements", { method: "POST", body: {
+console.log("\n1. Propose a job");
+let r = await a2("/portfolio", { method: "POST", body: {
   businessId: `${P}a3`, service: SERVICE, note: "Quarterly books for two entities.",
   occurredOn: LAST_MONTH,
 }});
 assert.equal(r.status, 201, JSON.stringify(r.data));
-const id = r.data.engagement.id;
-assert.equal(r.data.engagement.status, "pending");
-assert.equal(r.data.engagement.proposedByYou, true);
+const id = r.data.entry.id;
+assert.equal(r.data.entry.status, "pending");
+assert.equal(r.data.entry.proposedByYou, true);
 ok(`proposed (${id}), pending, proposedByYou true`);
 
-console.log("\n2. A pending engagement is public to nobody");
+console.log("\n2. A pending portfolio entry is public to nobody");
 // BY ID, NOT BY COUNT. An earlier run of this suite leaves confirmed rows
 // behind (fixtures.mjs seeds, teardown-e2e.mjs clears — neither is this file's
-// job), so "the profile has zero engagements" is an assertion about how many
+// job), so "the profile has zero portfolio entries" is an assertion about how many
 // times the suite has been run, not about the feature. Every count below is a
 // DELTA for the same reason.
 let profile = await publicProfile(`${P}a3`);
-assert.ok(!profile.engagements.some((e) => e.id === id), "pending must not appear on a public profile");
+assert.ok(!profile.entries.some((e) => e.id === id), "pending must not appear on a public profile");
 ok("pending appears on neither profile and counts nowhere");
 
 console.log("\n3. The proposer cannot confirm their own");
-r = await a2(`/engagements/${id}/confirm`, { method: "POST" });
+r = await a2(`/portfolio/${id}/confirm`, { method: "POST" });
 assert.equal(r.status, 403, JSON.stringify(r.data));
 ok(`proposer refused (403: "${r.data.error}") — this is the whole model`);
 
 console.log("\n4. A third party can neither see nor act on it");
-r = await a4(`/engagements/${id}/confirm`, { method: "POST" });
-// 404 rather than 403: whether two other businesses have an engagement is not
+r = await a4(`/portfolio/${id}/confirm`, { method: "POST" });
+// 404 rather than 403: whether two other businesses have a job is not
 // this caller's business, and a 403 would confirm that it exists.
 assert.equal(r.status, 404, JSON.stringify(r.data));
 ok(`uninvolved business gets 404, not 403 (no existence leak)`);
 
 console.log("\n5. The counterparty confirms, and it goes public on BOTH profiles");
-r = await a3(`/engagements/${id}/confirm`, { method: "POST" });
+r = await a3(`/portfolio/${id}/confirm`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
-assert.equal(r.data.engagement.status, "confirmed");
+assert.equal(r.data.entry.status, "confirmed");
 for (const who of [`${P}a2`, `${P}a3`]) {
   profile = await publicProfile(who);
-  assert.ok(profile.engagements.some((e) => e.id === id), `${who} must show the engagement`);
+  assert.ok(profile.entries.some((e) => e.id === id), `${who} must show the job`);
 }
 ok("confirmed, and visible on both profiles to a logged-out reader");
 
 console.log("\n6. Confirming twice is refused");
-r = await a3(`/engagements/${id}/confirm`, { method: "POST" });
+r = await a3(`/portfolio/${id}/confirm`, { method: "POST" });
 assert.equal(r.status, 409, JSON.stringify(r.data));
 ok(`second confirm refused (409: "${r.data.error}")`);
 
 const groupFor = async (businessId) => {
   const p = await publicProfile(businessId);
   return (
-    p.engagementSummary.services.find((s) => s.service === SERVICE) ?? {
-      engagements: 0,
+    p.portfolioSummary.services.find((s) => s.service === SERVICE) ?? {
+      entries: 0,
       counterparties: 0,
     }
   );
@@ -127,77 +127,77 @@ const groupFor = async (businessId) => {
 
 console.log("\n7. Repeat work with the same business is a SECOND row");
 const beforeRepeat = await groupFor(`${P}a3`);
-r = await a2("/engagements", { method: "POST", body: {
+r = await a2("/portfolio", { method: "POST", body: {
   businessId: `${P}a3`, service: SERVICE, occurredOn: LAST_MONTH,
 }});
 assert.equal(r.status, 201, JSON.stringify(r.data));
-const second = r.data.engagement.id;
-assert.notEqual(second, id, "a repeat engagement must not overwrite the first");
-await a3(`/engagements/${second}/confirm`, { method: "POST" });
-ok("no unique on the pair — repeat engagements coexist");
+const second = r.data.entry.id;
+assert.notEqual(second, id, "a repeat job must not overwrite the first");
+await a3(`/portfolio/${second}/confirm`, { method: "POST" });
+ok("no unique on the pair — repeat jobs coexist");
 
 console.log("\n8. A repeat with the SAME business adds volume but no breadth");
 // THE ANTI-COLLUSION PROPERTY, asserted as a delta so it holds however many
-// times this suite has run: a second engagement with a business already
-// counted raises `engagements` and must leave `counterparties` untouched.
-// If these ever move together, ten engagements with one friend would read as
+// times this suite has run: a second portfolio entry with a business already
+// counted raises `portfolio entries` and must leave `counterparties` untouched.
+// If these ever move together, ten portfolio entries with one friend would read as
 // the strongest signal on the profile.
 let group = await groupFor(`${P}a3`);
-assert.equal(group.engagements, beforeRepeat.engagements + 1, "volume rises by one");
+assert.equal(group.entries, beforeRepeat.entries + 1, "volume rises by one");
 assert.equal(group.counterparties, beforeRepeat.counterparties, "breadth must NOT move");
-ok("same counterparty: engagements +1, counterparties +0");
+ok("same counterparty: jobs +1, counterparties +0");
 
 console.log("\n9. A different counterparty moves the number that matters");
 const beforeNew = await groupFor(`${P}a3`);
-r = await a4("/engagements", { method: "POST", body: {
+r = await a4("/portfolio", { method: "POST", body: {
   businessId: `${P}a3`, service: SERVICE, occurredOn: LAST_MONTH,
 }});
 assert.equal(r.status, 201, JSON.stringify(r.data));
-await a3(`/engagements/${r.data.engagement.id}/confirm`, { method: "POST" });
+await a3(`/portfolio/${r.data.entry.id}/confirm`, { method: "POST" });
 group = await groupFor(`${P}a3`);
-assert.equal(group.engagements, beforeNew.engagements + 1);
+assert.equal(group.entries, beforeNew.entries + 1);
 assert.equal(
   group.counterparties,
   beforeNew.counterparties + 1,
   "a genuinely different business raises breadth",
 );
-ok("different counterparty: engagements +1, counterparties +1");
+ok("different counterparty: jobs +1, counterparties +1");
 
 console.log("\n10. A decline is terminal and invisible to everyone else");
-r = await a2("/engagements", { method: "POST", body: {
+r = await a2("/portfolio", { method: "POST", body: {
   businessId: `${P}a4`, service: SERVICE, occurredOn: LAST_MONTH,
 }});
-const declined = r.data.engagement.id;
-r = await a4(`/engagements/${declined}/decline`, { method: "POST" });
+const declined = r.data.entry.id;
+r = await a4(`/portfolio/${declined}/decline`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
-assert.equal(r.data.engagement.status, "declined");
+assert.equal(r.data.entry.status, "declined");
 profile = await publicProfile(`${P}a4`);
-assert.ok(!profile.engagements.some((e) => e.id === declined), "a declined row must be public to nobody");
+assert.ok(!profile.entries.some((e) => e.id === declined), "a declined row must be public to nobody");
 // ...but the two parties can still see their own.
-r = await a2("/engagements?status=declined");
-assert.ok(r.data.engagements.some((e) => e.id === declined), "the proposer can see their own declined row");
+r = await a2("/portfolio?status=declined");
+assert.ok(r.data.entries.some((e) => e.id === declined), "the proposer can see their own declined row");
 ok("declined: public to nobody, visible to the two parties");
 
 console.log("\n11. Rejections that keep the record honest");
-r = await a2("/engagements", { method: "POST", body: { businessId: `${P}a2`, occurredOn: LAST_MONTH }});
-assert.equal(r.status, 400, "self-engagement must be refused");
-r = await a2("/engagements", { method: "POST", body: {
+r = await a2("/portfolio", { method: "POST", body: { businessId: `${P}a2`, occurredOn: LAST_MONTH }});
+assert.equal(r.status, 400, "self-logged work must be refused");
+r = await a2("/portfolio", { method: "POST", body: {
   businessId: `${P}a3`, service: "cheap bookkeeping", occurredOn: LAST_MONTH }});
 assert.equal(r.status, 400, "a non-canonical service must be refused");
 const future = new Date(Date.UTC(new Date().getUTCFullYear() + 1, 0, 1)).toISOString();
-r = await a2("/engagements", { method: "POST", body: { businessId: `${P}a3`, occurredOn: future }});
+r = await a2("/portfolio", { method: "POST", body: { businessId: `${P}a3`, occurredOn: future }});
 assert.equal(r.status, 400, "a future month must be refused");
-ok("self-engagement, non-canonical service and future dates all refused");
+ok("self-logged work, non-canonical service and future dates all refused");
 
 console.log("\n12. Withdrawing removes a pending proposal entirely");
-r = await a2("/engagements", { method: "POST", body: { businessId: `${P}a3`, occurredOn: LAST_MONTH }});
-const pending = r.data.engagement.id;
-r = await a3(`/engagements/${pending}`, { method: "DELETE" });
+r = await a2("/portfolio", { method: "POST", body: { businessId: `${P}a3`, occurredOn: LAST_MONTH }});
+const pending = r.data.entry.id;
+r = await a3(`/portfolio/${pending}`, { method: "DELETE" });
 assert.equal(r.status, 403, "only the proposer may withdraw");
-r = await a2(`/engagements/${pending}`, { method: "DELETE" });
+r = await a2(`/portfolio/${pending}`, { method: "DELETE" });
 assert.equal(r.status, 200);
-r = await a2("/engagements");
-assert.ok(!r.data.engagements.some((e) => e.id === pending), "withdrawn is gone, not archived");
+r = await a2("/portfolio");
+assert.ok(!r.data.entries.some((e) => e.id === pending), "withdrawn is gone, not archived");
 ok("only the proposer withdraws, and the row is deleted rather than kept");
 
 console.log(`\n${pass} checks passed.`);

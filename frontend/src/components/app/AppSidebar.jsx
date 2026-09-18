@@ -182,7 +182,7 @@ function SidebarNav({
   locked,
   unreadCount,
   vouchActionCount,
-  engagementCount,
+  portfolioCount,
   incomingCount,
   onSignOut,
 }) {
@@ -263,7 +263,7 @@ function SidebarNav({
                   {item.url === "/app/inbox" && (
                     <NavBadge
                       count={
-                        vouchActionCount + incomingCount + engagementCount
+                        vouchActionCount + incomingCount + portfolioCount
                       }
                       label="waiting on you"
                     />
@@ -396,7 +396,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount, engagementCount } =
+  const { unreadCount, vouchActionCount, portfolioCount } =
     useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
@@ -434,7 +434,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           locked={locked}
           unreadCount={unreadCount}
           vouchActionCount={vouchActionCount}
-          engagementCount={engagementCount}
+          portfolioCount={portfolioCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
         />
@@ -463,7 +463,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               locked={locked}
               unreadCount={unreadCount}
               vouchActionCount={vouchActionCount}
-              engagementCount={engagementCount}
+              portfolioCount={portfolioCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}
             />

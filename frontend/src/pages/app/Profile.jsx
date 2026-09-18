@@ -10,8 +10,8 @@ import {
   Gem,
 } from "lucide-react";
 import {
-  EngagementList,
-} from "@/components/business/EngagementList";
+  PortfolioList,
+} from "@/components/business/PortfolioList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,7 +31,7 @@ import { VouchListItem } from "@/components/app/VouchListItem";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
 import { updateMyBusiness, fetchBusinesses } from "@/lib/api/businesses";
-import { proposeEngagement } from "@/lib/api/engagements";
+import { proposePortfolioEntry } from "@/lib/api/portfolio";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import { membershipTierAllows } from "@/lib/membershipTiers";
 import { toast } from "@/lib/toast";
@@ -87,13 +87,13 @@ const FIELDS = [
 // and the UI says so rather than letting an owner think they are covered.
 // Log work with another business.
 //
-// THE COUNTERPARTY IS PICKED, NEVER TYPED. An engagement is a claim about a
+// THE COUNTERPARTY IS PICKED, NEVER TYPED. A portfolio entry is a claim about a
 // specific business that has to reach that business's Inbox to be confirmed —
 // a typed name has nobody to send it to. This searches the directory and
 // submits an id, which is also why an unclaimed listing cannot be chosen: the
 // server refuses one (nobody there could ever confirm) and offering it here
 // would produce a failure the member could not have predicted.
-function LogEngagementDialog({ business, onSaved }) {
+function LogWorkDialog({ business, onSaved }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -173,7 +173,7 @@ function LogEngagementDialog({ business, onSaved }) {
     setSaving(true);
     setError(null);
     try {
-      await proposeEngagement({
+      await proposePortfolioEntry({
         businessId: target.id,
         service: service || undefined,
         note: note.trim() || undefined,
@@ -313,7 +313,7 @@ function LogEngagementDialog({ business, onSaved }) {
                   ))}
                 </div>
                 {/* Optional, and the consequence of leaving it out is stated
-                    rather than left to be discovered — an engagement with no
+                    rather than left to be discovered — a entry with no
                     service is real but appears in no aggregate. */}
                 <p className="mt-2 text-xs text-muted-foreground">
                   Optional. Without one this still counts as work you did
@@ -354,7 +354,7 @@ function LogEngagementDialog({ business, onSaved }) {
   );
 }
 
-// The owner's own "Worked with", plus the thing only they can see: which of
+// The owner's own Portfolio, plus the thing only they can see: which of
 // the services they CLAIM has anybody actually confirmed.
 //
 // THAT SECOND HALF IS THE POINT OF THIS PANEL. A business can tick every
@@ -363,9 +363,9 @@ function LogEngagementDialog({ business, onSaved }) {
 // what a counterparty has stood behind. Shown to the owner alone, and framed
 // as something to go and collect rather than as a failing: an unconfirmed
 // service is not a lie, it is just unevidenced.
-function OwnEngagements({ business, onChanged }) {
-  const entries = business.engagements ?? [];
-  const summary = business.engagementSummary ?? {
+function OwnPortfolio({ business, onChanged }) {
+  const entries = business.entries ?? [];
+  const summary = business.portfolioSummary ?? {
     total: 0,
     services: [],
   };
@@ -377,13 +377,13 @@ function OwnEngagements({ business, onChanged }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Worked with
+            Portfolio
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Confirmed by the other side. This is what visitors see.
           </p>
         </div>
-        <LogEngagementDialog business={business} onSaved={onChanged} />
+        <LogWorkDialog business={business} onSaved={onChanged} />
       </div>
 
       {entries.length === 0 ? (
@@ -392,7 +392,7 @@ function OwnEngagements({ business, onChanged }) {
           they confirm it, it shows on both your profiles.
         </p>
       ) : (
-        <EngagementList
+        <PortfolioList
           entries={entries}
           businessId={business.id}
           limit={6}
@@ -426,7 +426,7 @@ function OwnEngagements({ business, onChanged }) {
             })}
           </ul>
           <p className="mt-2 text-xs text-muted-foreground">
-            Ticked ones have at least one confirmed engagement behind them. The
+            Ticked ones have at least one confirmed entry behind them. The
             rest are still just claims — only you see this.
           </p>
         </div>
@@ -922,7 +922,7 @@ function Profile() {
               what this business has actually done, and the only place the
               owner can see which of their claimed services anybody has stood
               behind. */}
-          <OwnEngagements business={business} onChanged={refreshAccount} />
+          <OwnPortfolio business={business} onChanged={refreshAccount} />
 
           {/* contactLocked false: this is the owner's own view, which is
               never gated. The upsell below is what tells them the public

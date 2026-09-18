@@ -185,18 +185,18 @@ model Business {
   profileViewsMade     ProfileView[] @relation("ProfileViewer")
   profileViewsReceived ProfileView[] @relation("ProfileViewTarget")
 
-  // Both ends of every engagement this business is part of, plus the ones it
+  // Both ends of every portfolio entry this business is part of, plus the ones it
   // proposed. Three relations for the same reason Connection needs three: the
   // pair is stored ordered by id, so "which end am I" is not derivable and
   // "who proposed" is a separate fact again.
-  engagementsA        Engagement[] @relation("EngagementA")
-  engagementsB        Engagement[] @relation("EngagementB")
-  engagementsProposed Engagement[] @relation("EngagementProposer")
+  portfolioA        PortfolioEntry[] @relation("PortfolioEntryA")
+  portfolioB        PortfolioEntry[] @relation("PortfolioEntryB")
+  portfolioProposed PortfolioEntry[] @relation("PortfolioEntryProposer")
 
-  // A fourth engagement relation, and unlike the three above it is not about
+  // A fourth portfolio entry relation, and unlike the three above it is not about
   // which end of the pair this business sits on — it is about which end
-  // DELIVERED the service. See Engagement.serviceProvidedById.
-  engagementsProvided Engagement[] @relation("EngagementServiceProvider")
+  // DELIVERED the service. See PortfolioEntry.serviceProvidedById.
+  portfolioProvided PortfolioEntry[] @relation("PortfolioEntryServiceProvider")
 
   // Browse without being named. Off by default, and that default is the
   // feature working at all: a network where most members start invisible has
@@ -739,7 +739,7 @@ model ProfileView {
 // and the reputation rung (a vouch, which costs the giver prose and their own
 // name) with nothing in between — so the FIRST artifact it ever asked anyone
 // for was the most expensive one. That is why the vouch graph is thin. An
-// engagement costs one tap and a month.
+// portfolio entry costs one tap and a month.
 //
 // IT NEEDS THE OTHER SIDE'S AGREEMENT, for the reason Connection's own comment
 // gives about unilateral edges: "a CLAIM ABOUT A RELATIONSHIP... in a directory
@@ -752,8 +752,8 @@ model ProfileView {
 // never happened. That costs them a colluder, which is strictly more than a
 // self-nomination costs today, and the mitigation is visibility rather than
 // prevention: reads report DISTINCT COUNTERPARTIES, never a row count, so ten
-// engagements with one friend reads as one counterparty. See
-// engagementSummaryFor in lib/engagements.js — a ring is obvious when you can
+// portfolio entries with one friend reads as one counterparty. See
+// portfolio entrySummaryFor in lib/portfolio entries.js — a ring is obvious when you can
 // see who, and invisible behind a single number.
 //
 // NOT A RATING. There is no score, stars or free-form testimonial here. A
@@ -761,7 +761,7 @@ model ProfileView {
 // together. Keeping it factual is what keeps it cheap enough to be created,
 // and what keeps it defensible — a dated fact survives a dispute in a way a
 // judgement does not.
-model Engagement {
+model PortfolioEntry {
   id String @id @default(cuid())
 
   // "pending"   — the counterparty's move
@@ -769,29 +769,29 @@ model Engagement {
   // "declined"  — the counterparty says it did not happen. Terminal, and
   //               PRIVATE: only the proposer is told, it is shown to nobody
   //               and counted nowhere. If declines were public, proposing
-  //               engagements a rival would obviously decline becomes a way to
+  //               portfolio entries a rival would obviously decline becomes a way to
   //               damage them, which is a weapon rather than a record.
   // "cancelled" — withdrawn by the proposer, or lapsed after 14 days untouched
-  //               (lib/engagements.js, the same lazy sweep vouches use).
+  //               (lib/portfolio entries.js, the same lazy sweep vouches use).
   status String @default("pending")
 
   // The pair, ordered by id via orderedPair in lib/connections.js so one row
   // serves both directions — the same storage Connection uses.
   businessAId String
-  businessA   Business @relation("EngagementA", fields: [businessAId], references: [id])
+  businessA   Business @relation("PortfolioEntryA", fields: [businessAId], references: [id])
 
   businessBId String
-  businessB   Business @relation("EngagementB", fields: [businessBId], references: [id])
+  businessB   Business @relation("PortfolioEntryB", fields: [businessBId], references: [id])
 
   // Which end proposed. Not derivable from the ordered pair, and it decides
   // who may confirm (the other one) and who may withdraw (this one). Same role
   // and same reasoning as Connection.requestedById.
   proposedById String
-  proposedBy   Business @relation("EngagementProposer", fields: [proposedById], references: [id])
+  proposedBy   Business @relation("PortfolioEntryProposer", fields: [proposedById], references: [id])
 
   // A canonical service from lib/serviceVocab.js, validated on write.
   //
-  // THIS IS WHAT MAKES ENGAGEMENTS AGGREGATE. Because it is a catalogue value
+  // THIS IS WHAT MAKES PORTFOLIO ENTRIES AGGREGATE. Because it is a catalogue value
   // rather than typed text, "4 confirmed for SST advisory, from 3 different
   // businesses" is answerable — and a profile can separate the services a
   // business CLAIMS from the ones a counterparty has confirmed. Today anyone
@@ -805,7 +805,7 @@ model Engagement {
   // WHICH END DELIVERED the service above, and the column that stops one
   // business being credited with the other's work.
   //
-  // Without it, engagementSummaryFor credits `service` to BOTH ends of the
+  // Without it, portfolio entrySummaryFor credits `service` to BOTH ends of the
   // pair, because the pair is stored unordered and nothing said who did what.
   // A bakery that logged "SST advisory" against its accountant therefore
   // carried "SST advisory" on its own public profile — a service it does not
@@ -820,10 +820,10 @@ model Engagement {
   // Deliberately not expressible as a cheap DB constraint: this is always
   // businessAId or businessBId, never a third business.
   serviceProvidedById String?
-  serviceProvidedBy   Business? @relation("EngagementServiceProvider", fields: [serviceProvidedById], references: [id])
+  serviceProvidedBy   Business? @relation("PortfolioEntryServiceProvider", fields: [serviceProvidedById], references: [id])
 
   // Free text, optional, and deliberately inert — never matched, never
-  // aggregated, never searched. It exists so a reader can tell two engagements
+  // aggregated, never searched. It exists so a reader can tell two portfolio entries
   // for the same service apart.
   note String?
 
@@ -839,7 +839,7 @@ model Engagement {
 
   // NO @@unique ON THE PAIR — the one deliberate difference from Connection,
   // which allows exactly one edge per pair. Working together repeatedly is the
-  // strongest thing this model can record, so each engagement is its own row.
+  // strongest thing this model can record, so each portfolio entry is its own row.
   @@index([businessAId, status])
   @@index([businessBId, status])
   @@index([proposedById])

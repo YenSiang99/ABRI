@@ -20,8 +20,8 @@ import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
 import {
-  EngagementList,
-} from "@/components/business/EngagementList";
+  PortfolioList,
+} from "@/components/business/PortfolioList";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
@@ -62,16 +62,16 @@ function VouchCard({ vouch }) {
 // THE HEADLINE IS COUNTERPARTIES, NOT ENGAGEMENTS, and that is the anti-gaming
 // design rather than a wording choice. Two businesses can confirm work that
 // never happened — it costs them a colluder, which is more than a
-// self-nomination costs, but it is possible. Reporting "12 engagements" would
+// self-nomination costs, but it is possible. Reporting "12 portfolio entries" would
 // make the cheapest possible fake look like the strongest possible signal;
-// "12 engagements with 2 businesses" lets a reader judge it for themselves.
+// "12 portfolio entries with 2 businesses" lets a reader judge it for themselves.
 // Never replace this with a single total.
 //
 // NOT A RATING, for the same reason the verification record is not a score.
 // These rows say two businesses worked together on a date. Whether the work
 // was any good is what a vouch is for, and conflating them would let the
 // cheaper artifact borrow the dearer one's meaning.
-function EngagementRecord({ entries, summary, businessName, businessId }) {
+function PortfolioRecord({ entries, summary, businessName, businessId }) {
   if (!entries || entries.length === 0) return null;
 
   const top = summary?.services?.slice(0, 3) ?? [];
@@ -79,7 +79,7 @@ function EngagementRecord({ entries, summary, businessName, businessId }) {
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
       <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
-        Worked with
+        Portfolio
       </h2>
       <p className="mt-1 text-sm text-grey-500 dark:text-muted-foreground">
         Confirmed by the business on the other side, not self-reported.
@@ -95,8 +95,8 @@ function EngagementRecord({ entries, summary, businessName, businessId }) {
               <span className="font-semibold">{g.service}</span>
               <span className="text-grey-500 dark:text-muted-foreground">
                 {" \u2014 "}
-                {g.engagements}{" "}
-                {g.engagements === 1 ? "engagement" : "engagements"} with{" "}
+                {g.entries}{" "}
+                {g.entries === 1 ? "job" : "jobs"} with{" "}
                 {g.counterparties}{" "}
                 {g.counterparties === 1 ? "business" : "different businesses"}
               </span>
@@ -105,7 +105,7 @@ function EngagementRecord({ entries, summary, businessName, businessId }) {
         </ul>
       )}
 
-      <EngagementList
+      <PortfolioList
         entries={entries}
         businessName={businessName}
         businessId={businessId}
@@ -586,9 +586,9 @@ function BusinessProfile({ inApp = false }) {
                 half of this profile — what a registry said, and what a
                 counterparty confirmed. The evaluative half (vouches) lives in
                 its own tab. */}
-            <EngagementRecord
-              entries={business.engagements}
-              summary={business.engagementSummary}
+            <PortfolioRecord
+              entries={business.entries}
+              summary={business.portfolioSummary}
               businessName={business.name}
               businessId={business.id}
             />

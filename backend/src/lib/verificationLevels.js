@@ -23,7 +23,7 @@ const VERIFICATION_LEVELS = ["L0", "L1", "L2", "L3", "L4"];
 //
 // UNCLAIMED is the one that carries a rule rather than a label: a business at
 // this level has no owner, which is why it is refused every relational action
-// (POST /connections, POST /follows, and both ends of an engagement) — there
+// (POST /connections, POST /follows, and both ends of a portfolio entry) — there
 // is nobody on the other end to receive it or to agree to it.
 const UNCLAIMED = VERIFICATION_LEVELS[0];
 const CLAIMED = VERIFICATION_LEVELS[1];

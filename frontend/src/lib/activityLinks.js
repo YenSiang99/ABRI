@@ -14,19 +14,19 @@ const GIVEN_TAB_TYPES = new Set([
   "vouch_expired",
 ]);
 
-// Engagements. All four land on the Inbox tab rather than a specific row, for
+// Portfolio entries. All four land on the Inbox tab rather than a specific row, for
 // the structural reason this file already states about vouches:
 // ActivityEvent carries a type and an actor and no subject id, so there is
 // nothing to deep-link to.
 //
-// `engagement_proposed` goes to the tab that can CLEAR it. The other three name
+// `portfolio_proposed` goes to the tab that can CLEAR it. The other three name
 // something already settled — confirmed, declined or lapsed — and there is no
 // work left, but the same tab is still where the record is, so they share it.
-const ENGAGEMENT_TYPES = new Set([
-  "engagement_proposed",
-  "engagement_confirmed",
-  "engagement_declined",
-  "engagement_expired",
+const PORTFOLIO_TYPES = new Set([
+  "portfolio_proposed",
+  "portfolio_confirmed",
+  "portfolio_declined",
+  "portfolio_expired",
 ]);
 
 // Connection events that name something already SETTLED. Both land on the
@@ -54,7 +54,7 @@ function activityLink(event) {
   // button themselves, which is the trip this link exists to save.
   if (event.type === "connection_requested") return "/app/network/requests";
 
-  if (ENGAGEMENT_TYPES.has(event.type)) return "/app/inbox?tab=engagements";
+  if (PORTFOLIO_TYPES.has(event.type)) return "/app/inbox?tab=portfolio";
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
 

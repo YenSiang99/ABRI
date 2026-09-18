@@ -12,7 +12,7 @@ import { connectionRouter } from "./routes/connections.js";
 import { followRouter } from "./routes/follows.js";
 import { feedRouter } from "./routes/feed.js";
 import { watchRouter } from "./routes/watches.js";
-import { engagementRouter } from "./routes/engagements.js";
+import { portfolioRouter } from "./routes/portfolio.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -35,7 +35,7 @@ app.use("/connections", connectionRouter);
 app.use("/follows", followRouter);
 app.use("/feed", feedRouter);
 app.use("/watches", watchRouter);
-app.use("/engagements", engagementRouter);
+app.use("/portfolio", portfolioRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

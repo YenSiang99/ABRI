@@ -2,10 +2,10 @@ import { prisma } from "../prisma.js";
 import { createActivityEvent } from "./activityEvents.js";
 import { orderedPair } from "./connections.js";
 
-// Confirmed work records. Read the Engagement model in schema.prisma first —
+// Confirmed work records. Read the PortfolioEntry model in schema.prisma first —
 // this file implements the rules that comment states.
 
-// Untouched this long and a pending engagement lapses. Same number and same
+// Untouched this long and a pending portfolio entry lapses. Same number and same
 // lazy mechanism as lib/vouchExpiry.js: there is no background-job infra in
 // this codebase, so every route that reads one sweeps it first.
 const EXPIRY_DAYS = 14;
@@ -13,7 +13,7 @@ const EXPIRY_DAYS = 14;
 // The only status anyone other than the two parties ever sees.
 const PUBLIC_STATUS = "confirmed";
 
-const ENGAGEMENT_BUSINESS_SELECT = {
+const PORTFOLIO_BUSINESS_SELECT = {
   id: true,
   name: true,
   category: true,
@@ -21,17 +21,17 @@ const ENGAGEMENT_BUSINESS_SELECT = {
   verificationLevel: true,
 };
 
-const ENGAGEMENT_INCLUDE = {
-  businessA: { select: ENGAGEMENT_BUSINESS_SELECT },
-  businessB: { select: ENGAGEMENT_BUSINESS_SELECT },
+const PORTFOLIO_INCLUDE = {
+  businessA: { select: PORTFOLIO_BUSINESS_SELECT },
+  businessB: { select: PORTFOLIO_BUSINESS_SELECT },
 };
 
-function isExpired(engagement) {
-  if (engagement.status !== "pending") return false;
-  return engagement.lastActionAt.getTime() < Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+function isExpired(entry) {
+  if (entry.status !== "pending") return false;
+  return entry.lastActionAt.getTime() < Date.now() - EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 }
 
-// Lapses a pending engagement nobody answered. Returns the row either way, so
+// Lapses a pending portfolio entry nobody answered. Returns the row either way, so
 // callers can use it inline — the shape applyExpiryIfNeeded has in
 // lib/vouchExpiry.js.
 //
@@ -39,19 +39,19 @@ function isExpired(engagement) {
 // this, it just sat there. That distinction is the same one vouch_expired
 // exists for — without it the proposer is told they were refused by a business
 // that never actually did anything.
-async function applyExpiryIfNeeded(engagement) {
-  if (!isExpired(engagement)) return engagement;
+async function applyExpiryIfNeeded(entry) {
+  if (!isExpired(entry)) return entry;
 
   const [updated] = await prisma.$transaction([
-    prisma.engagement.update({
-      where: { id: engagement.id },
+    prisma.portfolioEntry.update({
+      where: { id: entry.id },
       data: { status: "cancelled", lastActionAt: new Date() },
-      include: ENGAGEMENT_INCLUDE,
+      include: PORTFOLIO_INCLUDE,
     }),
     createActivityEvent(prisma, {
-      businessId: engagement.proposedById,
-      actorBusinessId: counterpartyIdOf(engagement, engagement.proposedById),
-      type: "engagement_expired",
+      businessId: entry.proposedById,
+      actorBusinessId: counterpartyIdOf(entry, entry.proposedById),
+      type: "portfolio_expired",
     }),
   ]);
   return updated;
@@ -60,10 +60,10 @@ async function applyExpiryIfNeeded(engagement) {
 // The other end of the pair. The pair is stored ordered by id, so neither
 // column means "me" — every read has to resolve this, which is why it lives
 // here rather than at each call site.
-function counterpartyIdOf(engagement, viewerBusinessId) {
-  return engagement.businessAId === viewerBusinessId
-    ? engagement.businessBId
-    : engagement.businessAId;
+function counterpartyIdOf(entry, viewerBusinessId) {
+  return entry.businessAId === viewerBusinessId
+    ? entry.businessBId
+    : entry.businessAId;
 }
 
 // Mirrors serializeConnection: `counterparty` is resolved server-side so the
@@ -71,55 +71,55 @@ function counterpartyIdOf(engagement, viewerBusinessId) {
 //
 // `yours` is what the UI branches on — only the non-proposer may confirm or
 // decline, and only the proposer may withdraw.
-function serializeEngagement(engagement, viewerBusinessId = null) {
+function serializePortfolioEntry(entry, viewerBusinessId = null) {
   const counterparty =
-    engagement.businessAId === viewerBusinessId ? engagement.businessB : engagement.businessA;
+    entry.businessAId === viewerBusinessId ? entry.businessB : entry.businessA;
 
   return {
-    id: engagement.id,
-    status: engagement.status,
-    service: engagement.service,
+    id: entry.id,
+    status: entry.status,
+    service: entry.service,
     // Which end delivered it, so the client can label the record instead of
     // implying both sides do this work. Null means nobody recorded it.
-    serviceProvidedById: engagement.serviceProvidedById,
-    note: engagement.note,
-    occurredOn: engagement.occurredOn,
-    createdAt: engagement.createdAt,
-    confirmedAt: engagement.confirmedAt,
+    serviceProvidedById: entry.serviceProvidedById,
+    note: entry.note,
+    occurredOn: entry.occurredOn,
+    createdAt: entry.createdAt,
+    confirmedAt: entry.confirmedAt,
     counterparty: viewerBusinessId ? counterparty : null,
-    businessA: engagement.businessA,
-    businessB: engagement.businessB,
-    proposedByYou: viewerBusinessId ? engagement.proposedById === viewerBusinessId : null,
+    businessA: entry.businessA,
+    businessB: entry.businessB,
+    proposedByYou: viewerBusinessId ? entry.proposedById === viewerBusinessId : null,
   };
 }
 
-// Every confirmed engagement touching this business, newest work first.
+// Every confirmed portfolio entry touching this business, newest work first.
 // Confirmed only — see the status comment on the model for why a declined one
 // is shown to nobody.
-async function confirmedEngagementsFor(businessId, { limit = 50 } = {}) {
-  return prisma.engagement.findMany({
+async function confirmedPortfolioFor(businessId, { limit = 50 } = {}) {
+  return prisma.portfolioEntry.findMany({
     where: {
       status: PUBLIC_STATUS,
       OR: [{ businessAId: businessId }, { businessBId: businessId }],
     },
-    include: ENGAGEMENT_INCLUDE,
+    include: PORTFOLIO_INCLUDE,
     orderBy: [{ occurredOn: "desc" }, { id: "desc" }],
     take: limit,
   });
 }
 
-// Confirmed engagements grouped by service.
+// Confirmed portfolio entries grouped by service.
 //
 // COUNTS DISTINCT COUNTERPARTIES, NEVER ROWS, and that is the anti-collusion
-// design rather than a presentation choice. Ten engagements with one friendly
+// design rather than a presentation choice. Ten portfolio entries with one friendly
 // business is one counterparty; reporting "10" would make the cheapest
 // possible fake look like the strongest possible signal. A reader who sees
-// "4 engagements from 1 business" can judge it; a reader who sees "4" cannot.
+// "4 portfolio entries from 1 business" can judge it; a reader who sees "4" cannot.
 //
-// Engagements with no service are counted in `total` and appear in no group —
+// Portfolio entries with no service are counted in `total` and appear in no group —
 // the same contract a custom service has on a profile.
-async function engagementSummaryFor(businessId) {
-  const rows = await prisma.engagement.findMany({
+async function portfolioSummaryFor(businessId) {
+  const rows = await prisma.portfolioEntry.findMany({
     where: {
       status: PUBLIC_STATUS,
       OR: [{ businessAId: businessId }, { businessBId: businessId }],
@@ -147,10 +147,10 @@ async function engagementSummaryFor(businessId) {
     if (row.serviceProvidedById && row.serviceProvidedById !== businessId) continue;
     const other = row.businessAId === businessId ? row.businessBId : row.businessAId;
     if (!byService.has(row.service)) {
-      byService.set(row.service, { service: row.service, engagements: 0, counterparties: new Set() });
+      byService.set(row.service, { service: row.service, entries: 0, counterparties: new Set() });
     }
     const group = byService.get(row.service);
-    group.engagements += 1;
+    group.entries += 1;
     group.counterparties.add(other);
   }
 
@@ -162,7 +162,7 @@ async function engagementSummaryFor(businessId) {
   // of them CAME BACK. That count is gone — the portfolio is a list of work,
   // not a measurement of loyalty — but this half is a different thing and
   // stays: it is the anti-collusion denominator the directory ranks on. Ten
-  // engagements with one friendly business is one counterparty.
+  // portfolio entries with one friendly business is one counterparty.
   const counterparties = new Set();
   for (const row of rows) {
     counterparties.add(row.businessAId === businessId ? row.businessBId : row.businessAId);
@@ -177,22 +177,22 @@ async function engagementSummaryFor(businessId) {
     services: [...byService.values()]
       .map((g) => ({
         service: g.service,
-        engagements: g.engagements,
+        entries: g.entries,
         counterparties: g.counterparties.size,
       }))
-      .sort((a, b) => b.counterparties - a.counterparties || b.engagements - a.engagements),
+      .sort((a, b) => b.counterparties - a.counterparties || b.entries - a.entries),
   };
 }
 
 export {
   EXPIRY_DAYS,
   PUBLIC_STATUS,
-  ENGAGEMENT_INCLUDE,
-  ENGAGEMENT_BUSINESS_SELECT,
+  PORTFOLIO_INCLUDE,
+  PORTFOLIO_BUSINESS_SELECT,
   applyExpiryIfNeeded,
   counterpartyIdOf,
-  serializeEngagement,
-  confirmedEngagementsFor,
-  engagementSummaryFor,
+  serializePortfolioEntry,
+  confirmedPortfolioFor,
+  portfolioSummaryFor,
   orderedPair,
 };

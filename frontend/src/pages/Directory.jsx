@@ -15,9 +15,9 @@ import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 // the winners' numbers reads as a leaderboard. "Nobody has confirmed this yet"
 // is a real, useful answer about a business that says it does the work.
 //
-// Counts DIFFERENT businesses, never engagements — ten confirmations from one
-// friend is one counterparty. See engagementSummaryFor in
-// backend/src/lib/engagements.js.
+// Counts DIFFERENT businesses, never portfolio entries — ten confirmations from one
+// friend is one counterparty. See portfolioSummaryFor in
+// backend/src/lib/portfolio.js.
 function ConfirmedForService({ confirmed }) {
   if (!confirmed) return null;
   const n = confirmed.counterparties;

@@ -23,7 +23,7 @@ import { vouchersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
 import { recordProfileView } from "../lib/profileView.js";
 import { verificationTimelineFor } from "../lib/verificationTimeline.js";
-import { confirmedEngagementsFor, engagementSummaryFor, serializeEngagement } from "../lib/engagements.js";
+import { confirmedPortfolioFor, portfolioSummaryFor, serializePortfolioEntry } from "../lib/portfolio.js";
 import {
   LOOKUP_LIMIT,
   MIN_QUERY_LENGTH,
@@ -186,13 +186,13 @@ router.get(
     };
 
     // RANKED BY EVIDENCE WHEN A SERVICE IS NAMED, and this is the query the
-    // whole service + engagement design exists to make answerable: not "who
+    // whole service + portfolio entry design exists to make answerable: not "who
     // says they do company incorporation" but "who has had it CONFIRMED, and
     // by how many different businesses".
     //
-    // DISTINCT COUNTERPARTIES, NOT ROWS — the same rule engagementSummaryFor
+    // DISTINCT COUNTERPARTIES, NOT ROWS — the same rule portfolioSummaryFor
     // applies, and for the same reason. Ranking on row count would put a
-    // business with ten engagements from one friendly counterparty above one
+    // business with ten portfolio entries from one friendly counterparty above one
     // with three from three different firms, which inverts the signal.
     //
     // AGGREGATED BEFORE PAGING, which is why this branch exists at all rather
@@ -210,7 +210,7 @@ router.get(
       const candidates = await prisma.business.findMany({ where, select: { id: true } });
       const candidateIds = candidates.map((c) => c.id);
 
-      const engagements = await prisma.engagement.findMany({
+      const entries = await prisma.portfolioEntry.findMany({
         where: {
           status: "confirmed",
           service: canonicalServiceFilter,
@@ -219,11 +219,11 @@ router.get(
         select: { businessAId: true, businessBId: true, serviceProvidedById: true },
       });
 
-      // An engagement touches two businesses and only one of them is the
+      // A portfolio entry touches two businesses and only one of them is the
       // candidate for any given row — which end, depends on the id ordering
       // the pair is stored under, so both are checked.
       //
-      // THE SECOND READER OF THE PROVIDER RULE. engagementSummaryFor is the
+      // THE SECOND READER OF THE PROVIDER RULE. portfolioSummaryFor is the
       // first; this is the one members actually see, because it decides who
       // ranks top of a service search. Without the same guard, a business that
       // BOUGHT "SST advisory" outranks the firm that delivered it — the
@@ -231,7 +231,7 @@ router.get(
       // counts for both ends, exactly as it does there, and for the same
       // reason: those rows never recorded who did the work.
       const counterparties = new Map(candidateIds.map((id) => [id, new Set()]));
-      for (const e of engagements) {
+      for (const e of entries) {
         const provider = e.serviceProvidedById;
         if (counterparties.has(e.businessAId) && (!provider || provider === e.businessAId)) {
           counterparties.get(e.businessAId).add(e.businessBId);
@@ -253,7 +253,7 @@ router.get(
 
       // The sharp version of this query: only businesses somebody has actually
       // confirmed for this service. Off by default — a directory that hides
-      // every business without engagements would be empty today and would
+      // every business without portfolio entries would be empty today and would
       // punish new members for being new.
       if (confirmedOnly) ordered = ordered.filter((o) => o.confirmed > 0);
 
@@ -606,13 +606,13 @@ router.get(
     const verificationTimeline = await verificationTimelineFor(prisma, business);
 
     // The other half of the audit record, and public on the same terms and for
-    // the same reason. A confirmed engagement is a fact two businesses agreed
+    // the same reason. A confirmed portfolio entry is a fact two businesses agreed
     // on; gating it would mean selling the ability to find out who a business
     // has actually worked with, which is the question this product exists to
     // answer. Confirmed only — see the status comment on the model.
-    const [engagementRows, engagementSummary] = await Promise.all([
-      confirmedEngagementsFor(business.id),
-      engagementSummaryFor(business.id),
+    const [portfolioRows, portfolioSummary] = await Promise.all([
+      confirmedPortfolioFor(business.id),
+      portfolioSummaryFor(business.id),
     ]);
 
     // Flatten the live revision's text onto each vouch as `testimonial`.
@@ -631,8 +631,8 @@ router.get(
         // viewerBusinessId is null: this is the PUBLIC view, so no
         // `counterparty` is resolved and no proposedByYou is claimed. A reader
         // sees both ends named and works out for themselves which is which.
-        engagements: engagementRows.map((e) => serializeEngagement(e, null)),
-        engagementSummary,
+        entries: portfolioRows.map((e) => serializePortfolioEntry(e, null)),
+        portfolioSummary,
         testimonialsLocked: !showTestimonials,
         // Withheld the same way testimonials are — the keys are absent, not
         // null, so there is no masked value on the wire to un-mask.

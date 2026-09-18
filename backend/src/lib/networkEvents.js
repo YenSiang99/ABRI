@@ -73,10 +73,10 @@ const LEVEL_EVENT_LEVEL = {
 };
 
 // The business fields every feed payload carries. Identical today to
-// ENGAGEMENT_BUSINESS_SELECT in lib/engagements.js and COPIED rather than
+// PORTFOLIO_BUSINESS_SELECT in lib/portfolio.js and COPIED rather than
 // imported, for the
 // reason that constant's own comment gives: importing it would make the next
-// widening of an engagement row change what the feed sends.
+// widening of a portfolio entry row change what the feed sends.
 //
 // Note what it does not select: no contact columns, no membershipTier. That
 // is why publicBusinessView is not needed on this path — there is nothing

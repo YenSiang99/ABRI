@@ -5,7 +5,6 @@ import {
   Briefcase,
   Handshake,
   Users,
-  ClipboardList,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,10 +14,10 @@ import { useConnections } from "@/context/ConnectionsContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { fetchVouchRequests } from "@/lib/api/vouches";
 import {
-  fetchEngagements,
-  confirmEngagement,
-  declineEngagement,
-} from "@/lib/api/engagements";
+  fetchPortfolio,
+  confirmPortfolioEntry,
+  declinePortfolioEntry,
+} from "@/lib/api/portfolio";
 import { toast } from "@/lib/toast";
 
 // Everything waiting on this member, in one place.
@@ -43,9 +42,9 @@ import { toast } from "@/lib/toast";
 // instead of "things you owe" — which is the distinction that makes an inbox
 // worth opening at all. It stays on Home.
 
-const TABS = ["vouches", "connections", "engagements"];
+const TABS = ["vouches", "connections", "portfolio"];
 
-// One proposed engagement waiting on this member.
+// One proposed portfolio entry waiting on this member.
 //
 // CONFIRM IS A CLAIM ABOUT THEM, so the card leads with who said it and what
 // they said — not with the buttons. A member who confirms without reading has
@@ -56,9 +55,9 @@ const TABS = ["vouches", "connections", "engagements"];
 // NetworkRequests gives about declining a connection: saying "that didn't
 // happen" is an ordinary answer, and a red button would make it read as an
 // accusation.
-function EngagementRequestCard({ engagement, onChanged }) {
+function PortfolioRequestCard({ entry, onChanged }) {
   const [busy, setBusy] = useState(false);
-  const { counterparty, service, note, occurredOn } = engagement;
+  const { counterparty, service, note, occurredOn } = entry;
 
   const month = new Date(occurredOn).toLocaleDateString(undefined, {
     month: "long",
@@ -68,7 +67,7 @@ function EngagementRequestCard({ engagement, onChanged }) {
   async function act(fn, message) {
     setBusy(true);
     try {
-      await fn(engagement.id);
+      await fn(entry.id);
       toast(message);
       await onChanged();
     } catch (err) {
@@ -96,7 +95,7 @@ function EngagementRequestCard({ engagement, onChanged }) {
         <Button
           size="sm"
           disabled={busy}
-          onClick={() => act(confirmEngagement, "Confirmed")}
+          onClick={() => act(confirmPortfolioEntry, "Confirmed")}
         >
           Confirm
         </Button>
@@ -105,7 +104,7 @@ function EngagementRequestCard({ engagement, onChanged }) {
           variant="ghost"
           disabled={busy}
           onClick={() =>
-            act(declineEngagement, "Marked as not worked together")
+            act(declinePortfolioEntry, "Marked as not worked together")
           }
         >
           That didn&rsquo;t happen
@@ -171,7 +170,7 @@ function Inbox() {
   const tab = TABS.includes(requested) ? requested : "vouches";
 
   const [vouches, setVouches] = useState([]);
-  const [engagements, setEngagements] = useState([]);
+  const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
 
   // Both lists are fetched up front rather than per tab, because the tab
@@ -180,13 +179,13 @@ function Inbox() {
   function load() {
     return Promise.all([
       fetchVouchRequests().catch(() => []),
-      fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, engagementRows]) => {
+      fetchPortfolio("pending").catch(() => []),
+    ]).then(([vouchRows, portfolioRows]) => {
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
-      // Only the ones waiting on THIS member. A pending engagement they
+      // Only the ones waiting on THIS member. A pending portfolio entry they
       // proposed is waiting on the other side and is not their work — the same
       // rule the vouch filter above applies with waitingOn.
-      setEngagements(engagementRows.filter((e) => !e.proposedByYou));
+      setEntries(portfolioRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
   }
@@ -195,11 +194,11 @@ function Inbox() {
     let live = true;
     Promise.all([
       fetchVouchRequests().catch(() => []),
-      fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, engagementRows]) => {
+      fetchPortfolio("pending").catch(() => []),
+    ]).then(([vouchRows, portfolioRows]) => {
       if (!live) return;
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
-      setEngagements(engagementRows.filter((e) => !e.proposedByYou));
+      setEntries(portfolioRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
     return () => {
@@ -225,9 +224,9 @@ function Inbox() {
   const counts = {
     vouches: status === "ready" ? vouches.length : vouchActionCount,
     connections: incoming.length,
-    engagements: engagements.length,
+    entries: entries.length,
   };
-  const total = counts.vouches + counts.connections + counts.engagements;
+  const total = counts.vouches + counts.connections + counts.entries;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -261,20 +260,12 @@ function Inbox() {
           Connections
         </TabButton>
         <TabButton
-          active={tab === "answers"}
-          onClick={() => setTab("answers")}
-          count={counts.answers}
-          icon={ClipboardList}
-        >
-          Answers
-        </TabButton>
-        <TabButton
-          active={tab === "engagements"}
-          onClick={() => setTab("engagements")}
-          count={counts.engagements}
+          active={tab === "portfolio"}
+          onClick={() => setTab("portfolio")}
+          count={counts.entries}
           icon={Briefcase}
         >
-          Engagements
+          Portfolio
         </TabButton>
       </div>
 
@@ -315,19 +306,19 @@ function Inbox() {
         </div>
       )}
 
-      {status === "ready" && tab === "engagements" && (
+      {status === "ready" && tab === "portfolio" && (
         <div className="mt-6">
-          {engagements.length === 0 ? (
+          {entries.length === 0 ? (
             <Empty>
               Nobody has said you worked together. When a business logs work
               with you, it waits here for you to confirm.
             </Empty>
           ) : (
             <ul className="flex flex-col gap-4">
-              {engagements.map((e) => (
-                <EngagementRequestCard
+              {entries.map((e) => (
+                <PortfolioRequestCard
                   key={e.id}
-                  engagement={e}
+                  entry={e}
                   onChanged={load}
                 />
               ))}
