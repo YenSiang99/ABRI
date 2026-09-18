@@ -29,12 +29,12 @@ import { toast } from "@/lib/toast";
 const ASK_DECISIONS = {
   restore: {
     label: "Put it back",
-    consequence: "The ask reopens and its 30 days start again. The report is dismissed.",
+    consequence: "The request reopens and its 30 days start again. The report is dismissed.",
     noteRequired: false,
   },
   close: {
     label: "Close it",
-    consequence: "The ask is closed for good and the report is upheld. Say why.",
+    consequence: "The request is closed for good and the report is upheld. Say why.",
     noteRequired: true,
   },
 };
@@ -43,13 +43,13 @@ const ANSWER_DECISIONS = {
   restore: {
     label: "Put it back",
     consequence:
-      "The answer goes back in front of the asker to decide on. The report is dismissed.",
+      "The offer goes back in front of the business that asked. The report is dismissed.",
     noteRequired: false,
   },
   remove: {
     label: "Remove it",
     consequence:
-      "The answer is removed and stops showing on any profile. Its author can't re-answer. Say why.",
+      "The offer is removed and stops showing on any profile. Its author can't offer again. Say why.",
     noteRequired: true,
   },
 };
@@ -183,10 +183,10 @@ function AdminAskReviews() {
         Admin
       </div>
       <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-        Ask review
+        Request review
       </h1>
       <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-        Reported asks and answers. Anything frozen is at the top — those have a member waiting on
+        Reported requests and offers. Anything frozen is at the top — those have a member waiting on
         you, and nothing frozen ever drops off this list.
       </p>
 
@@ -223,7 +223,7 @@ function AdminAskReviews() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {review.askFrozen && <Pill strong>Ask frozen</Pill>}
+                  {review.askFrozen && <Pill strong>Request frozen</Pill>}
                   {review.frozenAnswers.length > 0 && (
                     <Pill strong>
                       {review.frozenAnswers.length} answer
@@ -253,7 +253,7 @@ function AdminAskReviews() {
                       <div className="flex items-center gap-2 text-foreground">
                         <Flag className="h-3.5 w-3.5 shrink-0" />
                         {REASON_LABELS[flag.reason] ?? flag.reason}
-                        {flag.answerId && <Pill>on an answer</Pill>}
+                        {flag.answerId && <Pill>on an offer</Pill>}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {flag.raisedBy.name} → {flag.against.name}

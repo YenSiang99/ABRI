@@ -25,6 +25,9 @@ import { CheckHistory } from "@/pages/app/CheckHistory";
 import { Inbox } from "@/pages/app/Inbox";
 import { AsksBoard } from "@/pages/app/asks/AsksBoard";
 import { AskDetail } from "@/pages/app/asks/AskDetail";
+import { RedirectAskToRequest } from "@/pages/app/asks/RedirectAskToRequest";
+import { ProjectsBoard } from "@/pages/app/projects/ProjectsBoard";
+import { ProjectDetail } from "@/pages/app/projects/ProjectDetail";
 import { Verify } from "@/pages/app/Verify";
 import { Plan } from "@/pages/app/Plan";
 import { Card } from "@/pages/app/Card";
@@ -78,16 +81,36 @@ function App() {
             <Route path="network/requests" element={<NetworkRequests />} />
             <Route path="network/connections" element={<NetworkConnections />} />
             <Route path="network/following" element={<NetworkFollowing />} />
-            {/* No public /asks counterpart. An ask states commercial intent
-                with a named business behind it; readable without a session,
-                the board is a scraping surface rather than a listing. */}
             {/* The network's trust activity. No :id child and no public
                 counterpart — a logged-out firehose of who-vouched-for-whom is
                 a scrape of the trust graph, which is the asset the product
                 sells. See backend/src/routes/feed.js. */}
             <Route path="feed" element={<Feed />} />
-            <Route path="asks" element={<AsksBoard />} />
-            <Route path="asks/:id" element={<AskDetail />} />
+            {/* No public counterpart. A request states commercial intent with
+                a named business behind it; readable without a session, the
+                board is a scraping surface rather than a listing.
+
+                RENAMED FROM /app/asks in Sept 2026 — the product calls these
+                Requests and Offers now. The old paths stay as redirects rather
+                than being deleted, the same way /app/check and /app/levels did:
+                bookmarks and every activity-event destination written before
+                the rename still land. */}
+            <Route path="requests" element={<AsksBoard />} />
+            <Route path="requests/:id" element={<AskDetail />} />
+            <Route path="asks" element={<Navigate to="/app/requests" replace />} />
+            <Route path="asks/:id" element={<RedirectAskToRequest />} />
+            {/* Siblings, not nested — this router has no nested groups, and
+              ProjectDetail renders standalone with its own back link, exactly
+              as AskDetail does.
+
+              No public counterpart, and for a stronger reason than the asks
+              board has: a project's thread is private to the businesses in it
+              under every visibility setting. What IS public — a completed
+              public project's title, dates and participants — is published on
+              the profiles themselves, which is where somebody looking a
+              business up is already standing. */}
+            <Route path="projects" element={<ProjectsBoard />} />
+            <Route path="projects/:id" element={<ProjectDetail />} />
             <Route path="directory" element={<AppDirectory />} />
             {/* /app/check was the in-app twin of the public check-a-business
                 screen. It went when the directory learned to match

@@ -18,6 +18,35 @@ const ACTIVITY_MESSAGES = {
   // lib/engagements.js and cannot be imported (that module imports this one).
   engagement_expired: (actorName) =>
     `Your engagement with ${actorName} lapsed after 14 days without a reply.`,
+  // Projects. FOUR TYPES FOR A FEATURE WITH SEVEN TRANSITIONS, and the three
+  // that write nothing are the interesting part.
+  //
+  // A DECLINE IS SILENT — there is no project_declined, the same call
+  // connections make: "they turned you down" is a hostile notification the
+  // reader can do nothing with. So is LEAVING, for the same reason.
+  //
+  // AND A POSTED UPDATE IS SILENT, which is the one worth defending. Every
+  // other event here is addressed to one business; an update would fan out to
+  // everyone else on the project, and a single chatty project would flush a
+  // member's fifty-row cap (ACTIVITY_KEEP_PER_BUSINESS below) within a day —
+  // evicting the vouch request and the engagement waiting on them. That is the
+  // same reasoning routes/asks.js gives for a posted ask notifying nobody, and
+  // it is why projects deliberately ship without an unread badge: an update is
+  // read when somebody opens the project, which is where it is useful anyway.
+  //
+  // The four that remain are all bounded by MAX_PARTICIPANTS and all name
+  // either a decision the reader has to make or a change to their own public
+  // profile.
+  project_invited: (actorName) => `${actorName} invited you to work together on a project.`,
+  project_joined: (actorName) => `${actorName} joined your project.`,
+  // Worded to say what actually happened to them, because this is the one
+  // notification in the product that announces a write to somebody's public
+  // record. True under both visibilities: a private project still puts
+  // confirmed engagements on both profiles — visibility governs the shell, not
+  // the work.
+  project_completed: (actorName) =>
+    `${actorName} completed your project — the work is now on both your profiles.`,
+  project_cancelled: (actorName) => `${actorName} cancelled a project you were part of.`,
   vouch_submitted: (actorName) => `${actorName} sent you a vouch to review.`,
   vouch_published: (actorName) => `${actorName} accepted your vouch.`,
   vouch_cancelled: (actorName) => `${actorName} cancelled your vouch.`,
@@ -119,17 +148,23 @@ const ACTIVITY_MESSAGES = {
   // business that was named — accepting an answer stopped publishing anything
   // to a third party's profile in Sept 2026, so there is no longer a profile
   // change anyone needs to be told about.
-  ask_answered: (actorName) => `${actorName} suggested a business for your ask.`,
-  ask_self_offered: (actorName) => `${actorName} offered their own services on your ask.`,
+  // "OFFER", NOT "ANSWER", AND "REQUEST", NOT "ASK" — the words changed in
+  // Sept 2026 and only the words did. The event TYPES below are still
+  // ask_answered / ask_answer_accepted and the tables are still Ask and
+  // AskAnswer, because renaming a column buys nothing a reader can see and
+  // costs a migration plus every test that names one. What a member reads is
+  // the only thing that had to change.
+  ask_answered: (actorName) => `${actorName} suggested a business on your request.`,
+  ask_self_offered: (actorName) => `${actorName} offered their own services on your request.`,
 
-  ask_answer_accepted: (actorName) => `${actorName} accepted your answer on their ask.`,
+  ask_answer_accepted: (actorName) => `${actorName} accepted your offer on their request.`,
 
   // No actor: nobody closed this, it lapsed. Names a next step, which is what
   // makes an event about something nobody did worth sending at all. "30 days"
   // mirrors ASK_EXPIRY_DAYS in lib/askExpiry.js; it can't be imported (that
   // module imports this one), so change both together.
   ask_expired: () =>
-    "Your ask closed after 30 days. Post a new one if you still need it.",
+    "Your request closed after 30 days. Post a new one if you still need it.",
 
   // Frozen-content events. Both carry actorBusinessId null, a deliberate
   // divergence from vouch_flagged, which does name the flagger: on a vouch
@@ -138,19 +173,19 @@ const ACTIVITY_MESSAGES = {
   // invitation to take it up with them directly. Like vouch_flagged these
   // name no next step, because there isn't one — but the reader still needs
   // to know why their post stopped working.
-  ask_flagged: () => "Your ask was reported and is on hold while an admin reviews it.",
+  ask_flagged: () => "Your request was reported and is on hold while an admin reviews it.",
   ask_answer_flagged: () =>
-    "Your answer was reported and is on hold while an admin reviews it.",
+    "Your offer was reported and is on hold while an admin reviews it.",
 
   // Admin decisions on a reported ask or answer. No actor, for the same
   // reason the vouch_review_* events have none.
   ask_review_restored: () =>
-    "An admin reviewed the report on your ask — it's open again.",
-  ask_review_closed: () => "An admin closed your ask after reviewing a report.",
+    "An admin reviewed the report on your request — it's open again.",
+  ask_review_closed: () => "An admin closed your request after reviewing a report.",
   ask_answer_review_restored: () =>
-    "An admin reviewed the report on your answer — it's back in front of the asker.",
+    "An admin reviewed the report on your offer — it's back in front of the business that asked.",
   ask_answer_review_removed: () =>
-    "An admin removed your answer after reviewing a report.",
+    "An admin removed your offer after reviewing a report.",
 };
 
 function messageFor(type, actorName) {

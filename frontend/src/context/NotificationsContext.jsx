@@ -14,6 +14,7 @@ import {
 import { fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyAsks } from "@/lib/api/asks";
 import { fetchEngagements } from "@/lib/api/engagements";
+import { fetchProjects } from "@/lib/api/projects";
 import { useAuth } from "./AuthContext";
 
 // The two numbers the sidebar puts on nav items: unread activity, and vouches
@@ -70,7 +71,15 @@ function NotificationsProvider({ children }) {
       fetchEngagements("pending")
         .then((rows) => rows.filter((e) => !e.proposedByYou).length)
         .catch(() => 0),
-    ]).then(([unread, vouchActions, askActions, engagementActions]) => {
+      // Project INVITES only — an invitation is a decision owed by this member,
+      // which is exactly what the Inbox badge means. Deliberately not unread
+      // project updates: those notify nobody at all (see the fan-out note in
+      // backend/src/lib/activityEvents.js), and a badge for them would be the
+      // one thing this feature shipped without on purpose.
+      fetchProjects({ participation: "invited" })
+        .then((rows) => rows.filter((p) => p.status === "active").length)
+        .catch(() => 0),
+    ]).then(([unread, vouchActions, askActions, engagementActions, projectActions]) => {
       if (!cancelled)
         setLoaded({
           businessId,
@@ -78,6 +87,7 @@ function NotificationsProvider({ children }) {
           vouchActions,
           askActions,
           engagementActions,
+          projectActions,
         });
     });
 
@@ -96,6 +106,7 @@ function NotificationsProvider({ children }) {
   const vouchActionCount = isCurrent ? loaded.vouchActions : 0;
   const askActionCount = isCurrent ? loaded.askActions : 0;
   const engagementCount = isCurrent ? loaded.engagementActions : 0;
+  const projectActionCount = isCurrent ? loaded.projectActions : 0;
 
   // Opening a notification clears that one. Decrements rather than refetching
   // because the click is usually a navigation away from the dashboard — the
@@ -168,6 +179,20 @@ function NotificationsProvider({ children }) {
     }
   }, []);
 
+  // Called by ProjectDetail after any transition. Refetches rather than
+  // decrementing for the same reason the two above do: one action can settle
+  // several rows — completing a project clears its invite, and cancelling one
+  // clears every outstanding invite on it at once.
+  const refreshProjectActions = useCallback(async () => {
+    try {
+      const rows = await fetchProjects({ participation: "invited" });
+      const projectActions = rows.filter((p) => p.status === "active").length;
+      setLoaded((current) => ({ ...current, projectActions }));
+    } catch {
+      // Leave the badge as-is, same reasoning as above.
+    }
+  }, []);
+
   return (
     <NotificationsContext.Provider
       value={{
@@ -175,10 +200,12 @@ function NotificationsProvider({ children }) {
         vouchActionCount,
         askActionCount,
         engagementCount,
+        projectActionCount,
         markOneRead,
         markAllRead,
         refreshVouchActions,
         refreshAskActions,
+        refreshProjectActions,
       }}
     >
       {children}

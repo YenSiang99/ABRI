@@ -72,7 +72,16 @@ const steps = [
   // SET NULL, so the ask delete above nulls it rather than being blocked by it.
   // It DOES matter for the three business FKs, which are RESTRICT like every
   // other relation here, so this has to run before the business delete.
-  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }] }],
+  // Projects, innermost first. All three carry RESTRICT business FKs, so a
+  // missed row here blocks the business delete at the bottom rather than being
+  // cleaned up by it — the same trap profileView above documents.
+  //
+  // Engagement.projectId is SET NULL, so the engagement delete below does not
+  // have to run first. The three business FKs on Engagement still do.
+  ["projectUpdate",      { OR: [{ project: { createdById: biz } }, { authorBusinessId: biz }] }],
+  ["projectParticipant", { OR: [{ project: { createdById: biz } }, { businessId: biz }, { invitedById: biz }] }],
+  ["project",            { createdById: biz }],
+  ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }, { serviceProvidedById: biz }] }],
   ["deferredConnection", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["emailVerificationToken", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["account",       { id: { in: accIds } }],

@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
-import fs from "node:fs";
-const url = fs.readFileSync(new URL("../.env", import.meta.url), "utf8").match(/^DIRECT_URL=(.*)$/m)[1].trim().replace(/^"|"$/g,"");
+import { TEST_DATABASE_URL } from "./env.mjs";
+const url = TEST_DATABASE_URL;
 const prisma = new PrismaClient({ datasourceUrl: url });
 
 // Every test row is prefixed e2e- so teardown can remove exactly what it made.

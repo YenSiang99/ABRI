@@ -1,4 +1,4 @@
-const API = "http://localhost:4000";
+import { API } from "./env.mjs";
 const P = "e2e-";
 async function login(key) {
   // COLD_RETRY: Neon scales the compute to zero, so the first request after an

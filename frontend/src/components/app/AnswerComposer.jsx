@@ -77,7 +77,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
     try {
       await answerAsk(ask.id, { recommendedBusinessId: target.id, comment });
       toast.success(
-        isSelf ? "Answer posted — listed as your own services." : `Suggested ${target.name}.`,
+        isSelf ? "Offer posted — listed as your own services." : `Suggested ${target.name}.`,
       );
       setComment("");
       setSelected(null);
@@ -92,7 +92,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="text-sm font-semibold text-foreground">Answer this ask</div>
+      <div className="text-sm font-semibold text-foreground">Make an offer</div>
 
       <div className="mt-3 flex flex-wrap gap-2">
         <ModeChip active={!isSelf} onClick={() => setMode("suggest")}>
@@ -162,7 +162,7 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
           {selected?.verificationLevel === UNCLAIMED && (
             <p className="mt-2 text-xs text-muted-foreground">
               {selected.name} hasn't claimed their listing yet — the asker will still see your
-              answer, but nobody there is reading ABRI.
+              offer, but nobody there is reading ABRI.
             </p>
           )}
         </div>
@@ -185,10 +185,10 @@ function AnswerComposer({ ask, businesses, onSuccess }) {
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
         <span className="text-xs text-muted-foreground">
           {ask.slotsLeft} of {ask.maxAnswers} {ask.slotsLeft === 1 ? "slot" : "slots"} left. One
-          answer per business.
+          offer per business.
         </span>
         <Button size="sm" onClick={submit} disabled={!ready || submitting}>
-          {submitting ? "Posting…" : "Post answer"}
+          {submitting ? "Posting…" : "Post offer"}
         </Button>
       </div>
     </div>

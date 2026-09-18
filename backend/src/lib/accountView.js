@@ -7,6 +7,7 @@ import {
   engagementSummaryFor,
   serializeEngagement,
 } from "./engagements.js";
+import { publicProjectShellsFor } from "./projects.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
 // the frontend expects: vouchCount/vouchLevel derived at read time (never
@@ -242,9 +243,15 @@ async function loadAccountView(accountId) {
   // Confirmed only, matching what GET /businesses/:id shows. An owner's page
   // that counted rows no visitor can see would tell them their profile carries
   // proof it does not.
-  const [engagementRows, engagementSummary] = await Promise.all([
+  //
+  // Projects come along for the same reason, and with the same restraint: only
+  // the PUBLIC completed ones, because this block is the owner's answer to
+  // "what does a visitor see". Their private projects are on /app/projects,
+  // where they belong.
+  const [engagementRows, engagementSummary, projects] = await Promise.all([
     confirmedEngagementsFor(business.id),
     engagementSummaryFor(business.id),
+    publicProjectShellsFor(prisma, business.id),
   ]);
 
   return {
@@ -253,6 +260,7 @@ async function loadAccountView(accountId) {
       ...serializeBusiness(business),
       engagements: engagementRows.map((e) => serializeEngagement(e, business.id)),
       engagementSummary,
+      projects,
     },
   };
 }

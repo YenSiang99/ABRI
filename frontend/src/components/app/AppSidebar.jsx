@@ -18,6 +18,7 @@ import {
   Users,
   Eye,
   ClipboardList,
+  FolderKanban,
   MessageSquareWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,13 @@ const TOP_ITEMS = [
   // The one row whose badge counts work rather than news. See Inbox.jsx on
   // why unread feed activity is deliberately not part of that number.
   { title: "Inbox", url: "/app/inbox", icon: Inbox },
+  // TOP, not FIND_ITEMS and not BUSINESS_ITEMS, and the group is the argument:
+  // a project is neither a way to find somebody (FIND) nor a fact about your
+  // own standing (BUSINESS) — it is work in flight, which is exactly what this
+  // group is for. No badge: an unanswered project INVITE is work owed and is
+  // counted on Inbox with the other four; unread updates inside a project are
+  // news, and lib/activityEvents.js explains why they notify nobody at all.
+  { title: "Projects", url: "/app/projects", icon: FolderKanban },
   // Kept as its own row even though the dashboard embeds the feed. /app/feed
   // is a real page with more than the dashboard shows, and dropping the row
   // would leave it reachable only by typing the URL.
@@ -79,7 +87,7 @@ const TOP_ITEMS = [
 // Outward-facing: the three ways to find or check somebody else.
 const FIND_ITEMS = [
   { title: "Directory", url: "/app/directory", icon: Search },
-  { title: "Asks", url: "/app/asks", icon: ClipboardList },
+  { title: "Requests", url: "/app/requests", icon: ClipboardList },
   // Sits with Directory because that is where checks are made — a record
   // belongs beside the thing it records. No lockFeature: the page has a free
   // half (the viewers count), and a padlock would shut it to exactly the
@@ -129,7 +137,7 @@ const ADMIN_ITEMS = [
   // above gives about vouch review: a queue reachable only from a link on
   // another admin page reads as part of that page's job.
   {
-    title: "Ask review",
+    title: "Request review",
     url: "/app/admin/ask-reviews",
     icon: MessageSquareWarning,
   },
@@ -194,6 +202,7 @@ function SidebarNav({
   vouchActionCount,
   askActionCount,
   engagementCount,
+  projectActionCount,
   incomingCount,
   onSignOut,
 }) {
@@ -277,7 +286,8 @@ function SidebarNav({
                         vouchActionCount +
                         askActionCount +
                         incomingCount +
-                        engagementCount
+                        engagementCount +
+                        projectActionCount
                       }
                       label="waiting on you"
                     />
@@ -410,7 +420,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount, askActionCount, engagementCount } =
+  const { unreadCount, vouchActionCount, askActionCount, engagementCount, projectActionCount } =
     useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
@@ -450,6 +460,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           vouchActionCount={vouchActionCount}
           askActionCount={askActionCount}
           engagementCount={engagementCount}
+          projectActionCount={projectActionCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
         />
@@ -480,6 +491,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               vouchActionCount={vouchActionCount}
               askActionCount={askActionCount}
               engagementCount={engagementCount}
+              projectActionCount={projectActionCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}
             />

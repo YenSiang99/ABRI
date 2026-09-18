@@ -89,7 +89,7 @@ async function loadOwnBusiness(req) {
 // already have lapsed to closed.
 async function loadAsk(id, include = ASK_DETAIL_INCLUDE) {
   const ask = await prisma.ask.findUnique({ where: { id }, include });
-  if (!ask) fail(404, "Ask not found.");
+  if (!ask) fail(404, "Request not found.");
   return applyExpiryIfNeeded(ask);
 }
 
@@ -102,7 +102,7 @@ async function loadAsk(id, include = ASK_DETAIL_INCLUDE) {
 // they have to be able to see why their post stopped working.
 function hideIfFrozenForOthers(ask, own) {
   if (ask.status === "under_review" && ask.askedByBusinessId !== own?.id) {
-    fail(404, "Ask not found.");
+    fail(404, "Request not found.");
   }
 }
 
@@ -221,7 +221,7 @@ router.get(
     if (!own) return res.json({ count: 0, top: [] });
 
     if (!can(own, "askAlerts")) {
-      failUpgrade("pro", "Pro tells you when an ask matches what you do.");
+      failUpgrade("pro", "Pro tells you when a request matches what you do.");
     }
 
     // Filters on expiresAt rather than calling applyExpiryIfNeeded. This is a
@@ -269,7 +269,7 @@ router.post(
     // it points the member at something free (get SSM-verified) rather than
     // at a price. There is deliberately no can() call anywhere in this file.
     if (!canPostAsks(own)) {
-      fail(403, "Posting an ask needs SSM verification. Your listing isn't verified yet.");
+      fail(403, "Posting a request needs SSM verification. Your listing isn't verified yet.");
     }
 
     const { category, matchCategory, matchLocation, matchServices, maxAnswers, title, detail } =
@@ -297,7 +297,7 @@ router.post(
     let cap = null;
     if (maxAnswers !== undefined && maxAnswers !== null) {
       if (!Number.isInteger(maxAnswers) || maxAnswers < 1) {
-        fail(400, "An answer limit must be a whole number of 1 or more.");
+        fail(400, "An offer limit must be a whole number of 1 or more.");
       }
       cap = maxAnswers;
     }
@@ -339,8 +339,8 @@ router.post(
     const own = await loadOwnBusiness(req);
     const ask = await loadAsk(req.params.id, ASK_INCLUDE);
 
-    if (ask.askedByBusinessId !== own.id) fail(403, "This isn't your ask.");
-    if (ask.status !== "open") fail(400, "This ask is already settled.");
+    if (ask.askedByBusinessId !== own.id) fail(403, "This isn't your request.");
+    if (ask.status !== "open") fail(400, "This request is already settled.");
 
     const updated = await prisma.ask.update({
       where: { id: ask.id },
@@ -361,8 +361,8 @@ router.post(
     const ask = await loadAsk(req.params.id, ASK_INCLUDE);
 
     hideIfFrozenForOthers(ask, own);
-    if (ask.status !== "open") fail(400, "This ask isn't taking answers.");
-    if (ask.askedByBusinessId === own.id) fail(400, "You can't answer your own ask.");
+    if (ask.status !== "open") fail(400, "This request isn't taking offers.");
+    if (ask.askedByBusinessId === own.id) fail(400, "You can't make an offer on your own request.");
 
     const { recommendedBusinessId, comment } = req.body ?? {};
     const cleanComment = comment?.trim();
@@ -433,10 +433,10 @@ router.post(
     // killed that answer, and letting its author re-file would make the
     // removal decorative.
     if (existing && existing.status === "removed") {
-      fail(403, "An admin removed your answer to this ask.");
+      fail(403, "An admin removed your offer on this request.");
     }
     if (existing && existing.status !== "withdrawn") {
-      fail(409, "You've already answered this ask.");
+      fail(409, "You've already made an offer on this request.");
     }
 
     // Fast path: refuse before writing anything when the ask is already full.
@@ -532,8 +532,8 @@ router.post(
     const answer = await prisma.askAnswer.findUnique({
       where: { askId_answeredByBusinessId: { askId: ask.id, answeredByBusinessId: own.id } },
     });
-    if (!answer) fail(404, "You haven't answered this ask.");
-    if (answer.status !== "offered") fail(400, "This answer can't be withdrawn.");
+    if (!answer) fail(404, "You haven't made an offer on this request.");
+    if (answer.status !== "offered") fail(400, "This offer can't be withdrawn.");
 
     await prisma.askAnswer.update({
       where: { id: answer.id },
@@ -552,8 +552,8 @@ router.post(
     const own = await loadOwnBusiness(req);
     const ask = await loadAsk(req.params.id, ASK_INCLUDE);
 
-    if (ask.askedByBusinessId !== own.id) fail(403, "This isn't your ask.");
-    if (ask.status !== "open") fail(400, "This ask is already settled.");
+    if (ask.askedByBusinessId !== own.id) fail(403, "This isn't your request.");
+    if (ask.status !== "open") fail(400, "This request is already settled.");
 
     const answer = await prisma.askAnswer.findUnique({
       where: { id: req.params.answerId },
@@ -561,8 +561,8 @@ router.post(
         recommendedBusiness: { select: { id: true, name: true, category: true, location: true, verificationLevel: true } },
       },
     });
-    if (!answer || answer.askId !== ask.id) fail(404, "Answer not found.");
-    if (answer.status !== "offered") fail(400, "That answer isn't available to accept.");
+    if (!answer || answer.askId !== ask.id) fail(404, "Offer not found.");
+    if (answer.status !== "offered") fail(400, "That offer isn't available to accept.");
 
     const now = new Date();
     await prisma.$transaction([
@@ -624,7 +624,7 @@ router.post(
     const ask = await loadAsk(req.params.id, ASK_INCLUDE);
 
     hideIfFrozenForOthers(ask, own);
-    if (ask.askedByBusinessId === own.id) fail(400, "You can't report your own ask.");
+    if (ask.askedByBusinessId === own.id) fail(400, "You can't report your own request.");
     const { reason, note } = req.body ?? {};
     if (!ASK_FLAG_REASONS.has(reason)) fail(400, "Pick a reason from the list.");
 
@@ -668,12 +668,12 @@ router.post(
     const ask = await loadAsk(req.params.id, ASK_INCLUDE);
 
     const answer = await prisma.askAnswer.findUnique({ where: { id: req.params.answerId } });
-    if (!answer || answer.askId !== ask.id) fail(404, "Answer not found.");
-    if (answer.answeredByBusinessId === own.id) fail(400, "You can't report your own answer.");
+    if (!answer || answer.askId !== ask.id) fail(404, "Offer not found.");
+    if (answer.answeredByBusinessId === own.id) fail(400, "You can't report your own offer.");
     // Freezing an already-withdrawn or removed answer would be freezing
     // nothing: it is not in front of anyone.
     if (!["offered", "accepted"].includes(answer.status)) {
-      fail(400, "That answer isn't live.");
+      fail(400, "That offer isn't live.");
     }
 
     const { reason, note } = req.body ?? {};

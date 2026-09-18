@@ -14,6 +14,7 @@ import { askRouter } from "./routes/asks.js";
 import { feedRouter } from "./routes/feed.js";
 import { watchRouter } from "./routes/watches.js";
 import { engagementRouter } from "./routes/engagements.js";
+import { projectRouter } from "./routes/projects.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -38,6 +39,7 @@ app.use("/asks", askRouter);
 app.use("/feed", feedRouter);
 app.use("/watches", watchRouter);
 app.use("/engagements", engagementRouter);
+app.use("/projects", projectRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

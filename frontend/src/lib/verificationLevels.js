@@ -17,6 +17,10 @@ const SSM_VERIFIED = VERIFICATION_LEVELS[2];
 
 const VOUCHABLE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
 const ASK_POSTING_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
+// Starting a project. Note there is no matching JOIN set: joining needs only a
+// claimed listing, which every logged-in member already has, so the client has
+// nothing to branch on there.
+const PROJECT_CREATE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
 
 export {
   VERIFICATION_LEVELS,
@@ -25,4 +29,5 @@ export {
   SSM_VERIFIED,
   VOUCHABLE_VERIFICATION_LEVELS,
   ASK_POSTING_VERIFICATION_LEVELS,
+  PROJECT_CREATE_VERIFICATION_LEVELS,
 };

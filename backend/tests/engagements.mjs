@@ -1,7 +1,6 @@
 import assert from "node:assert";
-import fs from "node:fs";
 import { PrismaClient } from "@prisma/client";
-const API = "http://localhost:4000";
+import { API, TEST_DATABASE_URL } from "./env.mjs";
 const P = "e2e-";
 let pass = 0;
 const ok = (m) => { console.log("  ✓", m); pass++; };
@@ -38,11 +37,7 @@ async function login(key) {
 // property of how often the suite has run, not of the feature.
 //
 // Scoped to the e2e businesses, so it can never touch real rows.
-const url = fs
-  .readFileSync(new URL("../.env", import.meta.url), "utf8")
-  .match(/^DIRECT_URL=(.*)$/m)[1]
-  .trim()
-  .replace(/^"|"$/g, "");
+const url = TEST_DATABASE_URL;
 const db = new PrismaClient({ datasourceUrl: url });
 await db.engagement.deleteMany({
   where: {

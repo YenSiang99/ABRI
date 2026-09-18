@@ -135,7 +135,7 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
         title,
         detail,
       });
-      toast.success("Ask posted — the businesses who do this will see it.");
+      toast.success("Request posted — the businesses who do this will see it.");
       onOpenChange(false);
       onSuccess?.(ask);
     } catch (err) {
@@ -149,7 +149,7 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Post an ask</DialogTitle>
+          <DialogTitle>Post a request</DialogTitle>
           <DialogDescription>
             Say what you need. The businesses who do that work, in that area,
             will see it on their dashboard.
@@ -235,7 +235,7 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
             </div>
           </Field>
 
-          <Field label="Limit answers? (optional)">
+          <Field label="Limit offers? (optional)">
             {/* NULL BY DEFAULT, and that is the change this field surfaces.
                 Every ask used to cap at 6, which never bound at current
                 density and, the moment it did, would lock out the seventh
@@ -256,7 +256,7 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
               </select>
               <span className="text-xs text-muted-foreground">
                 {answerLimit === ""
-                  ? "Anyone who can help may answer."
+                  ? "Anyone who can help may make an offer."
                   : `Closes to new answers after ${answerLimit}.`}
               </span>
             </div>
@@ -277,11 +277,16 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
           </Field>
 
           {/* The constraints, stated while writing rather than discovered
-              afterwards. Both numbers are the server's defaults; if an ask
-              ever carries a different cap, this line is read off the ask. */}
+              afterwards — and read off the FORM rather than hardcoded. This
+              line said "Up to 6 businesses can answer" long after the cap
+              became unlimited by default, which is the failure mode of writing
+              a server default into copy: the number stops being true and
+              nothing fails. */}
           <p className="text-xs text-muted-foreground">
-            Up to 6 businesses can answer. It closes automatically after 30
-            days.
+            {answerLimit
+              ? `Up to ${answerLimit} ${Number(answerLimit) === 1 ? "business" : "businesses"} can make an offer.`
+              : "Anyone who can help may make an offer."}{" "}
+            It closes automatically after 30 days.
           </p>
         </div>
 
@@ -294,7 +299,7 @@ function AskDialog({ open, onOpenChange, onSuccess }) {
             Cancel
           </Button>
           <Button onClick={submit} disabled={!ready || submitting}>
-            {submitting ? "Posting…" : "Post ask"}
+            {submitting ? "Posting…" : "Post request"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -29,8 +29,8 @@ const ASK_REASONS = [
 ];
 
 const ANSWER_REASONS = [
-  { value: "self_promotion", label: "Self-promotion dressed as a neutral answer" },
-  { value: "irrelevant", label: "Irrelevant to the ask" },
+  { value: "self_promotion", label: "Self-promotion dressed as a neutral suggestion" },
+  { value: "irrelevant", label: "Irrelevant to the request" },
   { value: "abusive_content", label: "Abusive content" },
   { value: "other", label: "Something else" },
 ];
@@ -81,7 +81,7 @@ function ReportAskDialog({ open, onOpenChange, target, onSuccess }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Report this {isAnswer ? "answer" : "ask"}</DialogTitle>
+          <DialogTitle>Report this {isAnswer ? "offer" : "request"}</DialogTitle>
           <DialogDescription>
             {target?.live
               ? "It stops being visible to other members while an admin reviews it. The person who posted it is told it was reported, but not by whom."

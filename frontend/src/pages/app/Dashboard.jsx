@@ -306,7 +306,7 @@ function Dashboard() {
           that is a paid feature. */}
       {!pending && asksNeedingYou > 0 && (
         <Link
-          to="/app/asks?tab=mine"
+          to="/app/requests?tab=mine"
           className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
         >
           <div className="flex items-start gap-3">
@@ -314,7 +314,7 @@ function Dashboard() {
             <div>
               <div className="text-sm font-semibold text-foreground">
                 {asksNeedingYou === 1
-                  ? "An ask of yours has answers waiting"
+                  ? "A request of yours has offers waiting"
                   : `${asksNeedingYou} of your asks have answers waiting`}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -332,7 +332,7 @@ function Dashboard() {
           this is push versus pull. */}
       {!pending && askAlerts?.count > 0 && (
         <Link
-          to="/app/asks?matches=category"
+          to="/app/requests?matches=category"
           className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
         >
           <div className="flex items-start gap-3">
@@ -340,7 +340,7 @@ function Dashboard() {
             <div>
               <div className="text-sm font-semibold text-foreground">
                 {askAlerts.count === 1
-                  ? "1 ask matches what you do"
+                  ? "1 request matches what you do"
                   : `${askAlerts.count} asks match what you do`}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -361,8 +361,8 @@ function Dashboard() {
       {!pending && !membershipTierAllows(business?.membershipTier, "askAlerts") && (
         <div className="mt-4">
           <LockedFeature
-            title="Asks that match what you do"
-            description="Members post asks — 'looking for a corporate secretary in KL'. Pro tells you the moment one lands in your category and area, while there are still slots to answer it. The board itself is already open to you."
+            title="Requests that match what you do"
+            description="Members post requests — 'looking for a corporate secretary in KL'. Pro tells you the moment one lands in your category and area, while there is still room to make an offer. The board itself is already open to you."
             requiredMembershipTier="pro"
           />
         </div>
@@ -382,9 +382,9 @@ function Dashboard() {
           icon={TrendingUp}
         />
         <StatCard
-          label="Answers accepted"
+          label="Offers accepted"
           value={answersAccepted}
-          hint="Asks you helped settle"
+          hint="Requests you helped settle"
           icon={ClipboardList}
         />
         <StatCard

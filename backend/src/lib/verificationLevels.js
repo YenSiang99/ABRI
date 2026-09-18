@@ -41,6 +41,14 @@ const SSM_VERIFIED = VERIFICATION_LEVELS[2];
 // two Sets that were always meant to agree and had no way of proving it.
 const VOUCHABLE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
 const ASK_POSTING_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
+// A third, for starting a project, and a third export for the reason the two
+// above are two: they gate different things and the doctrine discusses them
+// separately, so one must be widenable without silently widening the others.
+//
+// Note the asymmetry this one has that the others don't: creating a project
+// needs L2, but JOINING one needs only a claimed listing (L1). Anyone invited
+// can take part; the verification gate sits on the end that could spam.
+const PROJECT_CREATE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
 
 // Every level from `level` upwards, as an array ready for a Prisma `in`.
 //
@@ -73,6 +81,7 @@ export {
   SSM_VERIFIED,
   VOUCHABLE_VERIFICATION_LEVELS,
   ASK_POSTING_VERIFICATION_LEVELS,
+  PROJECT_CREATE_VERIFICATION_LEVELS,
   verificationLevelsAtOrAbove,
   isValidVerificationLevel,
 };

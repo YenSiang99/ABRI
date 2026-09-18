@@ -6,6 +6,7 @@ import {
   Handshake,
   Users,
   ClipboardList,
+  FolderKanban,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,13 +21,14 @@ import {
   confirmEngagement,
   declineEngagement,
 } from "@/lib/api/engagements";
+import { fetchProjects } from "@/lib/api/projects";
 import { toast } from "@/lib/toast";
 
 // Everything waiting on this member, in one place.
 //
 // THE PROBLEM THIS SOLVES is that "what needs me?" used to be four badges on
 // four rows in two sidebar groups — unread activity on Dashboard, vouch turns
-// on Vouches, answers to decide on Asks, and connection requests two levels
+// on Vouches, offers to decide on Requests, and connection requests two levels
 // deep under Network. The badge doctrine in AppSidebar.jsx was already right
 // (a count means somebody is owed something); what was wrong was that a
 // member had to assemble the answer from four places.
@@ -39,9 +41,9 @@ import { toast } from "@/lib/toast";
 // the same rows, not a second copy of them.
 //
 // ASKS ARE THE EXCEPTION, and deliberately. Deciding on an answer happens on
-// the ask's own page, where the other answers are visible and comparable —
+// the request's own page, where the other offers are visible and comparable —
 // accepting one out of that context is a decision made with half the
-// information. So this tab lists the asks with answers waiting and links to
+// information. So this tab lists the requests with offers waiting and links to
 // them; it does not inline an accept button.
 //
 // WHAT IS NOT HERE: unread feed activity. A feed item is news, not work.
@@ -50,7 +52,7 @@ import { toast } from "@/lib/toast";
 // instead of "things you owe" — which is the distinction that makes an inbox
 // worth opening at all. It stays on Home.
 
-const TABS = ["vouches", "connections", "answers", "engagements"];
+const TABS = ["vouches", "connections", "offers", "engagements", "projects"];
 
 // One proposed engagement waiting on this member.
 //
@@ -166,24 +168,63 @@ function Empty({ children }) {
   );
 }
 
-// One ask with answers to decide on. A row, not a card with buttons — see the
+// One request with offers to decide on. A row, not a card with buttons — see the
 // header on why the decision itself belongs on the ask's own page.
 function AskRow({ ask }) {
   return (
     <li className="flex flex-wrap items-start gap-4 py-5">
       <div className="min-w-0 flex-1">
         <Link
-          to={`/app/asks/${ask.id}`}
+          to={`/app/requests/${ask.id}`}
           className="text-base font-semibold text-foreground underline-offset-4 hover:underline"
         >
           {ask.title}
         </Link>
         <p className="mt-1 text-sm text-muted-foreground">
-          {ask.answerCount} {ask.answerCount === 1 ? "answer" : "answers"}{" "}
+          {ask.answerCount} {ask.answerCount === 1 ? "offer" : "offers"}{" "}
           waiting on your decision · {ask.category}
         </p>
       </div>
     </li>
+  );
+}
+
+// One project invite. A card that routes rather than one that decides, and
+// that is deliberate: joining is where a business settles the service it will
+// be publicly credited with when the project completes, and that choice needs
+// the project in front of it — who else is on it, what it is, what they are
+// each providing. A Join button here would be a one-click commitment to a
+// public claim, read off two lines of summary.
+function ProjectInviteCard({ project }) {
+  const joined = project.participants.filter((p) => p.status === "joined");
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="text-base font-semibold text-foreground">{project.title}</div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {project.createdBy.name} invited you ·{" "}
+        {joined.length} {joined.length === 1 ? "business" : "businesses"} on it so far
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {project.visibility === "public"
+          ? "When it finishes, a summary appears on both your profiles."
+          : "When it finishes, the work appears on both your profiles. The project stays private."}
+      </p>
+      <div className="mt-4">
+        <Button
+          size="sm"
+          render={
+            <Link
+              to={`/app/projects/${project.id}`}
+              state={{ from: "/app/inbox?tab=projects", label: "Back to inbox" }}
+            />
+          }
+          nativeButton={false}
+        >
+          Read it and decide
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -203,6 +244,7 @@ function Inbox() {
   const [vouches, setVouches] = useState([]);
   const [asks, setAsks] = useState([]);
   const [engagements, setEngagements] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [status, setStatus] = useState("loading");
 
   // Both lists are fetched up front rather than per tab, because the tab
@@ -213,13 +255,16 @@ function Inbox() {
       fetchVouchRequests().catch(() => []),
       fetchMyAsks().catch(() => []),
       fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, askRows, engagementRows]) => {
+      fetchProjects({ participation: "invited" }).catch(() => []),
+    ]).then(([vouchRows, askRows, engagementRows, projectRows]) => {
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
       setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
       // Only the ones waiting on THIS member. A pending engagement they
       // proposed is waiting on the other side and is not their work — the same
       // rule the vouch filter above applies with waitingOn.
       setEngagements(engagementRows.filter((e) => !e.proposedByYou));
+      // An invite on a project somebody has since cancelled is not work owed.
+      setProjects(projectRows.filter((p) => p.status === "active"));
       setStatus("ready");
     });
   }
@@ -230,11 +275,13 @@ function Inbox() {
       fetchVouchRequests().catch(() => []),
       fetchMyAsks().catch(() => []),
       fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, askRows, engagementRows]) => {
+      fetchProjects({ participation: "invited" }).catch(() => []),
+    ]).then(([vouchRows, askRows, engagementRows, projectRows]) => {
       if (!live) return;
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
       setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
       setEngagements(engagementRows.filter((e) => !e.proposedByYou));
+      setProjects(projectRows.filter((p) => p.status === "active"));
       setStatus("ready");
     });
     return () => {
@@ -261,11 +308,16 @@ function Inbox() {
   const counts = {
     vouches: status === "ready" ? vouches.length : vouchActionCount,
     connections: incoming.length,
-    answers: status === "ready" ? asks.length : askActionCount,
+    offers: status === "ready" ? asks.length : askActionCount,
     engagements: engagements.length,
+    projects: projects.length,
   };
   const total =
-    counts.vouches + counts.connections + counts.answers + counts.engagements;
+    counts.vouches +
+    counts.connections +
+    counts.offers +
+    counts.engagements +
+    counts.projects;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -299,12 +351,12 @@ function Inbox() {
           Connections
         </TabButton>
         <TabButton
-          active={tab === "answers"}
-          onClick={() => setTab("answers")}
-          count={counts.answers}
+          active={tab === "offers"}
+          onClick={() => setTab("offers")}
+          count={counts.offers}
           icon={ClipboardList}
         >
-          Answers
+          Offers
         </TabButton>
         <TabButton
           active={tab === "engagements"}
@@ -313,6 +365,19 @@ function Inbox() {
           icon={Briefcase}
         >
           Engagements
+        </TabButton>
+        {/* A fifth kind of work, not a fifth kind of news. An unanswered
+            project invite is a decision owed by this member, which is what
+            this screen and its one badge mean. Updates posted inside a project
+            are deliberately not here and notify nobody — see the fan-out note
+            in backend/src/lib/activityEvents.js. */}
+        <TabButton
+          active={tab === "projects"}
+          onClick={() => setTab("projects")}
+          count={counts.projects}
+          icon={FolderKanban}
+        >
+          Projects
         </TabButton>
       </div>
 
@@ -374,10 +439,25 @@ function Inbox() {
         </div>
       )}
 
-      {status === "ready" && tab === "answers" && (
+      {status === "ready" && tab === "projects" && (
+        <div className="mt-6 flex flex-col gap-4">
+          {projects.length === 0 ? (
+            <Empty>
+              No project invites waiting. When another business asks you onto a
+              piece of work, it lands here.
+            </Empty>
+          ) : (
+            projects.map((project) => (
+              <ProjectInviteCard key={project.id} project={project} />
+            ))
+          )}
+        </div>
+      )}
+
+      {status === "ready" && tab === "offers" && (
         <>
           {asks.length === 0 ? (
-            <Empty>No answers waiting on your decision.</Empty>
+            <Empty>No offers waiting on your decision.</Empty>
           ) : (
             <ul className="divide-y divide-border">
               {asks.map((ask) => (

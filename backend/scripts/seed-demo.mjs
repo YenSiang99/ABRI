@@ -51,11 +51,17 @@ const { hashPassword } = await import("../src/lib/password.js");
 const { normalizeSsm } = await import("../src/lib/businessLookup.js");
 const { CLAIMED, SSM_VERIFIED } = await import("../src/lib/verificationLevels.js");
 const { LEVEL_EVENT_LEVEL } = await import("../src/lib/networkEvents.js");
+const { PROJECT_INCLUDE, engagementRowsFor } = await import("../src/lib/projects.js");
 
 const DEMO_PASSWORD = "Demo1234!";
 
 const now = Date.now();
 const daysAgo = (n, hour = 10) => new Date(now - n * 86_400_000 + hour * 3_600_000);
+// First of the month, UTC — the precision Project.startedOn/completedOn and
+// Engagement.occurredOn all store, and the same flooring routes/projects.js
+// applies. Seeding a day-level date here would put demo rows in a shape the
+// product itself cannot produce.
+const monthFloor = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 
 // ── The roster ────────────────────────────────────────────────────────────
 //
@@ -180,6 +186,73 @@ const MEMBERS = [
     founding: false,
     claimedDaysAgo: 22,
     verifiedDaysAgo: 17,
+  },
+
+  // ── The everyday SMEs ───────────────────────────────────────────────────
+  //
+  // The buyers, and the reason the board below is readable. The ten above all
+  // sell professional services to each other, which made every seeded ask read
+  // "one firm you cannot picture needs another firm you cannot picture". A
+  // bakery needing an accountant is the transaction this network actually
+  // exists to carry, and until these rows existed it could not be seeded.
+  //
+  // They are L2 for a plain reason rather than a flattering one: posting an
+  // ask requires SSM verification (canPostAsks), so an unverified bakery is a
+  // bakery whose ask cannot appear on the board at all.
+  {
+    id: "roti-sawan-bakery",
+    person: "Siti Nadiah binti Osman",
+    email: "nadiah@rotisawan.my",
+    phone: "60127877441",
+    ssm: "201503018877",
+    tier: "plus",
+    founding: false,
+    claimedDaysAgo: 58,
+    verifiedDaysAgo: 54,
+  },
+  {
+    id: "kopi-lengkap-group",
+    person: "Chong Kar Wai",
+    email: "karwai@kopilengkap.my",
+    phone: "60321419080",
+    ssm: "201201009336",
+    tier: "pro",
+    founding: false,
+    claimedDaysAgo: 51,
+    verifiedDaysAgo: 46,
+  },
+  {
+    id: "hartaco-furniture",
+    person: "Rajesh Kumar Subramaniam",
+    email: "rajesh@hartaco.my",
+    phone: "60351228867",
+    ssm: "200601014028",
+    tier: "plus",
+    founding: false,
+    claimedDaysAgo: 44,
+    verifiedDaysAgo: 40,
+  },
+  {
+    id: "laju-logistics",
+    person: "Mohd Hafiz bin Zulkifli",
+    email: "hafiz@lajulogistics.my",
+    phone: "60355107788",
+    ssm: "201704021150",
+    tier: "free",
+    founding: false,
+    claimedDaysAgo: 37,
+    verifiedDaysAgo: 33,
+  },
+  {
+    id: "cetak-murni-press",
+    person: "Goh Mei Yee",
+    email: "meiyee@cetakmurni.my",
+    phone: "60380603321",
+    ssm: "201905012264",
+    tier: "free",
+    founding: false,
+    claimedDaysAgo: 29,
+    verifiedDaysAgo: 24,
   },
 ];
 
@@ -426,6 +499,226 @@ const ASKS = [
       { by: "sunway-legal-group", recommends: "klang-it-partners", accepted: true, comment: "Answering my own ask to record this — Klang IT Partners did our last rollout and were excellent. Putting it here so it's on the record for whoever searches next." },
     ],
   },
+
+  // ── The everyday SMEs asking ────────────────────────────────────────────
+  //
+  // PLAIN ON PURPOSE. The seven above are accurate and unreadable at a glance:
+  // "Company secretary for a three-entity group restructuring" is what the ask
+  // really says, and a person scanning the board cannot tell it apart from the
+  // next one without reading both. These say who is asking and what they need
+  // in the title — a bakery needs an accountant — which is what makes the
+  // board scannable rather than merely correct.
+  //
+  // It is also the honest shape of the demand side: an SME does not describe
+  // its problem in the supplier's vocabulary, and an asks board that only
+  // accepts the supplier's vocabulary is one SMEs will not post to.
+  {
+    id: "demo-ask-bakery-accountant",
+    by: "roti-sawan-bakery",
+    category: "Service requirement",
+    matchCategory: "Accounting & Tax",
+    matchLocation: "Petaling Jaya",
+    title: "Bakery with four outlets needs an accountant",
+    detail:
+      "We've outgrown doing the books ourselves. Four shops plus a central kitchen, about 30 staff, and we're behind on two years of filings. Need someone who has dealt with F&B — the stock and wastage side is where our last accountant got lost.",
+    daysAgo: 23,
+    answers: [
+      { by: "meridian-accounting", recommends: "meridian-accounting", accepted: true, comment: "We do the books for two restaurant groups and a central kitchen, so the wastage and stock questions are familiar. First thing is getting the two years of filings clean — we can quote that separately from the monthly work so you know what the catch-up costs." },
+      { by: "puchong-tax-advisory", recommends: "puchong-tax-advisory", comment: "Happy to take this on. We'd start with the outstanding filings before touching the monthly process, otherwise you're building on a mess." },
+      { by: "sentul-corp-services", recommends: "bangsar-south-accounting", comment: "Not our line, but Danial's team handles a few F&B clients and is good at the catch-up work." },
+    ],
+  },
+  {
+    id: "demo-ask-kopitiam-lawyer",
+    by: "kopi-lengkap-group",
+    category: "Service requirement",
+    matchCategory: "Law",
+    matchLocation: "Kuala Lumpur",
+    title: "Need a lawyer to look at our franchise agreement",
+    detail:
+      "Two people have asked to open outlets under our name and we don't have a franchise agreement — just a one-page letter our previous shop used. Want it done properly before we say yes to anyone.",
+    daysAgo: 16,
+    answers: [
+      { by: "bangsar-legal-partners", recommends: "bangsar-legal-partners", comment: "This is work we do regularly. The registration requirements under the Franchise Act catch most F&B operators out — worth understanding what you're committing to before the agreement is drafted, not after." },
+      { by: "sunway-legal-group", recommends: "sunway-legal-group", comment: "We've drafted three of these for F&B groups. Can share the structure we usually start from." },
+    ],
+  },
+  {
+    id: "demo-ask-furniture-delivery",
+    by: "hartaco-furniture",
+    category: "Supplier requirement",
+    matchCategory: "Logistics",
+    matchLocation: "Shah Alam",
+    title: "Furniture maker looking for a delivery partner",
+    detail:
+      "Roughly 40 deliveries a week around the Klang Valley, mostly bulky office furniture that needs two people and sometimes a lift booking. Our current arrangement is three lorry owners we call individually and it is falling apart.",
+    daysAgo: 12,
+    answers: [
+      { by: "laju-logistics", recommends: "laju-logistics", accepted: true, comment: "We run two-person crews for exactly this kind of load and can hold a fixed weekly slot. The lift bookings we handle ourselves — it's the part that causes most failed deliveries and it isn't really a transport problem." },
+    ],
+  },
+  {
+    id: "demo-ask-printer-cosec",
+    by: "cetak-murni-press",
+    category: "Service requirement",
+    matchCategory: "Corporate Secretarial",
+    matchLocation: "Puchong",
+    title: "Adding a business partner — need a company secretary",
+    detail:
+      "Bringing in someone who has been running the sales side for three years and wants equity. No idea what paperwork this actually needs. Looking for someone who will explain it in plain terms.",
+    daysAgo: 6,
+    answers: [
+      { by: "puchong-corp-sec-hub", recommends: "puchong-corp-sec-hub", comment: "Straightforward share allotment plus a shareholders agreement. We'd walk you through what each document does before anything is signed — it is not as complicated as it looks from outside." },
+      { by: "meridian-accounting", recommends: "usj-corp-sec-partners", comment: "Grace's team did this for a client of ours and were patient about explaining it. Worth a call." },
+    ],
+  },
+  {
+    id: "demo-ask-logistics-aircond",
+    by: "laju-logistics",
+    category: "Supplier requirement",
+    matchCategory: "Construction & Trades",
+    matchLocation: "Shah Alam",
+    title: "Warehouse aircond servicing contract",
+    detail:
+      "Two warehouses, twelve units between them, currently serviced whenever someone remembers. Want a proper maintenance contract with scheduled visits.",
+    daysAgo: 3,
+    answers: [],
+  },
+];
+
+// ── Projects, and the work record they mint ───────────────────────────────
+//
+// WITHOUT THESE, three screens are correct and look broken: /app/projects says
+// nobody is working with anybody, the "Worked with" panel on every profile is
+// empty, and the services a member claims all render as unbacked dashes — the
+// exact failure this whole file exists to prevent.
+//
+// THE COMPLETED ONES MINT, and they mint through the same function the route
+// does rather than through hand-written engagement rows. That is the point: if
+// engagementRowsFor ever changes what completion produces, this demo changes
+// with it, and a demo that can drift from the product is a demo that will.
+//
+// `provides` is per participant and is theirs — it is what they would have
+// declared at join. A pair where BOTH provide something mints two engagements,
+// which is why "Kopi Lengkap fit-out" produces more rows than it has people.
+const PROJECTS = [
+  {
+    id: "demo-proj-bakery-books",
+    title: "Getting Roti Sawan's books current",
+    detail:
+      "Two years of filings to catch up, then a monthly process the team can actually keep to. Split between the catch-up work and setting up the stock reporting.",
+    by: "roti-sawan-bakery",
+    askId: "demo-ask-bakery-accountant",
+    visibility: "public",
+    startedDaysAgo: 22,
+    completedDaysAgo: 4,
+    participants: [
+      { id: "roti-sawan-bakery", provides: null },
+      { id: "meridian-accounting", provides: "Bookkeeping" },
+    ],
+    updates: [
+      { by: "meridian-accounting", daysAgo: 20, body: "Got the box of receipts. FY24 is more complete than expected — starting there and working forward." },
+      { by: "roti-sawan-bakery", daysAgo: 14, body: "Central kitchen stock sheets are in the shared folder now. Sorry about the delay, two of the outlets were still on paper." },
+      { by: "meridian-accounting", daysAgo: 7, body: "FY24 and FY25 both filed. Moving to the monthly process — first pack goes out at the end of this month." },
+    ],
+  },
+  {
+    id: "demo-proj-kopi-fitout",
+    title: "Kopi Lengkap Bangsar outlet fit-out",
+    detail:
+      "New 60-seat outlet. Furniture, the launch campaign and the signage print all running to the same opening date.",
+    by: "kopi-lengkap-group",
+    visibility: "public",
+    startedDaysAgo: 96,
+    completedDaysAgo: 33,
+    participants: [
+      { id: "kopi-lengkap-group", provides: null },
+      { id: "hartaco-furniture", provides: "Furniture making" },
+      { id: "anggun-events", provides: null },
+      { id: "cetak-murni-press", provides: "Packaging & labelling" },
+    ],
+    updates: [
+      { by: "kopi-lengkap-group", daysAgo: 94, body: "Handover from the landlord is confirmed for the 14th. Everything keys off that date." },
+      { by: "hartaco-furniture", daysAgo: 72, body: "Counter and booth seating are in production. Tabletops need a finish decision by Friday or we lose the slot." },
+      { by: "kopi-lengkap-group", daysAgo: 70, body: "Going with the darker oak. Confirmed with the designer." },
+      { by: "cetak-murni-press", daysAgo: 48, body: "Menu boards and window vinyl delivered to site." },
+      { by: "hartaco-furniture", daysAgo: 40, body: "Install done. Two stools were short-shipped, replacements sent direct to the outlet." },
+    ],
+  },
+  {
+    id: "demo-proj-furniture-delivery",
+    title: "Weekly delivery route for Hartaco",
+    detail:
+      "Replacing three ad-hoc lorry arrangements with one fixed weekly slot, including lift bookings for the office deliveries.",
+    by: "hartaco-furniture",
+    askId: "demo-ask-furniture-delivery",
+    visibility: "private",
+    startedDaysAgo: 11,
+    completedDaysAgo: null,
+    participants: [
+      { id: "hartaco-furniture", provides: null },
+      { id: "laju-logistics", provides: "Last-mile delivery" },
+    ],
+    updates: [
+      { by: "laju-logistics", daysAgo: 10, body: "Ran the first Tuesday route. 14 drops, one failed on a lift booking we'll take over from next week." },
+      { by: "hartaco-furniture", daysAgo: 4, body: "Second week was clean. Happy to make this the standing arrangement." },
+    ],
+  },
+  {
+    id: "demo-proj-restructure",
+    title: "Three-entity group restructuring",
+    detail:
+      "Collapsing three operating companies into one holding structure ahead of a funding round. Cosec leads the sequencing, tax on the transfer treatment, legal on the shareholder side.",
+    by: "meridian-accounting",
+    askId: "demo-ask-restructure-cosec",
+    visibility: "public",
+    startedDaysAgo: 25,
+    completedDaysAgo: 2,
+    participants: [
+      { id: "meridian-accounting", provides: "Tax advisory" },
+      { id: "usj-corp-sec-partners", provides: "Corporate structuring" },
+      { id: "bangsar-legal-partners", provides: "Shareholder agreements" },
+    ],
+    updates: [
+      { by: "usj-corp-sec-partners", daysAgo: 24, body: "Draft sequencing circulated. The order the two dormant entities are wound matters for the transfer treatment — flagging for tax before anything is filed." },
+      { by: "meridian-accounting", daysAgo: 18, body: "Confirmed. If the dormant pair go first the transfer is clean; the other way round it is not. Sequencing as drafted." },
+      { by: "bangsar-legal-partners", daysAgo: 9, body: "Shareholders agreement executed. Nothing outstanding from our side." },
+    ],
+  },
+  {
+    id: "demo-proj-practice-cloud",
+    title: "Moving Bangsar Legal off the file server",
+    detail:
+      "On-premise to cloud for a 40-seat practice, with privilege obligations on where the data sits and who holds the keys.",
+    by: "bangsar-legal-partners",
+    askId: "demo-ask-cloud-migration",
+    visibility: "private",
+    startedDaysAgo: 13,
+    completedDaysAgo: null,
+    participants: [
+      { id: "bangsar-legal-partners", provides: null },
+      { id: "novatech-consulting", provides: "Cloud migration" },
+    ],
+    updates: [
+      { by: "novatech-consulting", daysAgo: 12, body: "Scoping done. Recommending a tenancy in the Singapore region with customer-managed keys — happy to put the reasoning in writing for your risk file." },
+    ],
+  },
+  // An INVITE that has not been answered, so /app/projects has something in
+  // its Invites tab and the Inbox badge has something to count.
+  {
+    id: "demo-proj-catering-books",
+    title: "Seri Murni — monthly bookkeeping",
+    detail: "Taking over the monthly books from April, plus the SST position on event catering.",
+    by: "bangsar-south-accounting",
+    visibility: "private",
+    startedDaysAgo: 2,
+    completedDaysAgo: null,
+    participants: [
+      { id: "bangsar-south-accounting", provides: "Bookkeeping" },
+      { id: "kopi-lengkap-group", provides: null, invitedOnly: true },
+    ],
+    updates: [],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -452,13 +745,18 @@ async function upsertAccount({ id, businessId, person, email, phone, hash, claim
 // second is not a demo of a feed. toVerificationLevel still comes from
 // LEVEL_EVENT_LEVEL rather than a literal, so this cannot disagree with the
 // visibility rule about what a business_claimed row means.
-async function upsertEvent({ id, type, subjectBusinessId, actorBusinessId = null, vouchId = null, askAnswerId = null, at }) {
+// NO askAnswerId. It was a column here until Sept 2026, carrying the
+// `recommendation_published` event that put an accepted answer on the named
+// business's profile; the feature and the column went together (see the
+// NetworkEvent comment in schema.prisma). This script kept passing it and has
+// been failing on every run since — the argument simply does not exist any
+// more, and Prisma rejects the whole upsert rather than ignoring it.
+async function upsertEvent({ id, type, subjectBusinessId, actorBusinessId = null, vouchId = null, at }) {
   const data = {
     type,
     subjectBusinessId,
     actorBusinessId,
     vouchId,
-    askAnswerId,
     toVerificationLevel: LEVEL_EVENT_LEVEL[type] ?? null,
     createdAt: at,
   };
@@ -703,6 +1001,89 @@ async function main() {
     }
   }
 
+  // ── Projects, participants, timeline, and the mint ──────────────────────
+  let mintedTotal = 0;
+  for (const p of PROJECTS) {
+    const startedOn = monthFloor(daysAgo(p.startedDaysAgo));
+    const completed = p.completedDaysAgo !== null && p.completedDaysAgo !== undefined;
+    const completedAt = completed ? daysAgo(p.completedDaysAgo) : null;
+    const header = {
+      title: p.title,
+      detail: p.detail ?? null,
+      createdById: p.by,
+      status: completed ? "completed" : "active",
+      visibility: p.visibility,
+      askId: p.askId ?? null,
+      startedOn,
+      completedOn: completed ? monthFloor(completedAt) : null,
+      createdAt: daysAgo(p.startedDaysAgo),
+      lastActionAt: completedAt ?? daysAgo(p.startedDaysAgo),
+      completedAt,
+      cancelledAt: null,
+    };
+    await prisma.project.upsert({ where: { id: p.id }, update: header, create: { id: p.id, ...header } });
+
+    for (const part of p.participants) {
+      const id = `${p.id}--${part.id}`;
+      const invited = Boolean(part.invitedOnly);
+      const data = {
+        projectId: p.id,
+        businessId: part.id,
+        // The creator joins their own project outright; everyone else was
+        // invited by them. Same shape POST /projects writes.
+        invitedById: p.by,
+        status: invited ? "invited" : "joined",
+        serviceProvided: part.provides ?? null,
+        invitedAt: daysAgo(p.startedDaysAgo),
+        joinedAt: invited ? null : daysAgo(p.startedDaysAgo - 1),
+        leftAt: null,
+      };
+      await prisma.projectParticipant.upsert({ where: { id }, update: data, create: { id, ...data } });
+    }
+
+    // The timeline, system rows included, so it reads the way a real one does
+    // rather than as a run of messages with no beginning.
+    const rows = [
+      { kind: "created", by: p.by, at: daysAgo(p.startedDaysAgo), body: null },
+      ...p.participants
+        .filter((part) => part.id !== p.by && !part.invitedOnly)
+        .map((part) => ({ kind: "joined", by: part.id, at: daysAgo(p.startedDaysAgo - 1), body: null })),
+      ...(p.updates ?? []).map((u) => ({ kind: "update", by: u.by, at: daysAgo(u.daysAgo), body: u.body })),
+      ...(completed ? [{ kind: "completed", by: p.by, at: completedAt, body: null }] : []),
+    ].sort((a, b) => a.at - b.at);
+
+    for (const [i, row] of rows.entries()) {
+      const id = `${p.id}-u${String(i + 1).padStart(2, "0")}`;
+      const data = {
+        projectId: p.id,
+        authorBusinessId: row.by,
+        type: row.kind,
+        body: row.body,
+        createdAt: row.at,
+      };
+      await prisma.projectUpdate.upsert({ where: { id }, update: data, create: { id, ...data } });
+    }
+
+    if (!completed) continue;
+
+    // THE MINT, through lib/projects.js rather than by hand. Writing the
+    // engagement rows here would be a second implementation of the rule that
+    // decides what a completed project produces, and the two would drift the
+    // first time either changed — with the demo being the one nobody notices
+    // is wrong. Deterministic ids so this stays idempotent, which createMany
+    // inside mintEngagementsFor cannot be.
+    const loaded = await prisma.project.findUnique({
+      where: { id: p.id },
+      include: PROJECT_INCLUDE,
+    });
+    const rowsToMint = engagementRowsFor(loaded, completedAt);
+    for (const [i, row] of rowsToMint.entries()) {
+      const id = `${p.id}-e${String(i + 1).padStart(2, "0")}`;
+      await prisma.engagement.upsert({ where: { id }, update: row, create: { id, ...row } });
+      mintedTotal += 1;
+    }
+  }
+
   const events = await prisma.networkEvent.count({ where: { id: { startsWith: "demo-ev-" } } });
   console.log(
     [
@@ -712,6 +1093,7 @@ async function main() {
       `  ${VOUCHES.length} published vouches`,
       `  ${CONNECTIONS.length} connections · ${FOLLOWS.length} follows`,
       `  ${ASKS.length} asks · ${answerCount} answers`,
+      `  ${PROJECTS.length} projects · ${mintedTotal} confirmed engagements minted`,
       `  ${events} feed events`,
       "",
       `  Log in as any owner with: ${DEMO_PASSWORD}`,

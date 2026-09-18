@@ -202,6 +202,19 @@ model Business {
   engagementsB        Engagement[] @relation("EngagementB")
   engagementsProposed Engagement[] @relation("EngagementProposer")
 
+  // A fourth engagement relation, and unlike the three above it is not about
+  // which end of the pair this business sits on — it is about which end
+  // DELIVERED the service. See Engagement.serviceProvidedById.
+  engagementsProvided Engagement[] @relation("EngagementServiceProvider")
+
+  // Projects. Four relations, and each one is a different question:
+  // which did I start, which am I in, which invites did I send, and what have
+  // I written on a timeline.
+  projectsCreated      Project[]            @relation("ProjectCreator")
+  projectParticipation ProjectParticipant[] @relation("ProjectParticipantBusiness")
+  projectInvitesSent   ProjectParticipant[] @relation("ProjectParticipantInviter")
+  projectUpdates       ProjectUpdate[]      @relation("ProjectUpdateAuthor")
+
   // Browse without being named. Off by default, and that default is the
   // feature working at all: a network where most members start invisible has
   // a viewers screen that says "someone" forever.
@@ -807,6 +820,27 @@ model Engagement {
   // contract a custom service has on a profile.
   service String?
 
+  // WHICH END DELIVERED the service above, and the column that stops one
+  // business being credited with the other's work.
+  //
+  // Without it, engagementSummaryFor credits `service` to BOTH ends of the
+  // pair, because the pair is stored unordered and nothing said who did what.
+  // A bakery that logged "SST advisory" against its accountant therefore
+  // carried "SST advisory" on its own public profile — a service it does not
+  // offer, on the one panel this product sells as unfakeable.
+  //
+  // NULL MEANS UNRECORDED, NOT "NEITHER", and that distinction is load-bearing
+  // rather than leniency: a null-provider row is credited to both ends, which
+  // is exactly the behaviour every row written before Sept 2026 has always
+  // had. Do not "tighten" that check — it would silently empty every profile
+  // the backfill could not speak for, with nothing in the logs.
+  //
+  // INVARIANT, enforced in lib/projects.js and routes/engagements.js and
+  // deliberately not expressible as a cheap DB constraint: this is always
+  // businessAId or businessBId, never a third business.
+  serviceProvidedById String?
+  serviceProvidedBy   Business? @relation("EngagementServiceProvider", fields: [serviceProvidedById], references: [id])
+
   // Free text, optional, and deliberately inert — never matched, never
   // aggregated, never searched. It exists so a reader can tell two engagements
   // for the same service apart.
@@ -823,6 +857,19 @@ model Engagement {
   askId String?
   ask   Ask?    @relation(fields: [askId], references: [id])
 
+  // The project that MINTED this row, when one did. Provenance, the same job
+  // askId does, and the thing that makes "a confirmed engagement has a paper
+  // trail behind it" checkable from this side rather than only from the
+  // project's.
+  //
+  // It earns its place for a second reason worth knowing: proposedById is
+  // meaningless on a minted row (nobody proposed it — a project completed),
+  // and serializeEngagement still emits `proposedByYou` from it. This column
+  // is what lets a reader branch on provenance instead of on a field that no
+  // longer means anything here.
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
   createdAt    DateTime  @default(now())
   // Bumped on every transition; drives the 14-day lazy expiry.
   lastActionAt DateTime  @default(now())
@@ -831,9 +878,20 @@ model Engagement {
   // NO @@unique ON THE PAIR — the one deliberate difference from Connection,
   // which allows exactly one edge per pair. Working together repeatedly is the
   // strongest thing this model can record, so each engagement is its own row.
+  //
+  // A completing project leans on this twice over: it mints over pairs that
+  // may already have an engagement (a real repeat, not a duplicate), and a
+  // pair where BOTH sides delivered a service gets two rows, because one row
+  // carries one service and one provider.
   @@index([businessAId, status])
   @@index([businessBId, status])
   @@index([proposedById])
+  // FK hygiene, the reason every other business key here carries one:
+  // Postgres does not index a foreign key for you, and the RESTRICT check on
+  // a Business delete is otherwise a sequential scan.
+  @@index([serviceProvidedById])
+  // FK hygiene, plus the teardown script's "everything this project minted".
+  @@index([projectId])
 }
 
 model NetworkEvent {
@@ -1197,7 +1255,14 @@ model Ask {
   answers     AskAnswer[]
   flags       AskFlag[]
   // Engagements that name this ask as where the work came from.
+  //
+  // Worth knowing which path actually writes them: until projects shipped,
+  // NONE did. The column was supported and validated server-side from the
+  // start and no screen ever sent it. A project carries the askId and copies
+  // it onto every row it mints, which is what finally closes this loop.
   engagements Engagement[]
+  // Projects started from this ask. The bridge the accept screen offers.
+  projects    Project[]
 
   // FK hygiene, the reason Connection carries @@index([requestedById]):
   // Postgres does not index a foreign key for you, and the RESTRICT check on
@@ -1361,4 +1426,236 @@ model AskFlag {
   // raisedByBusinessId) would not stop two ask-level reports from the same
   // business. The dedupe is a findFirst in the route.
   @@index([askId])
+}
+
+// A piece of work two or more businesses do together, and the thing that mints
+// the engagement record when it finishes.
+//
+// WHY THIS MODEL EXISTS. The product had intent (Ask) and outcome (Engagement)
+// and nothing in between. Accepting an ask answer settled the ask and offered
+// no next step at all; an engagement was a claim one business typed about
+// another, cheap to make and impossible to check. A project is the middle: a
+// shared surface with a visible history, whose completion writes the
+// engagements rather than asking someone to remember to.
+//
+// THE CONSENT ARGUMENT, because it is the whole reason auto-minting is
+// defensible. routes/engagements.js states that the proposer of an engagement
+// can never be the one who confirms it, "because an engagement a business can
+// confirm alone is a self-nomination with extra steps". Completing a project
+// writes CONFIRMED rows in one move, which looks like exactly that — and is
+// not, for one reason: nobody here is ever attributed a service they did not
+// personally declare. Each participant sets their own ProjectParticipant
+// .serviceProvided, correctable by them at join and editable only by them
+// afterwards. The completer asserts two things only — that it finished, and
+// which month. That, plus joining being a deliberate recorded act, is the same
+// agreement the confirm step was collecting, taken earlier and more explicitly.
+//
+// NOTHING HERE EXPIRES, and that is deliberate rather than unfinished. Every
+// other expiry in this codebase times out a row waiting on one named party to
+// make one decision (a vouch, an engagement proposal) or a public post with a
+// deadline its author can see (an ask). A project is ongoing work against no
+// deadline anyone agreed to. There is no cron, so expiry would mean sweeping
+// on read — and the sweep would have to choose between MINTING (turning "nobody
+// opened the page for a fortnight" into a public claim about three businesses)
+// and CANCELLING (destroying the record of work that is still happening).
+// Neither is defensible. A stale invite is already inert: it never mints.
+// Do not add an expiry here by analogy with the files that have one.
+model Project {
+  id String @id @default(cuid())
+
+  // One line, shown everywhere, and the only text that reaches a public
+  // shell. Same idiom and same reasoning as Ask.title.
+  title String
+
+  // The body, optional — and PRIVATE FOREVER. It never appears in
+  // publicProjectShell: this is prose participants wrote for each other while
+  // deciding what they were doing, not a description of finished work.
+  detail String?
+
+  createdById String
+  createdBy   Business @relation("ProjectCreator", fields: [createdById], references: [id])
+
+  // "active"    — running; the only status that accepts joins and updates
+  // "completed" — terminal, and the one transition that MINTS
+  // "cancelled" — terminal, and mints nothing
+  //
+  // String, not a Prisma enum — this schema has none. PROJECT_STATUSES in
+  // lib/projects.js is the only thing constraining it, the same role
+  // ASK_CATEGORIES plays in lib/asks.js.
+  status String @default("active")
+
+  // "private" | "public". Governs ONLY the shell — the summary that appears on
+  // each participant's profile when the project completes.
+  //
+  // IT DOES NOT GOVERN THE ENGAGEMENTS. Confirmed engagements are public on
+  // every plan and to anonymous visitors; that is Engagement's rule, not this
+  // column's, and a private project still puts real work on both profiles.
+  // What private withholds is the project itself: its title, its dates, and
+  // the fact that these particular businesses were in a room together.
+  //
+  // FROZEN ONCE TERMINAL (routes/projects.js). Flipping a published shell
+  // private would retract a public claim with no record of the retraction;
+  // flipping private -> public afterwards would publish work the participants
+  // agreed to keep quiet. Either direction is a decision somebody made once
+  // and cannot unmake, so the toggle lives only while the project is active.
+  visibility String @default("private")
+
+  // Optional provenance: the ask this came out of, copied onto every
+  // engagement this project mints. The only path in the product that ever
+  // populates Engagement.askId.
+  askId String?
+  ask   Ask?    @relation(fields: [askId], references: [id])
+
+  // Both month-floored UTC, the precision Engagement.occurredOn uses and for
+  // the same reason: nobody honestly remembers the day, and pretending
+  // otherwise invites arguments about it.
+  //
+  // completedOn IS the occurredOn every minted engagement gets — completion
+  // rather than start, because repeatSignalFor counts DISTINCT MONTHS per
+  // counterparty, so a six-month project has to claim one month or it would
+  // manufacture a repeat out of a single piece of work.
+  startedOn   DateTime
+  completedOn DateTime?
+
+  createdAt    DateTime  @default(now())
+  // Bumped by every write. The board's ordering key, and — since nothing here
+  // expires — the only thing that can surface a project everyone abandoned.
+  lastActionAt DateTime  @default(now())
+  // When the TRANSITION happened, as distinct from completedOn (when the work
+  // ended). The two differ whenever somebody records a project after the fact.
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+
+  participants ProjectParticipant[]
+  updates      ProjectUpdate[]
+  // The engagements this project minted. Empty until it completes.
+  engagements  Engagement[]
+
+  // FK hygiene, the reason Connection carries @@index([requestedById]):
+  // Postgres does not index a foreign key for you, and the RESTRICT check on
+  // a Business delete is otherwise a sequential scan. Doubles as "projects I
+  // started".
+  @@index([createdById])
+  // FK hygiene for the SET NULL, plus "projects that came out of this ask".
+  @@index([askId])
+  // The board's ordering, and the read any future "abandoned projects" admin
+  // screen would want.
+  @@index([status, lastActionAt])
+}
+
+// One business's place in one project, and the model that carries the consent
+// the whole feature rests on.
+model ProjectParticipant {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  businessId String
+  business   Business @relation("ProjectParticipantBusiness", fields: [businessId], references: [id])
+
+  // "invited"  — asked, hasn't answered. NEVER MINTED: they haven't agreed.
+  // "joined"   — in. THE ONLY STATUS THAT MINTS, and the consent record.
+  // "declined" — said no. Terminal, and PRIVATE: shown to the creator, told to
+  //              nobody, and it writes no timeline row and no activity event.
+  //              Same rule that keeps connection declines and unfollows
+  //              silent — "X turned you down" is a hostile notification the
+  //              reader can do nothing with.
+  // "left"     — joined, then withdrew. NOT MINTED: consent given and taken
+  //              back is not consent, and minting anyway would be the one
+  //              thing this model exists to prevent.
+  status String @default("invited")
+
+  // WHAT THIS BUSINESS DELIVERED, declared by THIS BUSINESS, from ITS OWN
+  // category's catalogue. Canonical only, validated on write against
+  // lib/serviceVocab.js — a custom service is deliberately unmatchable and
+  // would produce an engagement that appears in no aggregate.
+  //
+  // THE LOAD-BEARING COLUMN. It is set on the invite, correctable by the
+  // invitee at join, and editable afterwards only by them. That is what lets a
+  // project mint confirmed engagements without any business being credited
+  // with work it never claimed — see the consent note on Project above. A
+  // creator who could set this on somebody else's row would be writing a
+  // public claim about them, which is the forgeable signal the Connection
+  // model's accept step was added to stop.
+  //
+  // NULL MEANS TOOK PART, DELIVERED NO CATALOGUED SERVICE — the client on the
+  // job, or work that maps to no catalogue entry. Such a participant still
+  // gets engagements; they simply appear in no per-service aggregate, which is
+  // exactly the contract Engagement.service = null already has.
+  //
+  // THERE IS DELIBERATELY NO Project.service. A three-party project has two
+  // providers delivering two different services, and one column on the project
+  // could only name one of them — crediting the wrong business, which is the
+  // precise bug serviceProvidedById was added to fix.
+  serviceProvided String?
+
+  invitedById String
+  invitedBy   Business @relation("ProjectParticipantInviter", fields: [invitedById], references: [id])
+
+  invitedAt DateTime  @default(now())
+  joinedAt  DateTime?
+  leftAt    DateTime?
+
+  // One row per business per project, ever. Reused in place when somebody who
+  // declined or left is invited again — the same revival a cancelled Vouch and
+  // a withdrawn AskAnswer get, and what keeps this constraint meaning "ever"
+  // rather than "currently".
+  @@unique([projectId, businessId])
+  // The member's board, the pending-invite count and the public shell read all
+  // filter on exactly this pair. The unique above already leads with projectId,
+  // so that direction needs no index of its own.
+  @@index([businessId, status])
+  // FK hygiene.
+  @@index([invitedById])
+}
+
+// The project's timeline: system rows and the things participants wrote, in one
+// append-only table.
+//
+// One table rather than two because they share an ordering and a reader — the
+// timeline is the answer to "how was this handled", and splitting it would mean
+// merging two lists on every read to rebuild the only thing anyone wants.
+//
+// Modelled on VouchAction, and it keeps that model's rule: NO TEXT COLUMN HERE
+// IS EVER UPDATEd. An edit would insert; nothing overwrites. That is what makes
+// the trail worth reading — a history that can be rewritten is not a history.
+//
+// PRIVATE TO PARTICIPANTS UNDER EVERY VISIBILITY. publicProjectShell carries no
+// update of any kind. Project.visibility decides whether the SHELL is
+// published; it never opens the thread.
+model ProjectUpdate {
+  id String @id @default(cuid())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  // Null means nobody did it. On a system row this is the business the row is
+  // ABOUT — the joiner on "joined", the leaver on "left" — which is why one
+  // column does the work of two and there is no separate subject.
+  authorBusinessId String?
+  author           Business? @relation("ProjectUpdateAuthor", fields: [authorBusinessId], references: [id])
+
+  // "update"             — free text a participant wrote. The only kind with a body.
+  // "created" | "joined" | "left" | "visibility_changed" | "completed" | "cancelled"
+  //                      — system rows, body null.
+  //
+  // THERE IS NO "declined". A decline is private to the creator: writing it
+  // here would put "they turned you down" in front of everyone already in the
+  // project, which is a fact the decliner did not agree to publish and nobody
+  // can act on. See ProjectParticipant.status.
+  //
+  // Constrained by PROJECT_UPDATE_TYPES in lib/projects.js, which is also
+  // where "body is required on update and null otherwise" is enforced — a
+  // rule two nullable columns cannot express between them.
+  type String
+
+  body String?
+
+  createdAt DateTime @default(now())
+
+  // The timeline read, in its exact order. The only read this table gets.
+  @@index([projectId, createdAt])
+  // FK hygiene.
+  @@index([authorBusinessId])
 }

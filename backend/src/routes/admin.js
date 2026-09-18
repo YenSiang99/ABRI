@@ -752,9 +752,9 @@ router.post(
     }
 
     const ask = await prisma.ask.findUnique({ where: { id: req.params.id } });
-    if (!ask) return res.status(404).json({ error: "Ask not found." });
+    if (!ask) return res.status(404).json({ error: "Request not found." });
     if (ask.status !== "under_review") {
-      return res.status(400).json({ error: "This ask isn't under review." });
+      return res.status(400).json({ error: "This request isn't under review." });
     }
 
     const note = req.body?.note?.trim() || null;
@@ -811,9 +811,9 @@ router.post(
       where: { id: req.params.id },
       include: { ask: true },
     });
-    if (!answer) return res.status(404).json({ error: "Answer not found." });
+    if (!answer) return res.status(404).json({ error: "Offer not found." });
     if (answer.status !== "under_review") {
-      return res.status(400).json({ error: "This answer isn't under review." });
+      return res.status(400).json({ error: "This offer isn't under review." });
     }
 
     const note = req.body?.note?.trim() || null;

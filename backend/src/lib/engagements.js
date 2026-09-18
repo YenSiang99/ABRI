@@ -25,6 +25,10 @@ const ENGAGEMENT_INCLUDE = {
   businessA: { select: ENGAGEMENT_BUSINESS_SELECT },
   businessB: { select: ENGAGEMENT_BUSINESS_SELECT },
   ask: { select: { id: true, title: true } },
+  // Enough to link back to the project that minted this, and no more. The
+  // shell's participants and dates belong to the project's own read, not to
+  // every engagement row that mentions it.
+  project: { select: { id: true, title: true, visibility: true, status: true } },
 };
 
 function isExpired(engagement) {
@@ -80,11 +84,18 @@ function serializeEngagement(engagement, viewerBusinessId = null) {
     id: engagement.id,
     status: engagement.status,
     service: engagement.service,
+    // Which end delivered it, so the client can label the record instead of
+    // implying both sides do this work. Null means nobody recorded it.
+    serviceProvidedById: engagement.serviceProvidedById,
     note: engagement.note,
     occurredOn: engagement.occurredOn,
     createdAt: engagement.createdAt,
     confirmedAt: engagement.confirmedAt,
     ask: engagement.ask ?? null,
+    // Provenance. Set means a project minted this, which is also the flag that
+    // says `proposedByYou` below means nothing on this row — nobody proposed
+    // it, a project completed.
+    project: engagement.project ?? null,
     counterparty: viewerBusinessId ? counterparty : null,
     businessA: engagement.businessA,
     businessB: engagement.businessB,
@@ -203,12 +214,28 @@ async function engagementSummaryFor(businessId) {
       status: PUBLIC_STATUS,
       OR: [{ businessAId: businessId }, { businessBId: businessId }],
     },
-    select: { service: true, businessAId: true, businessBId: true, occurredOn: true },
+    select: {
+      service: true,
+      serviceProvidedById: true,
+      businessAId: true,
+      businessBId: true,
+      occurredOn: true,
+    },
   });
 
   const byService = new Map();
   for (const row of rows) {
     if (!row.service) continue;
+    // A SERVICE IS CREDITED TO WHOEVER DELIVERED IT, once anybody has said who
+    // that was. Before serviceProvidedById existed nothing asked, so both ends
+    // of the pair were credited — which put "SST advisory" on the public
+    // profile of a bakery whose only involvement was paying for it.
+    //
+    // A NULL PROVIDER IS CREDITED TO BOTH ENDS, and that is a RULE rather than
+    // leniency towards old rows. Do not "tighten" it: every row the backfill
+    // could not speak for would silently vanish from its own profile, with
+    // nothing failing and nothing in the logs. See the column comment.
+    if (row.serviceProvidedById && row.serviceProvidedById !== businessId) continue;
     const other = row.businessAId === businessId ? row.businessBId : row.businessAId;
     if (!byService.has(row.service)) {
       byService.set(row.service, { service: row.service, engagements: 0, counterparties: new Set() });

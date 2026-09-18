@@ -12,7 +12,7 @@ import { verificationLevelLabel } from "@/lib/trustLabels";
 import { toast } from "@/lib/toast";
 
 // The furniture the feed screen is built from, colocated exactly as
-// pages/app/asks/AskCard.jsx and pages/app/network/NetworkCard.jsx are, and
+// pages/app/requests/AskCard.jsx and pages/app/network/NetworkCard.jsx are, and
 // for the reason those files give: a section split across two files is how one
 // half drifts and nobody notices for a month.
 //

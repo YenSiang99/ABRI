@@ -1,7 +1,4 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 
 // The furniture the Asks screens share, mirroring
@@ -49,7 +46,7 @@ function MonoChip({ children }) {
 // its asker still has a decision to make. See routes/asks.js.
 function SlotsPill({ ask }) {
   if (ask.status !== "open") return null;
-  if (ask.slotsLeft === 0) return <Pill>Full — no more answers</Pill>;
+  if (ask.slotsLeft === 0) return <Pill>Full — no more offers</Pill>;
   return (
     <Pill muted={false}>
       {ask.slotsLeft} of {ask.maxAnswers} {ask.slotsLeft === 1 ? "slot" : "slots"} left
@@ -88,38 +85,89 @@ function Deadline({ ask, className }) {
   return <span className={className}>{text}</span>;
 }
 
-function AskListCard({ ask }) {
-  return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card p-5 transition-colors hover:border-foreground/20">
-      <div className="flex items-start justify-between gap-3">
+// How long ago, in the shortest honest words. Its own copy rather than the one
+// in FeedCard.jsx, for the reason that file states about PageHeader: sharing it
+// would mean the next change to one section silently restyled the other.
+function postedAgo(date) {
+  const ms = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return mins <= 1 ? "just now" : `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return days === 1 ? "yesterday" : `${days} days ago`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? "1 month ago" : `${months} months ago`;
+}
+
+function PostedAgo({ date, className }) {
+  return <span className={className}>{postedAgo(date)}</span>;
+}
+
+// ONE ROW IN THE LEFT COLUMN of the split board, shaped like a LinkedIn job
+// result: logo tile, title, who posted it, where and when, then a thin line of
+// metadata. It has to stay readable at 400px, which is what rules out the pill
+// row the old card carried — five chips wrap to three lines in this width and
+// the list stops being scannable, which is the only thing a list is for.
+//
+// A BUTTON ON DESKTOP, A LINK ON MOBILE, and that is not a style choice. On a
+// wide screen this selects into the pane beside it (?selected=), so it must
+// not navigate; below `lg` there is no pane to select into, so it goes to the
+// full page. Rendering both and hiding one with CSS is what keeps that honest
+// without the component having to measure the viewport.
+function AskRowCard({ ask, selected, onSelect }) {
+  const body = (
+    <>
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-base font-semibold text-background">
+          {ask.askedBy.name.charAt(0)}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold text-foreground">{ask.title}</div>
-          <div className="mt-0.5 truncate text-sm text-muted-foreground">
-            {ask.askedBy.name} · {ask.matchCategory} in {ask.matchLocation}
+          <div className="truncate text-[15px] font-semibold text-foreground">{ask.title}</div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">{ask.askedBy.name}</div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            {ask.matchLocation} · <PostedAgo date={ask.createdAt} />
           </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        <Pill>{ask.category}</Pill>
-        <MatchPill match={ask.matchStrength} />
-        <SlotsPill ask={ask} />
-        {ask.status === "answered" && <Pill>Answered</Pill>}
-        {ask.status === "under_review" && <Pill>On hold — reported</Pill>}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[52px] text-xs text-muted-foreground">
+        {ask.matchStrength === "service" && (
+          <span className="font-medium text-foreground">Matches your services</span>
+        )}
+        {ask.matchStrength === "exact" && (
+          <span className="font-medium text-foreground">Matches you</span>
+        )}
+        {ask.matchStrength === "category" && <span>Your line of work</span>}
+        <span>
+          {ask.answerCount} {ask.answerCount === 1 ? "offer" : "offers"}
+        </span>
+        {ask.status === "open" && <Deadline ask={ask} />}
+        {ask.status === "answered" && <span>Settled</span>}
+        {ask.status === "under_review" && <span>On hold — reported</span>}
       </div>
+    </>
+  );
 
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">
-        <Deadline ask={ask} className="text-xs text-muted-foreground" />
-        <Button
-          size="sm"
-          variant="outline"
-          render={<Link to={`/app/asks/${ask.id}`} state={{ from: "/app/asks", label: "Back to asks" }} />}
-          nativeButton={false}
-        >
-          Open <ArrowUpRight className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
+  const shell =
+    "w-full border-b border-border px-4 py-4 text-left transition-colors " +
+    (selected
+      ? "border-l-2 border-l-foreground bg-accent/10"
+      : "border-l-2 border-l-transparent hover:bg-accent/5");
+
+  return (
+    <>
+      <button type="button" onClick={onSelect} className={`hidden lg:block ${shell}`}>
+        {body}
+      </button>
+      <Link
+        to={`/app/requests/${ask.id}`}
+        state={{ from: "/app/requests", label: "Back to requests" }}
+        className={`block lg:hidden ${shell}`}
+      >
+        {body}
+      </Link>
+    </>
   );
 }
 
@@ -150,7 +198,7 @@ function AnswerCard({ answer, actions }) {
                 <span className="font-semibold">{answer.answeredBy.name}</span> suggested{" "}
                 <Link
                   to={`/app/business/${answer.recommended.id}`}
-                  state={{ from: "/app/asks", label: "Back to asks" }}
+                  state={{ from: "/app/requests", label: "Back to requests" }}
                   className="font-semibold underline underline-offset-2"
                 >
                   {answer.recommended.name}
@@ -195,7 +243,7 @@ function PageHeader({ title, children, action }) {
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Asks
+          Requests
         </div>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
           {title}
@@ -207,4 +255,16 @@ function PageHeader({ title, children, action }) {
   );
 }
 
-export { AskListCard, AnswerCard, Pill, MonoChip, SlotsPill, MatchPill, Deadline, Grid, Empty, PageHeader };
+export {
+  AskRowCard,
+  AnswerCard,
+  Pill,
+  MonoChip,
+  SlotsPill,
+  MatchPill,
+  Deadline,
+  PostedAgo,
+  Grid,
+  Empty,
+  PageHeader,
+};

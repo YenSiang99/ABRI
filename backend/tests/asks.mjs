@@ -1,5 +1,5 @@
 import assert from "node:assert";
-const API = "http://localhost:4000";
+import { API } from "./env.mjs";
 const P = "e2e-";
 let pass = 0;
 const ok = (m) => { console.log("  ✓", m); pass++; };

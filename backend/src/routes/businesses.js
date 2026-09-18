@@ -24,6 +24,7 @@ import { recordChecks } from "../lib/businessCheck.js";
 import { recordProfileView } from "../lib/profileView.js";
 import { verificationTimelineFor } from "../lib/verificationTimeline.js";
 import { confirmedEngagementsFor, engagementSummaryFor, serializeEngagement } from "../lib/engagements.js";
+import { publicProjectShellsFor } from "../lib/projects.js";
 import {
   LOOKUP_LIMIT,
   MIN_QUERY_LENGTH,
@@ -216,16 +217,29 @@ router.get(
           service: canonicalServiceFilter,
           OR: [{ businessAId: { in: candidateIds } }, { businessBId: { in: candidateIds } }],
         },
-        select: { businessAId: true, businessBId: true },
+        select: { businessAId: true, businessBId: true, serviceProvidedById: true },
       });
 
       // An engagement touches two businesses and only one of them is the
       // candidate for any given row — which end, depends on the id ordering
       // the pair is stored under, so both are checked.
+      //
+      // THE SECOND READER OF THE PROVIDER RULE. engagementSummaryFor is the
+      // first; this is the one members actually see, because it decides who
+      // ranks top of a service search. Without the same guard, a business that
+      // BOUGHT "SST advisory" outranks the firm that delivered it — the
+      // credited-to-both-ends bug at its most visible. A null provider still
+      // counts for both ends, exactly as it does there, and for the same
+      // reason: those rows never recorded who did the work.
       const counterparties = new Map(candidateIds.map((id) => [id, new Set()]));
       for (const e of engagements) {
-        if (counterparties.has(e.businessAId)) counterparties.get(e.businessAId).add(e.businessBId);
-        if (counterparties.has(e.businessBId)) counterparties.get(e.businessBId).add(e.businessAId);
+        const provider = e.serviceProvidedById;
+        if (counterparties.has(e.businessAId) && (!provider || provider === e.businessAId)) {
+          counterparties.get(e.businessAId).add(e.businessBId);
+        }
+        if (counterparties.has(e.businessBId) && (!provider || provider === e.businessBId)) {
+          counterparties.get(e.businessBId).add(e.businessAId);
+        }
       }
       confirmedByBusiness = new Map(
         [...counterparties].map(([id, set]) => [id, set.size]),
@@ -597,9 +611,15 @@ router.get(
     // on; gating it would mean selling the ability to find out who a business
     // has actually worked with, which is the question this product exists to
     // answer. Confirmed only — see the status comment on the model.
-    const [engagementRows, engagementSummary] = await Promise.all([
+    //
+    // Projects ride alongside on the same terms, with one extra condition the
+    // engagements do not have: the project must be `public`. That is the whole
+    // difference the visibility column buys — the work is public either way,
+    // the fact that these particular businesses were in a room together is not.
+    const [engagementRows, engagementSummary, projects] = await Promise.all([
       confirmedEngagementsFor(business.id),
       engagementSummaryFor(business.id),
+      publicProjectShellsFor(prisma, business.id),
     ]);
 
     // Flatten the live revision's text onto each vouch as `testimonial`.
@@ -620,6 +640,7 @@ router.get(
         // sees both ends named and works out for themselves which is which.
         engagements: engagementRows.map((e) => serializeEngagement(e, null)),
         engagementSummary,
+        projects,
         testimonialsLocked: !showTestimonials,
         // Withheld the same way testimonials are — the keys are absent, not
         // null, so there is no masked value on the wire to un-mask.

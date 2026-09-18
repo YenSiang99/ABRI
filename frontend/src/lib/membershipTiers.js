@@ -248,7 +248,7 @@ const MEMBERSHIP_TIER_FEATURES = [
   // would have been worse than four strings: a tick reads as "included on
   // Free", which over-promises to a member who isn't verified yet.
   {
-    label: "Asks board — post and answer",
+    label: "Requests board — post and offer",
     free: "SSM-verified",
     plus: "SSM-verified",
     pro: "SSM-verified",
@@ -261,7 +261,7 @@ const MEMBERSHIP_TIER_FEATURES = [
   //
   // Pro's first row in this table that isn't a promise.
   {
-    label: "Told when an ask matches you",
+    label: "Told when a request matches you",
     free: false,
     plus: false,
     pro: true,

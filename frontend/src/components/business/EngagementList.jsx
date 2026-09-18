@@ -67,17 +67,27 @@ function periodFor(entries) {
 // The services touched by one group, deduplicated and in the order they were
 // worked. Rendered on its own line under the dates with a small mark beside
 // it, the way a skills line sits under a role.
-function servicesFor(entries) {
+//
+// ONLY THE SERVICES THIS BUSINESS DELIVERED. An engagement row is shared by
+// both ends, and its service describes the work one of them did — so without
+// `businessId` this line credited a bakery with the "SST advisory" it had
+// bought from its accountant. Mirrors the same rule in
+// backend/src/lib/engagements.js, including the fallback: a row with NO
+// recorded provider predates that column and is shown to both ends, exactly as
+// it always has been.
+function servicesFor(entries, businessId) {
   const seen = [];
   for (const e of entries) {
-    if (e.service && !seen.includes(e.service)) seen.push(e.service);
+    if (!e.service || seen.includes(e.service)) continue;
+    if (businessId && e.serviceProvidedById && e.serviceProvidedById !== businessId) continue;
+    seen.push(e.service);
   }
   return seen;
 }
 
-function EngagementGroup({ group }) {
+function EngagementGroup({ group, businessId }) {
   const { business, entries } = group;
-  const services = servicesFor(entries);
+  const services = servicesFor(entries, businessId);
   const count = entries.length;
   // Notes belong to single engagements, so only show one when the group holds
   // a single engagement — attributing one row's note to a group of four would
@@ -172,7 +182,11 @@ function RepeatSignal({ repeatCounterparties, owner = false }) {
 // The list itself. `businessName` is only needed on the public profile, where
 // the server sends both ends and no resolved counterparty; the owner's view
 // passes rows that already carry one.
-function EngagementList({ entries, businessName, limit = 5, className = "" }) {
+//
+// `businessId` is separate from it and is needed on BOTH views: grouping is by
+// name because that is what a public row gives us, but service CREDIT is by id,
+// because names are not what the provider column stores. See servicesFor.
+function EngagementList({ entries, businessName, businessId, limit = 5, className = "" }) {
   const groups = groupByCounterparty(entries, businessName);
   const shown = limit ? groups.slice(0, limit) : groups;
   const rest = groups.length - shown.length;
@@ -184,7 +198,7 @@ function EngagementList({ entries, businessName, limit = 5, className = "" }) {
           section uses to say so. */}
       <ul className="divide-y divide-grey-200 dark:divide-border">
         {shown.map((group) => (
-          <EngagementGroup key={group.business.id} group={group} />
+          <EngagementGroup key={group.business.id} group={group} businessId={businessId} />
         ))}
       </ul>
       {rest > 0 && (

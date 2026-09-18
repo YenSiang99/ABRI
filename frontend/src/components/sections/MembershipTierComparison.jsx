@@ -134,8 +134,8 @@ function TierCard({ tier }) {
               <span>
                 <span className="text-ink dark:text-foreground">{f.label}</span>
                 {/* A colon, not a dash: two labels already contain an em dash
-                    ("Asks board — post and answer"), and a second one produced
-                    "post and answer — SSM-verified", which reads as a third
+                    ("Requests board — post and offer"), and a second one produced
+                    "post and offer — SSM-verified", which reads as a third
                     clause rather than as the value. */}
                 {f.detail && <span className="text-grey-600 dark:text-muted-foreground">: {f.detail}</span>}
               </span>

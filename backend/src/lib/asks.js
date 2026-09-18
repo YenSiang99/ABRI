@@ -133,6 +133,23 @@ const ASK_DETAIL_INCLUDE = {
     },
     orderBy: { createdAt: "asc" },
   },
+  // The projects this ask produced, so the detail screen can say so.
+  //
+  // WITHOUT THIS THE BRIDGE IS ONE-WAY. Accepting an answer offers "Start a
+  // project", the project records which ask it came from — and the ask had no
+  // idea. A member who started one, navigated away and came back saw the same
+  // "Start a project" button, no sign anything existed, and no route to it;
+  // the reasonable next move is to press it again, which is how one ask ends
+  // up with three identical projects.
+  //
+  // Participants are included because serializeAsk has to FILTER on them: a
+  // project is private by default, and an ask is readable by every member, so
+  // listing every project spawned from one would tell the whole board which
+  // businesses are working together. Only the viewer's own are ever exposed.
+  projects: {
+    include: { participants: { select: { businessId: true, status: true } } },
+    orderBy: { createdAt: "desc" },
+  },
 };
 
 // How strongly an ask is addressed to a given business.
@@ -272,6 +289,25 @@ function serializeAsk(ask, viewerBusiness) {
     matchStrength: viewerBusiness && !askedByYou ? matchStrengthFor(ask, viewerBusiness) : null,
     yourAnswerStatus: yourAnswer?.status ?? null,
     ...(ask.answers ? { answers: ask.answers.map(serializeAnswer) } : {}),
+    // YOUR projects from this ask, and only yours. The filter is the privacy
+    // rule, not a convenience: a project is private unless completed AND
+    // published, while an ask is readable by every member — so exposing all of
+    // an ask's projects would announce which businesses are working together
+    // to anyone who opens the board. A viewer who is on the project already
+    // knows it exists.
+    ...(ask.projects
+      ? {
+          yourProjects: ask.projects
+            .filter((p) =>
+              viewerBusiness
+                ? p.participants.some(
+                    (x) => x.businessId === viewerBusiness.id && x.status !== "declined",
+                  )
+                : false,
+            )
+            .map((p) => ({ id: p.id, title: p.title, status: p.status })),
+        }
+      : {}),
   };
 }
 

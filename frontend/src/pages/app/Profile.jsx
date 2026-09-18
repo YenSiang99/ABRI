@@ -13,6 +13,7 @@ import {
   EngagementList,
   RepeatSignal,
 } from "@/components/business/EngagementList";
+import { ProjectShellList } from "@/components/business/ProjectShellList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -395,7 +396,12 @@ function OwnEngagements({ business, onChanged }) {
           they confirm it, it shows on both your profiles.
         </p>
       ) : (
-        <EngagementList entries={entries} limit={6} className="mt-4" />
+        <EngagementList
+          entries={entries}
+          businessId={business.id}
+          limit={6}
+          className="mt-4"
+        />
       )}
 
       {claimed.length > 0 && (
@@ -920,6 +926,10 @@ function Profile() {
               owner can see which of their claimed services anybody has stood
               behind. */}
           <OwnEngagements business={business} onChanged={refreshAccount} />
+        {/* The same component the public profile uses, so "this is what
+            visitors see" stays true. Only completed PUBLIC projects are in
+            this payload — the private ones live on /app/projects. */}
+        <ProjectShellList projects={business.projects} className="mt-6" />
 
           {/* contactLocked false: this is the owner's own view, which is
               never gated. The upsell below is what tells them the public

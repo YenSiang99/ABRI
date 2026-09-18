@@ -17,6 +17,21 @@ const BUSINESS_CATEGORIES = [
   // See the backend copy for why this fifth one exists: a member had already
   // registered under it before the vocabularies gated new writes.
   "Design",
+  // The everyday SMEs — the businesses that BUY the five above. See the
+  // backend copy for the argument; the short version is that a directory of
+  // only professional-services firms is one where everybody sells the same
+  // thing to nobody, and "a bakery needs an accountant" is the most common
+  // real transaction in the corridor.
+  "Food & Beverage",
+  "Retail",
+  "Manufacturing",
+  "Construction & Trades",
+  "Logistics",
+  "Property",
+  "Education",
+  "Health & Wellness",
+  "Marketing & Media",
+  "Professional Training",
 ];
 
 const BUSINESS_LOCATIONS = [

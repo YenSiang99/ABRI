@@ -36,6 +36,37 @@ const BUSINESS_CATEGORIES = [
   // this is a fifth the network already contains, not a widening of it. The
   // value matches the stored column exactly, so no migration was needed.
   "Design",
+  // ── The everyday SMEs, added Sept 2026 ────────────────────────────────
+  //
+  // THE FIVE ABOVE ARE SUPPLIERS OF PROFESSIONAL SERVICES; THESE ARE THE ONES
+  // WHO BUY THEM, and the network does not work without both halves. A
+  // directory holding only accountants, lawyers and company secretaries is a
+  // directory where everybody sells the same thing to nobody — every ask reads
+  // "professional-services firm needs professional-services firm", and the
+  // most common real transaction in the corridor (a bakery needs an
+  // accountant) cannot be expressed at all.
+  //
+  // This does NOT widen the go-to-market. The blueprint's corridor focus is
+  // about where the PAID members come from, and that is still the five above:
+  // an accountant sells to many SMEs, so the supply side is where density and
+  // revenue are. What these add is the demand side that makes the asks board
+  // mean something.
+  //
+  // Widening a closed list is the SAFE direction, the same argument
+  // serviceVocab.js makes about growing its catalogue: adding a value can only
+  // turn a business that was unregisterable into one that matches. Removing
+  // one is the dangerous direction — it silently orphans every row that held
+  // it — so prefer leaving a retired category in place.
+  "Food & Beverage",
+  "Retail",
+  "Manufacturing",
+  "Construction & Trades",
+  "Logistics",
+  "Property",
+  "Education",
+  "Health & Wellness",
+  "Marketing & Media",
+  "Professional Training",
 ];
 
 // The six localities the seeded corridor covers.

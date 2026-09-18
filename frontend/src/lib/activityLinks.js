@@ -29,6 +29,23 @@ const ENGAGEMENT_TYPES = new Set([
   "engagement_expired",
 ]);
 
+// Project events. ActivityEvent carries no subject id (see the note at the top
+// of this file), so none of these can deep-link to the project they are about —
+// they land on the board, which is the same limitation every type here has.
+//
+// `project_invited` is the only one that is WORK, and it goes to the tab that
+// can clear it. The other three name something already settled.
+//
+// There is deliberately no entry for a posted update, because no such event is
+// ever written: an n-1 fan-out per message would flush a member's fifty-row
+// activity cap. See backend/src/lib/activityEvents.js.
+const PROJECT_INVITE_TYPES = new Set(["project_invited"]);
+const PROJECT_SETTLED_TYPES = new Set([
+  "project_joined",
+  "project_completed",
+  "project_cancelled",
+]);
+
 // Connection events that name something already SETTLED. Both land on the
 // actor's profile, because the message names them and there is nothing left
 // to do about it. `connection_requested` is deliberately not in here — a
@@ -78,10 +95,13 @@ function activityLink(event) {
   // button themselves, which is the trip this link exists to save.
   if (event.type === "connection_requested") return "/app/network/requests";
 
-  if (ASK_ASKER_TYPES.has(event.type)) return "/app/asks?tab=mine";
-  if (ASK_ANSWERER_TYPES.has(event.type)) return "/app/asks?tab=answered";
+  if (ASK_ASKER_TYPES.has(event.type)) return "/app/requests?tab=mine";
+  if (ASK_ANSWERER_TYPES.has(event.type)) return "/app/requests?tab=offers";
 
   if (ENGAGEMENT_TYPES.has(event.type)) return "/app/inbox?tab=engagements";
+
+  if (PROJECT_INVITE_TYPES.has(event.type)) return "/app/inbox?tab=projects";
+  if (PROJECT_SETTLED_TYPES.has(event.type)) return "/app/projects";
 
   if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
 

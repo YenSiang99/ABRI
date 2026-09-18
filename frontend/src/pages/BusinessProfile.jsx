@@ -23,6 +23,7 @@ import {
   EngagementList,
   RepeatSignal,
 } from "@/components/business/EngagementList";
+import { ProjectShellList } from "@/components/business/ProjectShellList";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
@@ -72,7 +73,7 @@ function VouchCard({ vouch }) {
 // These rows say two businesses worked together on a date. Whether the work
 // was any good is what a vouch is for, and conflating them would let the
 // cheaper artifact borrow the dearer one's meaning.
-function EngagementRecord({ entries, summary, businessName }) {
+function EngagementRecord({ entries, summary, businessName, businessId }) {
   if (!entries || entries.length === 0) return null;
 
   const top = summary?.services?.slice(0, 3) ?? [];
@@ -111,6 +112,7 @@ function EngagementRecord({ entries, summary, businessName }) {
       <EngagementList
         entries={entries}
         businessName={businessName}
+        businessId={businessId}
         className="mt-4 border-t border-grey-200 pt-4 dark:border-border"
       />
     </div>
@@ -592,7 +594,13 @@ function BusinessProfile({ inApp = false }) {
               entries={business.engagements}
               summary={business.engagementSummary}
               businessName={business.name}
+              businessId={business.id}
             />
+            {/* Directly beneath the engagements it explains. A project is the
+                paper trail behind a confirmed engagement — the reason the
+                record above is more than an assertion — so it reads as a
+                footnote to that panel rather than as a tab of its own. */}
+            <ProjectShellList projects={business.projects} />
             {/* No tier lock of its own here. On T0 this whole tab isn't
                 rendered (the unclaimed panel replaces it), and on T1 the
                 plan gate already covers it via reason "owner_plan". The
