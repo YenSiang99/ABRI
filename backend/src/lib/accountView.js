@@ -7,6 +7,7 @@ import {
   portfolioSummaryFor,
   serializePortfolioEntry,
 } from "./portfolio.js";
+import { verificationTimelineFor } from "./verificationTimeline.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
 // the frontend expects: vouchCount/vouchLevel derived at read time (never
@@ -242,9 +243,20 @@ async function loadAccountView(accountId) {
   // Confirmed only, matching what GET /businesses/:id shows. An owner's page
   // that counted rows no visitor can see would tell them their profile carries
   // proof it does not.
-  const [portfolioRows, portfolioSummary] = await Promise.all([
+  // The verification record rides along on the same terms as the portfolio,
+  // and it is here for a reason worth stating: until now the owner was the one
+  // person who could NOT see it. It has always been on the public profile, so
+  // a counterparty could read "SSM verification revoked, August" while the
+  // member whose profile it is had no surface that showed it — they would find
+  // out from whoever had already read it.
+  //
+  // Same function the public route calls, so there is no owner-only variant of
+  // this history. See lib/verificationTimeline.js: it deliberately keeps the
+  // rows the feed drops, which is the half that can be unflattering.
+  const [portfolioRows, portfolioSummary, verificationTimeline] = await Promise.all([
     confirmedPortfolioFor(business.id),
     portfolioSummaryFor(business.id),
+    verificationTimelineFor(prisma, business),
   ]);
 
   return {
@@ -253,6 +265,7 @@ async function loadAccountView(accountId) {
       ...serializeBusiness(business),
       entries: portfolioRows.map((e) => serializePortfolioEntry(e, business.id)),
       portfolioSummary,
+      verificationTimeline,
     },
   };
 }

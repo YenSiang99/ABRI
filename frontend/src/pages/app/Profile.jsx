@@ -12,6 +12,7 @@ import {
 import {
   PortfolioList,
 } from "@/components/business/PortfolioList";
+import { VerificationTimeline } from "@/components/business/VerificationTimeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -923,6 +924,13 @@ function Profile() {
               owner can see which of their claimed services anybody has stood
               behind. */}
           <OwnPortfolio business={business} onChanged={refreshAccount} />
+
+          {/* The same panel a visitor reads, and the owner's copy of it. It
+              has been on the public profile since the timeline shipped; this
+              is the first surface that shows it to the business whose record
+              it is. Renders nothing for an unclaimed or event-less business,
+              so a new member sees no empty box. */}
+          <VerificationTimeline entries={business.verificationTimeline} />
 
           {/* contactLocked false: this is the owner's own view, which is
               never gated. The upsell below is what tells them the public

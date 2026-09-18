@@ -284,9 +284,17 @@ const PENDING_SSM = [
   },
 ];
 
-// Claimed, but hasn't submitted a number yet — the state between L1 and the
+// Claimed, but no verification standing today — the state between L1 and the
 // review queue, and the one that shows the "Get verified" prompt with nothing
 // pending behind it.
+//
+// `lost` IS THE WHOLE POINT OF THE VERIFICATION RECORD, and without one seeded
+// row carrying it the panel demos as a list of good news. A business that was
+// SSM-verified and had it revoked is the only thing on a profile that can say
+// something unflattering, and it is the reason the timeline reads NetworkEvent
+// without the feed's visibility filter. Both of these businesses sit at L1
+// today; the difference is that one of them used to be higher, and a
+// counterparty can only find that out here.
 const CLAIMED_ONLY = [
   {
     id: "cheras-accounting-hub",
@@ -294,6 +302,18 @@ const CLAIMED_ONLY = [
     email: "hafiz@cherasaccountinghub.my",
     phone: "60194402277",
     claimedDaysAgo: 12,
+  },
+  {
+    id: "damansara-law-chambers",
+    person: "Tan Mei Fong",
+    email: "meifong@damansaralaw.my",
+    phone: "60377268841",
+    claimedDaysAgo: 140,
+    // Verified, then revoked. stillInForce() compares the level each row
+    // ANNOUNCES against the level held now, so the business_verified row below
+    // renders struck through and labelled "no longer in force" — the state the
+    // component was written for and that nothing seeded could reach until now.
+    lost: { verifiedDaysAgo: 132, revokedDaysAgo: 26 },
   },
 ];
 
@@ -711,6 +731,23 @@ async function main() {
       subjectBusinessId: c.id,
       at: daysAgo(c.claimedDaysAgo),
     });
+    // The two rows that make a revocation legible: the grant it reverses has
+    // to be there too, or the record says something was taken away that was
+    // never given.
+    if (c.lost) {
+      await upsertEvent({
+        id: `demo-ev-verify-${c.id}`,
+        type: "business_verified",
+        subjectBusinessId: c.id,
+        at: daysAgo(c.lost.verifiedDaysAgo),
+      });
+      await upsertEvent({
+        id: `demo-ev-revoke-${c.id}`,
+        type: "business_verification_revoked",
+        subjectBusinessId: c.id,
+        at: daysAgo(c.lost.revokedDaysAgo),
+      });
+    }
   }
 
   // ── Vouches ─────────────────────────────────────────────────────────────
