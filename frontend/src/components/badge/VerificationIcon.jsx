@@ -4,7 +4,7 @@
 //
 // The prop is `mark`, not `level`, because it was called `tier` until Aug 2026
 // — which made it a FIFTH unrelated meaning of that word, alongside the
-// verification level, the membership tier, the vouch ladder and the asks
+// verification level, the membership tier and the vouch
 // board's match strength. Splitting it out is what let the other four become
 // unambiguous.
 //

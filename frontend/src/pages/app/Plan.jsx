@@ -121,10 +121,10 @@ function TierCard({ tier, currentTier }) {
               <Check className="mt-px h-3.5 w-3.5 flex-none text-foreground" aria-hidden />
               <span>
                 <span className="text-foreground">{f.label}</span>
-                {/* A colon, not a dash. Two of these labels already contain
-                    an em dash ("Asks board — post and answer"), and joining
-                    with another one produced "post and answer — SSM-verified",
-                    which reads as a third clause rather than as the value. */}
+                {/* A colon, not a dash. A label can already contain an em
+                    dash ("Check a business — by name, SSM number or website"),
+                    and joining with another one reads as a third clause
+                    rather than as the value. */}
                 {f.detail && <span className="text-muted-foreground">: {f.detail}</span>}
               </span>
             </li>

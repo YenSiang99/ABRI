@@ -12,7 +12,7 @@ import { verificationLevelLabel } from "@/lib/trustLabels";
 import { toast } from "@/lib/toast";
 
 // The furniture the feed screen is built from, colocated exactly as
-// pages/app/asks/AskCard.jsx and pages/app/network/NetworkCard.jsx are, and
+// pages/app/network/NetworkCard.jsx is, and
 // for the reason those files give: a section split across two files is how one
 // half drifts and nobody notices for a month.
 //
@@ -176,7 +176,7 @@ function FeedActions({ event, onVouch }) {
         (awaitingVerification ? (
           // A VERIFICATION gate, so no upgrade prompt: there is no plan that
           // opens this door. Disabled rather than hidden, with the free next
-          // step named — the same treatment "Post an ask" gets on the asks
+          // step named — the same treatment other empty states get on the
           // board, and the same order the server checks in POST /vouches.
           <Button size="sm" variant="outline" disabled title="Vouching unlocks once you're SSM-verified">
             Vouch
@@ -255,8 +255,8 @@ function Empty({ icon: Icon, children }) {
   );
 }
 
-// Its own copy rather than the one exported from AskCard.jsx, which hardcodes
-// "Asks" as its eyebrow. Same reason ASK_BUSINESS_SELECT is copied rather than
+// Its own copy rather than a shared one, so a card elsewhere cannot change
+// what the feed renders. Same reason ENGAGEMENT_BUSINESS_SELECT is copied rather than
 // imported on the server: sharing it would mean the next change to one
 // section's header silently restyled the other's.
 function PageHeader({ title, eyebrow, children }) {

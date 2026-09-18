@@ -52,7 +52,7 @@ await db.business.update({ where: { id: `${P}target` }, data: {
 await db.business.update({ where: { id: `${P}a4` }, data: {
   ssm: "E2E1234567-A", ssmNormalized: "E2E1234567A", domain: null, website: null } });
 
-const member = await login(`${P}asker@e2e.test`);
+const member = await login(`${P}primary@e2e.test`);
 
 // Wait out any anonymous rate-limit budget this file spent on a previous run.
 //

@@ -75,8 +75,8 @@ const MEMBERSHIP_TIER_FEATURES = [
   // direction: the table is usually accused of promising more than the
   // product has, and here it was quietly delivering more than it sold.
   //
-  // The first two are true in all four columns ON PURPOSE, the same way the
-  // asks row is. Checking a business is open to everyone including logged-out
+  // The first two are true in all four columns ON PURPOSE. Checking a
+  // business is open to everyone including logged-out
   // visitors — an invite that cannot be verified without joining is
   // self-defeating — and the feed is open to every member. Four ticks says
   // "not gated", which is a thing worth saying on a pricing page.
@@ -237,36 +237,6 @@ const MEMBERSHIP_TIER_FEATURES = [
     pro: "Top",
     enterprise: "Top",
   },
-  // ENFORCED — by VERIFICATION, not by plan, and the only row in this table
-  // that says so. Posting an ask needs T2 (SSM-verified), which no plan can
-  // buy (§6: "verification cannot be bought"); answering needs nothing at all.
-  // Every cell is therefore the same, and the row exists to say that out loud.
-  //
-  // The version this replaced read "Post + reply" under Pro alone, which
-  // promised a paywall this feature deliberately doesn't have, and "Private"
-  // under Enterprise, which described an unbuilt white-label item. Four ticks
-  // would have been worse than four strings: a tick reads as "included on
-  // Free", which over-promises to a member who isn't verified yet.
-  {
-    label: "Asks board — post and answer",
-    free: "SSM-verified",
-    plus: "SSM-verified",
-    pro: "SSM-verified",
-    enterprise: "SSM-verified",
-  },
-  // ENFORCED, by `askAlerts` in backend/src/lib/entitlements.js — GET
-  // /asks/alerts answers 402 below Pro. What Pro buys is being TOLD an ask
-  // matches what you do, not the ability to act on one: the same asks are on
-  // the board for everyone, one filter away. Push versus pull.
-  //
-  // Pro's first row in this table that isn't a promise.
-  {
-    label: "Told when an ask matches you",
-    free: false,
-    plus: false,
-    pro: true,
-    enterprise: true,
-  },
   // Nothing behind this yet — no route, no screen, no data. It used to read
   // "Referral tracker + introductions"; the introductions half was removed
   // in Aug 2026 (the screen was mock data end to end) and the referral
@@ -308,9 +278,9 @@ const MEMBERSHIP_TIER_FEATURES = [
 //   quantities — appear on every tier that raises them ("20 / mo" then
 //                "40 / mo"), and drop off where they don't ("Top" under Pro
 //                stays "Top" under Enterprise, so Enterprise doesn't claim it).
-//   constants  — never appear as a delta at all. The asks row is the same
-//                string in all four columns on purpose (verification gates it,
-//                not billing), so no card can imply you're buying it.
+//   constants  — never appear as a delta at all: a row with the same string
+//                in all four columns describes something billing does not
+//                gate, so no card can imply you're buying it.
 //
 // `free` is the base case: its own truthy rows, since there is no tier below.
 //
@@ -345,11 +315,6 @@ function membershipTierUpgrades(t) {
 // data that is false for every plan. That is luck, not design — the moment a
 // real taps table exists, this gate needs a server half.
 const FEATURE_MIN_MEMBERSHIP_TIER = {
-  // Read to decide whether the dashboard renders the alert PANEL or the pitch
-  // for it — never whether the Asks nav item or the board itself renders.
-  // Those are open to everyone, and a client-side copy could not withhold them
-  // safely anyway.
-  askAlerts: "pro",
   // The viewer-side gates — see backend/src/lib/entitlements.js. Client copies
   // are UX only; the server answers 402 regardless.
   networkOverlap: "plus",

@@ -12,7 +12,6 @@ import {
   markOneActivityRead,
 } from "@/lib/api/activity";
 import { fetchVouchRequests } from "@/lib/api/vouches";
-import { fetchMyAsks } from "@/lib/api/asks";
 import { fetchEngagements } from "@/lib/api/engagements";
 import { useAuth } from "./AuthContext";
 
@@ -53,16 +52,6 @@ function NotificationsProvider({ children }) {
       fetchVouchRequests()
         .then((vouches) => vouches.filter((v) => v.waitingOn === "you").length)
         .catch(() => 0),
-      // Answers waiting on YOUR decision, on asks YOU posted. Deliberately
-      // not a count of asks you could answer: that would be a tally of work
-      // nobody has asked you for, which is the same reason there is no badge
-      // on the Sent connection requests tab.
-      fetchMyAsks()
-        .then(
-          (asks) =>
-            asks.filter((a) => a.status === "open" && a.answerCount > 0).length,
-        )
-        .catch(() => 0),
       // Only the ones waiting on THIS member. An engagement they proposed is
       // waiting on the other side, and counting it would nag them about work
       // that is not theirs — the same rule the vouch count applies with
@@ -70,13 +59,12 @@ function NotificationsProvider({ children }) {
       fetchEngagements("pending")
         .then((rows) => rows.filter((e) => !e.proposedByYou).length)
         .catch(() => 0),
-    ]).then(([unread, vouchActions, askActions, engagementActions]) => {
+    ]).then(([unread, vouchActions, engagementActions]) => {
       if (!cancelled)
         setLoaded({
           businessId,
           unread,
           vouchActions,
-          askActions,
           engagementActions,
         });
     });
@@ -94,7 +82,6 @@ function NotificationsProvider({ children }) {
   const isCurrent = Boolean(businessId) && loaded.businessId === businessId;
   const unreadCount = isCurrent ? loaded.unread : 0;
   const vouchActionCount = isCurrent ? loaded.vouchActions : 0;
-  const askActionCount = isCurrent ? loaded.askActions : 0;
   const engagementCount = isCurrent ? loaded.engagementActions : 0;
 
   // Opening a notification clears that one. Decrements rather than refetching
@@ -152,33 +139,15 @@ function NotificationsProvider({ children }) {
     }
   }, []);
 
-  // Called by AskDetail after an accept or a close, for the same reason
-  // refreshVouchActions refetches rather than decrementing: accepting one
-  // answer settles the whole ask, and an expiry swept on read can settle
-  // others between loads.
-  const refreshAskActions = useCallback(async () => {
-    try {
-      const asks = await fetchMyAsks();
-      const askActions = asks.filter(
-        (a) => a.status === "open" && a.answerCount > 0,
-      ).length;
-      setLoaded((current) => ({ ...current, askActions }));
-    } catch {
-      // Leave the badge as-is, same reasoning as above.
-    }
-  }, []);
-
   return (
     <NotificationsContext.Provider
       value={{
         unreadCount,
         vouchActionCount,
-        askActionCount,
         engagementCount,
         markOneRead,
         markAllRead,
         refreshVouchActions,
-        refreshAskActions,
       }}
     >
       {children}

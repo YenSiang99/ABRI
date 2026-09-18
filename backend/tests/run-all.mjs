@@ -13,9 +13,8 @@ import { TEST_DATABASE_URL } from "./env.mjs";
 // IT USED TO NEED YOUR DEV SERVER, and that is the thing that changed. The
 // suites drove http://localhost:4000, which is the server you run with
 // `npm run dev`, which is pointed at the DEVELOPMENT database — so every run
-// wrote `e2e-asker`, "concurrency: 8 answer at once, cap is 6" and a fresh
-// copy of every moderation fixture into the directory you were looking at in
-// the browser. Nothing was broken; the tests were simply aimed at the wrong
+// wrote a fresh copy of every e2e fixture into the directory you were looking
+// at in the browser. Nothing was broken; the tests were simply aimed at the wrong
 // database, and they were aimed there by every suite independently.
 //
 // Now there is one database for you and one for them, and neither this file
@@ -35,13 +34,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // named fixtures.mjs and is not in the list below.
 const FIXTURES = "fixtures.mjs";
 
-// ORDER IS LOAD-BEARING. Three real dependencies, each found the hard way:
-//
-//   tiers.mjs BEFORE OR AFTER asks.mjs — either is fine, but only because
-//     tiers.mjs cleans up the vouch graph it builds on e2e-target. asks.mjs
-//     asserts that business's vouch count is unchanged by accepting an answer,
-//     so a tiers.mjs that skipped its teardown would fail a suite it never
-//     touches, and the failure would look like asks' bug.
+// ORDER IS LOAD-BEARING. One real dependency, found the hard way:
 //
 //   lookup.mjs EXHAUSTS ITS OWN RATE-LIMIT BUDGET. Its last step fires 40
 //     anonymous lookups to prove the limiter trips — that is the assertion.
@@ -49,24 +42,16 @@ const FIXTURES = "fixtures.mjs";
 //     lookup.mjs waits the window out at its start rather than failing on a
 //     second run inside a minute.
 //
-//   ask-concurrency.mjs fires 8 simultaneous answers at one ask. Kept last:
-//     it is the only suite that deliberately contends, and giving it a quiet
-//     database makes its "no 5xx" assertion mean something.
 const SUITES = [
-  "asks.mjs",
-  "ask-alerts.mjs",
-  "ask-moderation.mjs",
   "feed.mjs",
   "ssm-verification.mjs",
   "lookup.mjs",
   "directory.mjs",
   "tiers.mjs",
-  // Before ask-concurrency for the reason stated above: that one wants a quiet
-  // database. This suite creates and confirms engagements between the e2e
+  // This suite creates and confirms engagements between the e2e
   // businesses and cleans none of them up — they are fixtures' rows to remove,
   // not this file's, and teardown-e2e.mjs knows about the table.
   "engagements.mjs",
-  "ask-concurrency.mjs",
 ];
 
 function run(file) {
@@ -202,9 +187,9 @@ if (seeded.code !== 0) {
 const results = [];
 for (const suite of SUITES) {
   const { code, out } = await run(suite);
-  // Every suite ends with "N checks passed." except ask-concurrency, which
-  // prints its own summary lines — so fall back to the exit code rather than
-  // insisting on a format none of them agreed to.
+  // Every suite ends with "N checks passed.", but fall back to the exit code
+  // rather than insisting on a format none of them agreed to — a suite that
+  // prints its own summary is still allowed to pass.
   const passed = out.match(/(\d+) checks passed\./)?.[1];
   const ok = code === 0;
   results.push({ suite, ok, passed, out });

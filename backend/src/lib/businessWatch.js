@@ -88,7 +88,7 @@ async function notifyWatchers(businessId, { fromLevel, toLevel }) {
       createActivityEvent(prisma, {
         businessId: w.watcherId,
         // No actor. An admin moved this, and staff never appear as an actor
-        // in a member-facing feed — the same call ask_expired makes.
+        // in a member-facing feed.
         actorBusinessId: null,
         type,
       }),

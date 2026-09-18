@@ -70,15 +70,16 @@ const FIELDS = [
   "openingHours",
 ];
 
-// The services picker — the half of this page the Asks board depends on.
+// The services picker — the half of this page the directory and the portfolio
+// both depend on.
 //
 // WHY THIS IS NOT A TEXT INPUT ANY MORE. It was one comma-separated field, and
 // that made every service a unique string: "SSM filings", "SSM filing" and
 // "ssm  filings" are three values no query can join. Category and location were
-// closed for exactly this reason (see lib/businessVocab.js) because the Asks
-// board routes on them by equality; services were left behind, which is why the
-// board can only match on category today. Picking from a list is what turns
-// this field into something an ask can be routed by.
+// closed for exactly this reason (see lib/businessVocab.js) because the
+// directory filters on them by equality; services were left behind. Picking
+// from a list is what turns this field into something the service browse can
+// filter on and something a portfolio entry can be credited against.
 //
 // CUSTOM SERVICES SURVIVE, deliberately — see backend/src/lib/serviceVocab.js.
 // A closed list would be a claim that we can name every professional service in
@@ -513,8 +514,9 @@ function ServicePicker({ category, selected, onChange }) {
         Services
       </label>
       <p className="mt-1 text-xs text-muted-foreground">
-        Pick what you actually do. These are what the asks board uses to route
-        work to you.
+        Pick what you actually do. These are what the directory uses to put
+        you in front of somebody searching, and what work gets credited
+        against on your portfolio.
       </p>
 
       {catalogue === null ? (
@@ -567,11 +569,11 @@ function ServicePicker({ category, selected, onChange }) {
                 ))}
               </div>
               {/* Said plainly rather than left to be discovered. An owner who
-                  thinks a typed service routes work to them is worse off than
+                  thinks a typed service makes them findable is worse off than
                   one who knows it does not. */}
               <p className="mt-2 text-xs text-muted-foreground">
-                Shown on your profile, but asks aren&rsquo;t routed by these —
-                pick from the list above where one fits.
+                Shown on your profile, but nobody can search or confirm work
+                against these — pick from the list above where one fits.
               </p>
             </div>
           )}

@@ -17,8 +17,6 @@ import {
   Inbox,
   Users,
   Eye,
-  ClipboardList,
-  MessageSquareWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -43,8 +41,9 @@ import { CLAIMED } from "@/lib/verificationLevels";
 // faults:
 //
 //   FOUR INBOXES. "What needs me?" was four badges on four rows in two
-//     groups — unread on Dashboard, vouch turns on Vouches, answers on Asks,
-//     and connection requests two levels deep under Network. The badge
+//     groups — unread on Dashboard, vouch turns on Vouches, work waiting to
+//     be confirmed, and connection requests two levels deep under Network.
+//     The badge
 //     doctrine below was right; the placement made a member assemble one
 //     answer from four places. /app/inbox now owns the three that are WORK,
 //     and carries their combined count.
@@ -79,7 +78,6 @@ const TOP_ITEMS = [
 // Outward-facing: the three ways to find or check somebody else.
 const FIND_ITEMS = [
   { title: "Directory", url: "/app/directory", icon: Search },
-  { title: "Asks", url: "/app/asks", icon: ClipboardList },
   // Sits with Directory because that is where checks are made — a record
   // belongs beside the thing it records. No lockFeature: the page has a free
   // half (the viewers count), and a padlock would shut it to exactly the
@@ -125,15 +123,7 @@ const BUSINESS_ITEMS = [
 const ADMIN_ITEMS = [
   { title: "Claims review", url: "/app/admin", icon: ClipboardCheck },
   { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
-  // A third sibling queue, and it belongs here for the reason the comment
-  // above gives about vouch review: a queue reachable only from a link on
-  // another admin page reads as part of that page's job.
-  {
-    title: "Ask review",
-    url: "/app/admin/ask-reviews",
-    icon: MessageSquareWarning,
-  },
-  // A fourth queue, and the one that makes L2 real: until it existed an
+  // A third queue, and the one that makes L2 real: until it existed an
   // admin granted SSM-Verified from the claims screen with no number in front
   // of them. See pages/admin/AdminSsmReviews.jsx.
   { title: "SSM review", url: "/app/admin/ssm-reviews", icon: ShieldCheck },
@@ -192,7 +182,6 @@ function SidebarNav({
   locked,
   unreadCount,
   vouchActionCount,
-  askActionCount,
   engagementCount,
   incomingCount,
   onSignOut,
@@ -260,9 +249,9 @@ function SidebarNav({
                     <NavBadge count={unreadCount} label="unread" />
                   )}
                   {/* THE ONE WORK BADGE, and the reason this row exists. The
-                      three counts that used to sit on Vouches, Asks and
-                      Network › Requests are summed here, because the Inbox is
-                      the page that can clear all three — which is exactly what
+                      counts that used to sit on Vouches and Network ›
+                      Requests are summed here, because the Inbox is the page
+                      that can clear them all — which is exactly what
                       the badge doctrine asks of whatever a count points at.
 
                       vouchActionCount is NOT suppressed while `locked`, unlike
@@ -274,10 +263,7 @@ function SidebarNav({
                   {item.url === "/app/inbox" && (
                     <NavBadge
                       count={
-                        vouchActionCount +
-                        askActionCount +
-                        incomingCount +
-                        engagementCount
+                        vouchActionCount + incomingCount + engagementCount
                       }
                       label="waiting on you"
                     />
@@ -410,7 +396,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount, askActionCount, engagementCount } =
+  const { unreadCount, vouchActionCount, engagementCount } =
     useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
@@ -448,7 +434,6 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           locked={locked}
           unreadCount={unreadCount}
           vouchActionCount={vouchActionCount}
-          askActionCount={askActionCount}
           engagementCount={engagementCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
@@ -478,7 +463,6 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               locked={locked}
               unreadCount={unreadCount}
               vouchActionCount={vouchActionCount}
-              askActionCount={askActionCount}
               engagementCount={engagementCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}

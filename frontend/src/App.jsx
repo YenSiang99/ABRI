@@ -23,15 +23,12 @@ import { AppDirectory } from "@/pages/app/AppDirectory";
 import { Feed } from "@/pages/app/feed/Feed";
 import { CheckHistory } from "@/pages/app/CheckHistory";
 import { Inbox } from "@/pages/app/Inbox";
-import { AsksBoard } from "@/pages/app/asks/AsksBoard";
-import { AskDetail } from "@/pages/app/asks/AskDetail";
 import { Verify } from "@/pages/app/Verify";
 import { Plan } from "@/pages/app/Plan";
 import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
 import { AdminSsmReviews } from "@/pages/admin/AdminSsmReviews";
-import { AdminAskReviews } from "@/pages/admin/AdminAskReviews";
 
 function PublicLayout() {
   return (
@@ -78,16 +75,11 @@ function App() {
             <Route path="network/requests" element={<NetworkRequests />} />
             <Route path="network/connections" element={<NetworkConnections />} />
             <Route path="network/following" element={<NetworkFollowing />} />
-            {/* No public /asks counterpart. An ask states commercial intent
-                with a named business behind it; readable without a session,
-                the board is a scraping surface rather than a listing. */}
             {/* The network's trust activity. No :id child and no public
                 counterpart — a logged-out firehose of who-vouched-for-whom is
                 a scrape of the trust graph, which is the asset the product
                 sells. See backend/src/routes/feed.js. */}
             <Route path="feed" element={<Feed />} />
-            <Route path="asks" element={<AsksBoard />} />
-            <Route path="asks/:id" element={<AskDetail />} />
             <Route path="directory" element={<AppDirectory />} />
             {/* /app/check was the in-app twin of the public check-a-business
                 screen. It went when the directory learned to match
@@ -118,7 +110,6 @@ function App() {
             <Route path="card" element={<Card />} />
             <Route path="admin" element={<AdminReview />} />
             <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />
-            <Route path="admin/ask-reviews" element={<AdminAskReviews />} />
             <Route path="admin/ssm-reviews" element={<AdminSsmReviews />} />
           </Route>
         </Route>

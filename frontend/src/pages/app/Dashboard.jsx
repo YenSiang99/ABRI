@@ -10,7 +10,6 @@ import {
   Circle,
   Award,
   Clock,
-  ClipboardList,
 } from "lucide-react";
 import { StatCard } from "@/components/app/StatCard";
 import { AppBusinessCard } from "@/components/app/AppBusinessCard";
@@ -20,9 +19,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { verificationLevelLabel, vouchLevelLabel } from "@/lib/trustLabels";
 import { fetchBusinesses } from "@/lib/api/businesses";
-import { fetchMyAsks, fetchAnsweredAsks, fetchAskAlerts } from "@/lib/api/asks";
-import { membershipTierAllows } from "@/lib/membershipTiers";
-import { LockedFeature } from "@/components/app/LockedFeature";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
@@ -130,9 +126,6 @@ function Dashboard() {
   const openVouch = vouchGate.guard((target) => setVouchTarget(target));
   const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
   const [needsYouCount, setNeedsYouCount] = useState(0);
-  const [asksNeedingYou, setAsksNeedingYou] = useState(0);
-  const [askAlerts, setAskAlerts] = useState(null);
-  const [answersAccepted, setAnswersAccepted] = useState(0);
   const [activity, setActivity] = useState([]);
 
   // Derived from the feed rather than the context's unreadCount, which
@@ -185,43 +178,6 @@ function Dashboard() {
     fetchMyActivity()
       .then(setActivity)
       .catch(() => {});
-    // Open asks of yours that have answers waiting on a decision. This is the
-    // more important of the two ask prompts: it is what turns answers into
-    // ACCEPTED answers, which is the only thing that makes answering worth
-    // anyone's time.
-    fetchMyAsks()
-      .then((asks) =>
-        setAsksNeedingYou(asks.filter((a) => a.status === "open" && a.answerCount > 0).length))
-      .catch(() => {});
-    // Guarded client-side so a member below Pro never fires a request the
-    // server will answer 402 — the useUpgradeGate doctrine: the client check
-    // is the UX, the server is the enforcement.
-    // The give-first number: answers of yours that an asker actually picked.
-    // Self-nominations are excluded, and that exclusion is the whole point —
-    // pitching yourself is a legitimate answer and it is not a contribution to
-    // anyone but yourself, so counting it would make this a scoreboard you can
-    // climb by advertising.
-    //
-    // A CONTRIBUTION SIGNAL, NOT A TRUST ONE, which is why it sits beside
-    // "Vouches given" and appears on nobody's public profile. Accepting an
-    // answer stopped publishing anything to the answerer's profile in Sept
-    // 2026; this card is the private half that survived, and it must stay
-    // private — a public count of accepted answers would be the recommendation
-    // artifact rebuilt under another name.
-    fetchAnsweredAsks()
-      .then((asks) =>
-        setAnswersAccepted(
-          asks.filter((a) => {
-            const mine = a.answers?.[0];
-            return mine?.status === "accepted" && !mine.isSelfNomination;
-          }).length,
-        ))
-      .catch(() => {});
-    if (membershipTierAllows(business?.membershipTier, "askAlerts")) {
-      fetchAskAlerts()
-        .then(setAskAlerts)
-        .catch(() => {});
-    }
     // `business` rather than `business.id`: the suggestion filter now reads
     // its `vouchedFor` list too, so a business you've just vouched for has
     // to drop out of the suggestions on the next refreshAccount(). Identity
@@ -301,73 +257,6 @@ function Dashboard() {
         </Link>
       )}
 
-      {/* Ungated, and deliberately above the Pro one. Answers sitting
-          undecided are work the member already owes somebody — nothing about
-          that is a paid feature. */}
-      {!pending && asksNeedingYou > 0 && (
-        <Link
-          to="/app/asks?tab=mine"
-          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
-        >
-          <div className="flex items-start gap-3">
-            <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
-            <div>
-              <div className="text-sm font-semibold text-foreground">
-                {asksNeedingYou === 1
-                  ? "An ask of yours has answers waiting"
-                  : `${asksNeedingYou} of your asks have answers waiting`}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Pick one and your ask is settled.
-              </p>
-            </div>
-          </div>
-          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </Link>
-      )}
-
-      {/* The routed alert — Pro's first delivered feature. What it sells is
-          TIMING: the same asks are on the board for every member, one filter
-          away. Nothing is hidden, so "never hide a gated affordance" holds;
-          this is push versus pull. */}
-      {!pending && askAlerts?.count > 0 && (
-        <Link
-          to="/app/asks?matches=category"
-          className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
-        >
-          <div className="flex items-start gap-3">
-            <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
-            <div>
-              <div className="text-sm font-semibold text-foreground">
-                {askAlerts.count === 1
-                  ? "1 ask matches what you do"
-                  : `${askAlerts.count} asks match what you do`}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {askAlerts.top[0].title} — {askAlerts.top[0].slotsLeft}{" "}
-                {askAlerts.top[0].slotsLeft === 1 ? "slot" : "slots"} left.
-              </p>
-            </div>
-          </div>
-          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </Link>
-      )}
-
-      {/* LockedFeature rather than UpgradePrompt: this is a whole PANEL that
-          is shut, which is that component's stated job, and nothing here is a
-          button to press. No UPGRADE_COPY entry either — following the
-          nfcCard precedent, nothing opens a dialog for this gate, so a second
-          copy of the pitch would be exactly the drift that map prevents. */}
-      {!pending && !membershipTierAllows(business?.membershipTier, "askAlerts") && (
-        <div className="mt-4">
-          <LockedFeature
-            title="Asks that match what you do"
-            description="Members post asks — 'looking for a corporate secretary in KL'. Pro tells you the moment one lands in your category and area, while there are still slots to answer it. The board itself is already open to you."
-            requiredMembershipTier="pro"
-          />
-        </div>
-      )}
-
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           label="Vouches received"
@@ -380,12 +269,6 @@ function Dashboard() {
           value={pending ? "—" : vouchesGivenCount}
           hint={pending ? "Unlocks after SSM verification" : "Give-first: keep going"}
           icon={TrendingUp}
-        />
-        <StatCard
-          label="Answers accepted"
-          value={answersAccepted}
-          hint="Asks you helped settle"
-          icon={ClipboardList}
         />
         <StatCard
           label="Profile views (7d)"

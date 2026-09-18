@@ -50,14 +50,14 @@ await db.account.upsert({
 
 // ── The graph under test ──────────────────────────────────────────────────
 //
-//   e2e-asker  (the VIEWER)  ──connected──> e2e-a2 ──vouches for──> e2e-target
+//   e2e-primary  (the VIEWER)  ──connected──> e2e-a2 ──vouches for──> e2e-target
 //                                            e2e-a3 ──vouches for──> e2e-target  (NOT connected)
 //
 // So the viewer should be told about a2 and never about a3: one is somebody
 // they know, the other is a stranger who happens to have vouched.
 const TARGET = `${P}target`;
 await db.business.update({ where: { id: TARGET }, data: { verificationLevel: "L2", membershipTier: "plus" } });
-for (const id of [`${P}asker`, `${P}a2`, `${P}a3`]) {
+for (const id of [`${P}primary`, `${P}a2`, `${P}a3`]) {
   await db.business.update({ where: { id }, data: { verificationLevel: "L2", membershipTier: "plus" } });
 }
 
@@ -81,19 +81,19 @@ await resetVouch(`${P}a2`, TARGET, "published");
 await resetVouch(`${P}a3`, TARGET, "published");
 
 // Connect the viewer to a2 only. ACCEPTED — a pending request must not count.
-await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}asker` }, { businessBId: `${P}asker` }] } });
-const pair = [`${P}asker`, `${P}a2`].sort();
+await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}primary` }, { businessBId: `${P}primary` }] } });
+const pair = [`${P}primary`, `${P}a2`].sort();
 await db.connection.create({ data: {
-  businessAId: pair[0], businessBId: pair[1], requestedById: `${P}asker`,
+  businessAId: pair[0], businessBId: pair[1], requestedById: `${P}primary`,
   status: "accepted", source: "directory" } });
 
-const viewer = () => login(`${P}asker@e2e.test`);
+const viewer = () => login(`${P}primary@e2e.test`);
 const admin = await login(`${P}admin@e2e.test`);
 const anon = async (path) => {
   const r = await fetch(`${API}${path}`);
   return { status: r.status, data: await r.json().catch(() => null) };
 };
-const setTier = (tier) => db.business.update({ where: { id: `${P}asker` }, data: { membershipTier: tier } });
+const setTier = (tier) => db.business.update({ where: { id: `${P}primary` }, data: { membershipTier: tier } });
 const lookTarget = async (client) =>
   (await client(`/businesses/lookup?q=${encodeURIComponent("E2E Recommended")}`)).data
     .matches.find((m) => m.id === TARGET);
@@ -160,7 +160,7 @@ console.log("\n6. Pro can watch an UNCLAIMED listing — the case follows refuse
 await setTier("pro");
 v = await viewer();
 await db.business.update({ where: { id: `${P}t0` }, data: { verificationLevel: "L0" } });
-await db.businessWatch.deleteMany({ where: { watcherId: `${P}asker` } });
+await db.businessWatch.deleteMany({ where: { watcherId: `${P}primary` } });
 
 // POST /follows refuses a T0 outright; a watch is the feature follows.js
 // named as the better answer, so this MUST be allowed.
@@ -171,7 +171,7 @@ assert.equal(follow.status, 400, "while following the same listing is still refu
 // Idempotent, like a follow: the button may be double-pressed.
 r = await v("/watches", { method: "POST", body: { businessId: `${P}t0` } });
 assert.equal(r.status, 201, "watching twice is a success, not a conflict");
-assert.equal((await db.businessWatch.count({ where: { watcherId: `${P}asker` } })), 1, "and makes one row");
+assert.equal((await db.businessWatch.count({ where: { watcherId: `${P}primary` } })), 1, "and makes one row");
 ok("T0 watchable where it is unfollowable; idempotent");
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -180,29 +180,29 @@ console.log("\n7. A watched business getting verified reaches the watcher");
 // so this also asserts the hook is actually wired into the place a level
 // changes — which is the half most likely to be forgotten.
 await db.business.update({ where: { id: `${P}t1` }, data: { verificationLevel: "L1" } });
-await db.businessWatch.deleteMany({ where: { watcherId: `${P}asker` } });
-await db.activityEvent.deleteMany({ where: { businessId: `${P}asker` } });
+await db.businessWatch.deleteMany({ where: { watcherId: `${P}primary` } });
+await db.activityEvent.deleteMany({ where: { businessId: `${P}primary` } });
 r = await v("/watches", { method: "POST", body: { businessId: `${P}t1` } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
 
 r = await admin(`/admin/businesses/${P}t1/verify-ssm`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
-let events = await db.activityEvent.findMany({ where: { businessId: `${P}asker` } });
+let events = await db.activityEvent.findMany({ where: { businessId: `${P}primary` } });
 assert.equal(events.length, 1, "exactly one event");
 assert.equal(events[0].type, "watched_business_verified");
 assert.equal(events[0].actorBusinessId, null, "no actor — an admin moved it");
 // Caught up, so the NEXT change is measured from here rather than from
 // whatever it was when the watch was set.
-let watchRow = await db.businessWatch.findFirst({ where: { watcherId: `${P}asker`, watchedId: `${P}t1` } });
+let watchRow = await db.businessWatch.findFirst({ where: { watcherId: `${P}primary`, watchedId: `${P}t1` } });
 assert.equal(watchRow.lastSeenLevel, "L2", "lastSeenLevel advanced");
 ok("verify-ssm notified the watcher once, no actor, watch caught up");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n8. Losing a level reads as a warning, not as news");
-await db.activityEvent.deleteMany({ where: { businessId: `${P}asker` } });
+await db.activityEvent.deleteMany({ where: { businessId: `${P}primary` } });
 r = await admin(`/admin/businesses/${P}t1/revoke-ssm`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
-events = await db.activityEvent.findMany({ where: { businessId: `${P}asker` } });
+events = await db.activityEvent.findMany({ where: { businessId: `${P}primary` } });
 // The direction is the whole reason lastSeenLevel is stored: a member told
 // "is now verified" when a counterparty was just downgraded has the fact
 // right and the meaning backwards.
@@ -215,29 +215,29 @@ console.log("\n8b. And the claim direction says 'claimed'");
 // caller is approveClaimAndRejectRivals, which needs a whole pending-account
 // fixture to reach. The hook itself is asserted in e2e-t0's claim flow.
 const { notifyWatchers } = await import("../src/lib/businessWatch.js");
-await db.activityEvent.deleteMany({ where: { businessId: `${P}asker` } });
+await db.activityEvent.deleteMany({ where: { businessId: `${P}primary` } });
 const notified = await notifyWatchers(`${P}t1`, { fromLevel: "L0", toLevel: "L1" });
 assert.equal(notified, 1, "one watcher notified");
-events = await db.activityEvent.findMany({ where: { businessId: `${P}asker` } });
+events = await db.activityEvent.findMany({ where: { businessId: `${P}primary` } });
 assert.equal(events[0].type, "watched_business_claimed");
 // And the watcher whose OWN business moved is skipped — you do not need
 // telling that you got verified.
-const selfNotified = await notifyWatchers(`${P}asker`, { fromLevel: "L1", toLevel: "L2" });
+const selfNotified = await notifyWatchers(`${P}primary`, { fromLevel: "L1", toLevel: "L2" });
 assert.equal(selfNotified, 0, "a business watching itself is not notified about itself");
 ok("claimed direction, and self-notification suppressed");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n9. Check history is written for Pro and nobody else");
-await db.businessCheck.deleteMany({ where: { checkedById: `${P}asker` } });
+await db.businessCheck.deleteMany({ where: { checkedById: `${P}primary` } });
 await setTier("free");
 await lookTarget(await viewer());
-assert.equal(await db.businessCheck.count({ where: { checkedById: `${P}asker` } }), 0,
+assert.equal(await db.businessCheck.count({ where: { checkedById: `${P}primary` } }), 0,
   "a Free member's searches are not logged — collecting them to sell the log back is the wrong trade");
 
 await setTier("pro");
 v = await viewer();
 await lookTarget(v);
-let checks = await db.businessCheck.findMany({ where: { checkedById: `${P}asker` } });
+let checks = await db.businessCheck.findMany({ where: { checkedById: `${P}primary` } });
 assert.ok(checks.length > 0, "a Pro member's are");
 assert.equal(checks.find((c) => c.checkedId === TARGET).levelAtCheck, "L2",
   "recording the level AT THE TIME, not a live join");
@@ -245,10 +245,10 @@ ok(`nothing logged on Free; ${checks.length} logged on Pro, with the level as it
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n10. Re-checking refreshes rather than duplicating");
-const before = await db.businessCheck.count({ where: { checkedById: `${P}asker` } });
+const before = await db.businessCheck.count({ where: { checkedById: `${P}primary` } });
 await lookTarget(v);
 await lookTarget(v);
-assert.equal(await db.businessCheck.count({ where: { checkedById: `${P}asker` } }), before,
+assert.equal(await db.businessCheck.count({ where: { checkedById: `${P}primary` } }), before,
   "a debounced search box must not write a row per keystroke-pause");
 ok("same business inside the window updates one row");
 
@@ -288,11 +288,9 @@ ok("both routes read the session only; a target id changes nothing");
 
 // ── Clean up ──────────────────────────────────────────────────────────────
 //
-// This file builds a vouch graph on shared fixtures, and asks.mjs asserts that
-// e2e-target's vouch count is unchanged by an accepted answer.
-// Leaving them behind makes that suite fail depending on the order the two
-// are run in — which is the worst kind of failure, because it looks like the
-// other file's bug.
+// This file builds a vouch graph on shared fixtures. Leaving it behind makes
+// another suite fail depending on the order the two are run in — which is the
+// worst kind of failure, because it looks like the other file's bug.
 for (const from of [`${P}a2`, `${P}a3`]) {
   const rows = await db.vouch.findMany({ where: { fromBusinessId: from, toBusinessId: TARGET }, select: { id: true } });
   for (const { id } of rows) {
@@ -302,10 +300,10 @@ for (const from of [`${P}a2`, `${P}a3`]) {
     await db.vouch.delete({ where: { id } });
   }
 }
-await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}asker` }, { businessBId: `${P}asker` }] } });
-await db.businessWatch.deleteMany({ where: { watcherId: `${P}asker` } });
-await db.businessCheck.deleteMany({ where: { checkedById: `${P}asker` } });
-await db.business.update({ where: { id: `${P}asker` }, data: { membershipTier: "free" } });
+await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}primary` }, { businessBId: `${P}primary` }] } });
+await db.businessWatch.deleteMany({ where: { watcherId: `${P}primary` } });
+await db.businessCheck.deleteMany({ where: { checkedById: `${P}primary` } });
+await db.business.update({ where: { id: `${P}primary` }, data: { membershipTier: "free" } });
 
 console.log(`\n${pass} checks passed.`);
 await db.$disconnect();

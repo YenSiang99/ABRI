@@ -5,7 +5,7 @@ import { VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/verificationLevels";
 // backend/src/routes/vouches.js's VOUCHABLE_VERIFICATION_LEVELS exactly — a business
 // must be SSM-verified (T2+) to give or receive a vouch.
 // Imported rather than re-declared — mirrors the server's single source.
-// This Set and the ask-posting one have always held the same three values.
+// This Set has always held the same three values as the SSM-verified gate.
 
 // The viewer's existing outgoing vouch to `targetId`, or null. Reads
 // `vouchedFor` off the logged-in business (see backend lib/accountView.js),

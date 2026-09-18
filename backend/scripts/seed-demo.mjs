@@ -7,12 +7,12 @@
 // unclaimed L0 rows with no owner, which is exactly right for exercising the
 // claim flow and exactly wrong for demoing anything else. A directory of 22
 // unclaimed rows renders 22 identical grey cards; the feed is empty; check-a-
-// business finds a name and can say nothing about it; the asks board says
-// "nobody has posted an ask yet". Every one of those screens is working
+// business finds a name and can say nothing about it; a profile shows an
+// empty portfolio. Every one of those screens is working
 // correctly and looks broken.
 //
 // This layers the part that makes them mean something: owners, verification,
-// registration numbers, a vouch graph, connections, asks, and the feed events
+// registration numbers, a vouch graph, connections, a work record, and the feed events
 // that announce all of it.
 //
 // IDEMPOTENT. Every row it writes carries a deterministic `demo-` id and is
@@ -190,14 +190,10 @@ const MEMBERS = [
   // ── The everyday SMEs ───────────────────────────────────────────────────
   //
   // The buyers, and the reason the board below is readable. The ten above all
-  // sell professional services to each other, which made every seeded ask read
-  // "one firm you cannot picture needs another firm you cannot picture". A
-  // bakery needing an accountant is the transaction this network actually
+  // sell professional services to each other, which made every seeded row read
+  // "one firm you cannot picture worked with another firm you cannot picture".
+  // A bakery hiring an accountant is the transaction this network actually
   // exists to carry, and until these rows existed it could not be seeded.
-  //
-  // They are L2 for a plain reason rather than a flattering one: posting an
-  // ask requires SSM verification (canPostAsks), so an unverified bakery is a
-  // bakery whose ask cannot appear on the board at all.
   {
     id: "roti-sawan-bakery",
     person: "Siti Nadiah binti Osman",
@@ -379,210 +375,6 @@ const FOLLOWS = [
   ["bangsar-south-accounting", "meridian-accounting", 68],
   ["sentul-corp-services", "meridian-accounting", 80],
   ["meridian-accounting", "bangsar-legal-partners", 75],
-];
-
-// ── Asks ──────────────────────────────────────────────────────────────────
-//
-// Every poster is L2+, mirroring canPostAsks(). Two asks carry an accepted
-// answer, which settles them — accepting publishes nothing anywhere, so these
-// exist to give the board a realistic mix of open and settled threads rather
-// than to seed anything on a profile.
-const ASKS = [
-  {
-    id: "demo-ask-restructure-cosec",
-    by: "meridian-accounting",
-    category: "Service requirement",
-    matchCategory: "Corporate Secretarial",
-    matchLocation: "Petaling Jaya",
-    title: "Company secretary for a three-entity group restructuring",
-    detail:
-      "Client is collapsing three operating companies into one holding structure before a funding round. Needs someone who has done a group restructuring end to end, not just annual returns. Timeline is about eight weeks.",
-    daysAgo: 26,
-    answers: [
-      { by: "usj-corp-sec-partners", recommends: "usj-corp-sec-partners", accepted: true, comment: "We've run four of these in the last two years, including one with a foreign shareholder. Happy to walk through the sequencing before you commit — the order the entities are wound matters more than most people expect." },
-      { by: "sentul-corp-services", recommends: "sentul-corp-services", comment: "We can take this. Two of our team have done group restructurings under the same timeline. Can share a redacted example of the resolution set." },
-      { by: "bangsar-legal-partners", recommends: "ttdi-corp-sec-studio", comment: "Not our line of work, but Amirul at TTDI has done exactly this for a client of ours. Worth a call." },
-    ],
-  },
-  {
-    id: "demo-ask-msc-tax",
-    by: "novatech-consulting",
-    category: "Service requirement",
-    matchCategory: "Accounting & Tax",
-    matchLocation: "Shah Alam",
-    title: "Tax agent who actually understands MSC status incentives",
-    detail:
-      "We've been quoted by two firms who clearly hadn't dealt with MSC-status conditions before. Looking for someone who has filed for a company under the incentive and knows what the conditions look like in practice.",
-    daysAgo: 19,
-    answers: [
-      { by: "meridian-accounting", recommends: "meridian-accounting", accepted: true, comment: "We file for three MSC-status companies currently. The part most firms miss is the annual conditions reporting — happy to show you what that looks like before you decide." },
-      { by: "bangsar-south-accounting", recommends: "bangsar-south-accounting", comment: "We handle two under the incentive. Can quote if you're still comparing." },
-      { by: "usj-corp-sec-partners", recommends: "puchong-tax-advisory", comment: "Faizal at Puchong Tax has done MSC filings for a mutual client. Smaller shop, very hands-on." },
-    ],
-  },
-  {
-    id: "demo-ask-cloud-migration",
-    by: "bangsar-legal-partners",
-    category: "Supplier requirement",
-    matchCategory: "IT Consulting",
-    matchLocation: "Bangsar",
-    title: "Cloud migration partner for a 40-seat legal practice",
-    detail:
-      "Moving off an on-premise file server. Document confidentiality is the hard requirement — we need someone who has done this for a firm under professional privilege obligations, not a generic office migration.",
-    daysAgo: 14,
-    answers: [
-      { by: "novatech-consulting", recommends: "novatech-consulting", comment: "We've migrated two practices with the same constraint. The privilege question mostly comes down to where the data lands and who holds the keys — we can scope that in a first session." },
-      { by: "meridian-accounting", recommends: "subang-it-solutions", comment: "Ravi's team did ours. Careful with access control, and they documented everything for our own audit." },
-    ],
-  },
-  {
-    id: "demo-ask-employment-counsel",
-    by: "usj-corp-sec-partners",
-    category: "Service requirement",
-    matchCategory: "Law",
-    matchLocation: "Subang Jaya",
-    title: "Employment counsel for a redundancy exercise",
-    detail:
-      "Client is restructuring and will need to let roughly a dozen people go. Wants it done properly and quietly. Needs someone experienced with the notification requirements.",
-    daysAgo: 11,
-    answers: [
-      { by: "bangsar-legal-partners", recommends: "bangsar-legal-partners", comment: "This is squarely our work. The sequencing and the paper trail are what determine whether this becomes a claim later — happy to talk the client through it directly." },
-      { by: "novatech-consulting", recommends: "sunway-legal-group", comment: "Chong at Sunway Legal handled something similar for a client of ours last year. Very steady under pressure." },
-    ],
-  },
-  {
-    id: "demo-ask-sst-partnership",
-    by: "bangsar-south-accounting",
-    category: "Partnership",
-    matchCategory: "Accounting & Tax",
-    matchLocation: "Kuala Lumpur",
-    title: "Partner firm to co-deliver SST advisory in Penang",
-    detail:
-      "We have three clients with Penang operations and no presence there. Looking for a firm to co-deliver rather than refer away — happy to structure it as a revenue share.",
-    daysAgo: 8,
-    answers: [
-      { by: "meridian-accounting", recommends: "meridian-accounting", comment: "We don't have a Penang office either, but we've co-delivered this way twice and can share how we structured it if that's useful." },
-    ],
-  },
-  {
-    id: "demo-ask-incorporation-overflow",
-    by: "ttdi-corp-sec-studio",
-    category: "Collaboration",
-    matchCategory: "Corporate Secretarial",
-    matchLocation: "Kuala Lumpur",
-    title: "Referral partner for startup incorporation overflow",
-    detail:
-      "We're turning away roughly five incorporations a month and would rather send them somewhere good than let them find whoever ranks first on Google. Looking for one or two firms to build a proper referral relationship with.",
-    daysAgo: 5,
-    answers: [
-      { by: "sentul-corp-services", recommends: "sentul-corp-services", comment: "We'd take these. We already do overflow for two firms and can turn an incorporation around in under a week when the documents are clean." },
-      { by: "usj-corp-sec-partners", recommends: "usj-corp-sec-partners", comment: "Interested. Our early-stage pricing is built for exactly this volume." },
-      { by: "meridian-accounting", recommends: "clearpath-corp-sec", comment: "Farah at Clearpath is building a startup-focused practice and would likely welcome these." },
-    ],
-  },
-  {
-    id: "demo-ask-dms-vendor",
-    by: "sunway-legal-group",
-    category: "Supplier requirement",
-    matchCategory: "IT Consulting",
-    matchLocation: "Subang Jaya",
-    title: "Document management system for a small practice",
-    detail:
-      "Twelve people, currently on shared drives and email. Want something with proper version history and access control that our team will actually use.",
-    daysAgo: 2,
-    answers: [
-      { by: "novatech-consulting", recommends: "novatech-consulting", comment: "We've deployed two of these at similar size. The adoption problem is bigger than the software choice — worth a conversation about that before you pick a product." },
-      // Recommends an UNCLAIMED listing. This answer is real and visible on
-      // the board; the feed row it would produce stays dark until Klang IT
-      // Partners claims their listing. That is the T0 growth loop, live.
-      { by: "sunway-legal-group", recommends: "klang-it-partners", accepted: true, comment: "Answering my own ask to record this — Klang IT Partners did our last rollout and were excellent. Putting it here so it's on the record for whoever searches next." },
-    ],
-  },
-
-  // ── The everyday SMEs asking ────────────────────────────────────────────
-  //
-  // PLAIN ON PURPOSE. The seven above are accurate and unreadable at a glance:
-  // "Company secretary for a three-entity group restructuring" is what the ask
-  // really says, and a person scanning the board cannot tell it apart from the
-  // next one without reading both. These say who is asking and what they need
-  // in the title — a bakery needs an accountant — which is what makes the
-  // board scannable rather than merely correct.
-  //
-  // It is also the honest shape of the demand side: an SME does not describe
-  // its problem in the supplier's vocabulary, and an asks board that only
-  // accepts the supplier's vocabulary is one SMEs will not post to.
-  {
-    id: "demo-ask-bakery-accountant",
-    by: "roti-sawan-bakery",
-    category: "Service requirement",
-    matchCategory: "Accounting & Tax",
-    matchLocation: "Petaling Jaya",
-    title: "Bakery with four outlets needs an accountant",
-    detail:
-      "We've outgrown doing the books ourselves. Four shops plus a central kitchen, about 30 staff, and we're behind on two years of filings. Need someone who has dealt with F&B — the stock and wastage side is where our last accountant got lost.",
-    daysAgo: 23,
-    answers: [
-      { by: "meridian-accounting", recommends: "meridian-accounting", accepted: true, comment: "We do the books for two restaurant groups and a central kitchen, so the wastage and stock questions are familiar. First thing is getting the two years of filings clean — we can quote that separately from the monthly work so you know what the catch-up costs." },
-      { by: "puchong-tax-advisory", recommends: "puchong-tax-advisory", comment: "Happy to take this on. We'd start with the outstanding filings before touching the monthly process, otherwise you're building on a mess." },
-      { by: "sentul-corp-services", recommends: "bangsar-south-accounting", comment: "Not our line, but Danial's team handles a few F&B clients and is good at the catch-up work." },
-    ],
-  },
-  {
-    id: "demo-ask-kopitiam-lawyer",
-    by: "kopi-lengkap-group",
-    category: "Service requirement",
-    matchCategory: "Law",
-    matchLocation: "Kuala Lumpur",
-    title: "Need a lawyer to look at our franchise agreement",
-    detail:
-      "Two people have asked to open outlets under our name and we don't have a franchise agreement — just a one-page letter our previous shop used. Want it done properly before we say yes to anyone.",
-    daysAgo: 16,
-    answers: [
-      { by: "bangsar-legal-partners", recommends: "bangsar-legal-partners", comment: "This is work we do regularly. The registration requirements under the Franchise Act catch most F&B operators out — worth understanding what you're committing to before the agreement is drafted, not after." },
-      { by: "sunway-legal-group", recommends: "sunway-legal-group", comment: "We've drafted three of these for F&B groups. Can share the structure we usually start from." },
-    ],
-  },
-  {
-    id: "demo-ask-furniture-delivery",
-    by: "hartaco-furniture",
-    category: "Supplier requirement",
-    matchCategory: "Logistics",
-    matchLocation: "Shah Alam",
-    title: "Furniture maker looking for a delivery partner",
-    detail:
-      "Roughly 40 deliveries a week around the Klang Valley, mostly bulky office furniture that needs two people and sometimes a lift booking. Our current arrangement is three lorry owners we call individually and it is falling apart.",
-    daysAgo: 12,
-    answers: [
-      { by: "laju-logistics", recommends: "laju-logistics", accepted: true, comment: "We run two-person crews for exactly this kind of load and can hold a fixed weekly slot. The lift bookings we handle ourselves — it's the part that causes most failed deliveries and it isn't really a transport problem." },
-    ],
-  },
-  {
-    id: "demo-ask-printer-cosec",
-    by: "cetak-murni-press",
-    category: "Service requirement",
-    matchCategory: "Corporate Secretarial",
-    matchLocation: "Puchong",
-    title: "Adding a business partner — need a company secretary",
-    detail:
-      "Bringing in someone who has been running the sales side for three years and wants equity. No idea what paperwork this actually needs. Looking for someone who will explain it in plain terms.",
-    daysAgo: 6,
-    answers: [
-      { by: "puchong-corp-sec-hub", recommends: "puchong-corp-sec-hub", comment: "Straightforward share allotment plus a shareholders agreement. We'd walk you through what each document does before anything is signed — it is not as complicated as it looks from outside." },
-      { by: "meridian-accounting", recommends: "usj-corp-sec-partners", comment: "Grace's team did this for a client of ours and were patient about explaining it. Worth a call." },
-    ],
-  },
-  {
-    id: "demo-ask-logistics-aircond",
-    by: "laju-logistics",
-    category: "Supplier requirement",
-    matchCategory: "Construction & Trades",
-    matchLocation: "Shah Alam",
-    title: "Warehouse aircond servicing contract",
-    detail:
-      "Two warehouses, twelve units between them, currently serviced whenever someone remembers. Want a proper maintenance contract with scheduled visits.",
-    daysAgo: 3,
-    answers: [],
-  },
 ];
 
 // ── The work record ─────────────────────────────────────────
@@ -1001,47 +793,6 @@ async function main() {
     await prisma.follow.upsert({ where: { id }, update: data, create: { id, ...data } });
   }
 
-  // ── Asks and answers ────────────────────────────────────────────────────
-  let answerCount = 0;
-  for (const ask of ASKS) {
-    const at = daysAgo(ask.daysAgo);
-    const accepted = ask.answers.find((a) => a.accepted);
-    const header = {
-      askedByBusinessId: ask.by,
-      category: ask.category,
-      matchCategory: ask.matchCategory,
-      matchLocation: ask.matchLocation,
-      title: ask.title,
-      detail: ask.detail,
-      status: accepted ? "answered" : "open",
-      maxAnswers: 6,
-      // 30 days from posting, matching ASK_EXPIRY_DAYS. Computed off the
-      // backdated createdAt so the older asks are genuinely closer to expiry
-      // rather than all resetting to 30 days out.
-      expiresAt: new Date(at.getTime() + 30 * 86_400_000),
-      createdAt: at,
-    };
-    await prisma.ask.upsert({ where: { id: ask.id }, update: header, create: { id: ask.id, ...header } });
-
-    for (const [i, ans] of ask.answers.entries()) {
-      const id = `${ask.id}-a${i + 1}`;
-      // Staggered a few hours apart so the answer list has a real order
-      // rather than every row sharing one timestamp.
-      const answeredAt = new Date(at.getTime() + (i + 1) * 7 * 3_600_000);
-      const data = {
-        askId: ask.id,
-        answeredByBusinessId: ans.by,
-        recommendedBusinessId: ans.recommends,
-        comment: ans.comment,
-        status: ans.accepted ? "accepted" : "offered",
-        createdAt: answeredAt,
-        acceptedAt: ans.accepted ? new Date(answeredAt.getTime() + 26 * 3_600_000) : null,
-      };
-      await prisma.askAnswer.upsert({ where: { id }, update: data, create: { id, ...data } });
-      answerCount += 1;
-    }
-  }
-
   // ── The work record ───────────────────────────────────────
   //
   // orderedPair rather than writing businessAId/businessBId as listed: the
@@ -1064,7 +815,6 @@ async function main() {
     await prisma.engagement.upsert({ where: { id: e.id }, update: data, create: { id: e.id, ...data } });
   }
 
-
   const events = await prisma.networkEvent.count({ where: { id: { startsWith: "demo-ev-" } } });
   console.log(
     [
@@ -1073,7 +823,6 @@ async function main() {
       `  ${PENDING_SSM.length} awaiting SSM review · ${CLAIMED_ONLY.length} claimed, no number yet`,
       `  ${VOUCHES.length} published vouches`,
       `  ${CONNECTIONS.length} connections · ${FOLLOWS.length} follows`,
-      `  ${ASKS.length} asks · ${answerCount} answers`,
       `  ${ENGAGEMENTS.length} portfolio entries`,
       `  ${events} feed events`,
       "",

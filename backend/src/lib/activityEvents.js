@@ -43,7 +43,7 @@ const ACTIVITY_MESSAGES = {
   // The three connection events, and the distinction that matters most:
   // connection_added is a fact, connection_requested is a to-do. Only a card
   // tap produces the first now (AUTO_ACCEPT_SOURCES in lib/connections.js) —
-  // a directory connect asks, and wording an ask like a done deal is how it
+  // a directory connect asks, and wording it like a done deal is how it
   // sits unanswered because the reader was told it had already happened.
   //
   // All three go only to the side that didn't press the button. There is no
@@ -71,7 +71,7 @@ const ACTIVITY_MESSAGES = {
 
   // ─── SSM verification ────────────────────────────────────────────────────
   // Both carry no actor: an admin ruled on these, and staff never appear as
-  // an actor in a member-facing feed. Same call ask_expired makes.
+  // an actor in a member-facing feed.
   //
   // The rejection names the NEXT ACTION rather than the fault, because it
   // cannot name the fault: this table has no detail column, so every message
@@ -107,50 +107,6 @@ const ACTIVITY_MESSAGES = {
     "A business you're watching has lost a verification level. Worth a look before you deal with them.",
   watched_business_unclaimed: () =>
     "A business you're watching is unclaimed again — its owner's claim was revoked.",
-
-  // ─── Asks ────────────────────────────────────────────────────────────────
-  // Two answer events rather than one with a branch, and the reason is that
-  // this map takes only an actor name: "named someone else" and "offered
-  // their own services" are different claims to an asker weighing them, and a
-  // distinction that is visible on the ask page but flattened in the
-  // notification is one the asker meets twice and reads two different ways.
-  //
-  // Both are now only ever read BY THE ASKER. Nothing here reaches the
-  // business that was named — accepting an answer stopped publishing anything
-  // to a third party's profile in Sept 2026, so there is no longer a profile
-  // change anyone needs to be told about.
-  ask_answered: (actorName) => `${actorName} suggested a business for your ask.`,
-  ask_self_offered: (actorName) => `${actorName} offered their own services on your ask.`,
-
-  ask_answer_accepted: (actorName) => `${actorName} accepted your answer on their ask.`,
-
-  // No actor: nobody closed this, it lapsed. Names a next step, which is what
-  // makes an event about something nobody did worth sending at all. "30 days"
-  // mirrors ASK_EXPIRY_DAYS in lib/askExpiry.js; it can't be imported (that
-  // module imports this one), so change both together.
-  ask_expired: () =>
-    "Your ask closed after 30 days. Post a new one if you still need it.",
-
-  // Frozen-content events. Both carry actorBusinessId null, a deliberate
-  // divergence from vouch_flagged, which does name the flagger: on a vouch
-  // the flagger is the counterparty, already party to it and already known;
-  // on a board the reporter can be any member, and naming them is an
-  // invitation to take it up with them directly. Like vouch_flagged these
-  // name no next step, because there isn't one — but the reader still needs
-  // to know why their post stopped working.
-  ask_flagged: () => "Your ask was reported and is on hold while an admin reviews it.",
-  ask_answer_flagged: () =>
-    "Your answer was reported and is on hold while an admin reviews it.",
-
-  // Admin decisions on a reported ask or answer. No actor, for the same
-  // reason the vouch_review_* events have none.
-  ask_review_restored: () =>
-    "An admin reviewed the report on your ask — it's open again.",
-  ask_review_closed: () => "An admin closed your ask after reviewing a report.",
-  ask_answer_review_restored: () =>
-    "An admin reviewed the report on your answer — it's back in front of the asker.",
-  ask_answer_review_removed: () =>
-    "An admin removed your answer after reviewing a report.",
 };
 
 function messageFor(type, actorName) {

@@ -14,7 +14,6 @@ import { RequestCard } from "@/pages/app/network/NetworkRequests";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useNotifications } from "@/context/NotificationsContext";
 import { fetchVouchRequests } from "@/lib/api/vouches";
-import { fetchMyAsks } from "@/lib/api/asks";
 import {
   fetchEngagements,
   confirmEngagement,
@@ -26,8 +25,8 @@ import { toast } from "@/lib/toast";
 //
 // THE PROBLEM THIS SOLVES is that "what needs me?" used to be four badges on
 // four rows in two sidebar groups — unread activity on Dashboard, vouch turns
-// on Vouches, answers to decide on Asks, and connection requests two levels
-// deep under Network. The badge doctrine in AppSidebar.jsx was already right
+// on Vouches, work waiting to be confirmed, and connection requests two
+// levels deep under Network. The badge doctrine in AppSidebar.jsx was already right
 // (a count means somebody is owed something); what was wrong was that a
 // member had to assemble the answer from four places.
 //
@@ -38,19 +37,13 @@ import { toast } from "@/lib/toast";
 // show the same items in their own fuller context; this is a second door onto
 // the same rows, not a second copy of them.
 //
-// ASKS ARE THE EXCEPTION, and deliberately. Deciding on an answer happens on
-// the ask's own page, where the other answers are visible and comparable —
-// accepting one out of that context is a decision made with half the
-// information. So this tab lists the asks with answers waiting and links to
-// them; it does not inline an accept button.
-//
 // WHAT IS NOT HERE: unread feed activity. A feed item is news, not work.
 // Nobody is owed anything by it, nothing is blocked on reading it, and folding
 // it in would make the one number on this row mean "things that happened"
 // instead of "things you owe" — which is the distinction that makes an inbox
 // worth opening at all. It stays on Home.
 
-const TABS = ["vouches", "connections", "answers", "engagements"];
+const TABS = ["vouches", "connections", "engagements"];
 
 // One proposed engagement waiting on this member.
 //
@@ -166,34 +159,11 @@ function Empty({ children }) {
   );
 }
 
-// One ask with answers to decide on. A row, not a card with buttons — see the
-// header on why the decision itself belongs on the ask's own page.
-function AskRow({ ask }) {
-  return (
-    <li className="flex flex-wrap items-start gap-4 py-5">
-      <div className="min-w-0 flex-1">
-        <Link
-          to={`/app/asks/${ask.id}`}
-          className="text-base font-semibold text-foreground underline-offset-4 hover:underline"
-        >
-          {ask.title}
-        </Link>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {ask.answerCount} {ask.answerCount === 1 ? "answer" : "answers"}{" "}
-          waiting on your decision · {ask.category}
-        </p>
-      </div>
-    </li>
-  );
-}
-
 function Inbox() {
   const { incoming } = useConnections();
   const {
     vouchActionCount,
-    askActionCount,
     refreshVouchActions,
-    refreshAskActions,
   } = useNotifications();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -201,7 +171,6 @@ function Inbox() {
   const tab = TABS.includes(requested) ? requested : "vouches";
 
   const [vouches, setVouches] = useState([]);
-  const [asks, setAsks] = useState([]);
   const [engagements, setEngagements] = useState([]);
   const [status, setStatus] = useState("loading");
 
@@ -211,11 +180,9 @@ function Inbox() {
   function load() {
     return Promise.all([
       fetchVouchRequests().catch(() => []),
-      fetchMyAsks().catch(() => []),
       fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, askRows, engagementRows]) => {
+    ]).then(([vouchRows, engagementRows]) => {
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
-      setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
       // Only the ones waiting on THIS member. A pending engagement they
       // proposed is waiting on the other side and is not their work — the same
       // rule the vouch filter above applies with waitingOn.
@@ -228,12 +195,10 @@ function Inbox() {
     let live = true;
     Promise.all([
       fetchVouchRequests().catch(() => []),
-      fetchMyAsks().catch(() => []),
       fetchEngagements("pending").catch(() => []),
-    ]).then(([vouchRows, askRows, engagementRows]) => {
+    ]).then(([vouchRows, engagementRows]) => {
       if (!live) return;
       setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
-      setAsks(askRows.filter((a) => a.status === "open" && a.answerCount > 0));
       setEngagements(engagementRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
@@ -248,7 +213,6 @@ function Inbox() {
   async function onVouchChanged() {
     await load();
     refreshVouchActions?.();
-    refreshAskActions?.();
   }
 
   function setTab(next) {
@@ -261,11 +225,9 @@ function Inbox() {
   const counts = {
     vouches: status === "ready" ? vouches.length : vouchActionCount,
     connections: incoming.length,
-    answers: status === "ready" ? asks.length : askActionCount,
     engagements: engagements.length,
   };
-  const total =
-    counts.vouches + counts.connections + counts.answers + counts.engagements;
+  const total = counts.vouches + counts.connections + counts.engagements;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -374,19 +336,6 @@ function Inbox() {
         </div>
       )}
 
-      {status === "ready" && tab === "answers" && (
-        <>
-          {asks.length === 0 ? (
-            <Empty>No answers waiting on your decision.</Empty>
-          ) : (
-            <ul className="divide-y divide-border">
-              {asks.map((ask) => (
-                <AskRow key={ask.id} ask={ask} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
     </div>
   );
 }

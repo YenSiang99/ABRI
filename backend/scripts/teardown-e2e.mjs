@@ -35,22 +35,14 @@ if (bizIds.length === 0 && accIds.length === 0) {
   process.exit(0);
 }
 
-// Asks and vouches owned by e2e businesses drag their own children along, so
-// their ids are needed before anything is deleted.
-const askIds = (await db.ask.findMany({ where: { askedByBusinessId: biz }, select: { id: true } })).map((a) => a.id);
-const answerIds = (await db.askAnswer.findMany({
-  where: { OR: [{ answeredByBusinessId: biz }, { recommendedBusinessId: biz }, { askId: { in: askIds } }] },
-  select: { id: true },
-})).map((a) => a.id);
+// Vouches owned by e2e businesses drag their own children along, so their ids
+// are needed before anything is deleted.
 const vouchIds = (await db.vouch.findMany({
   where: { OR: [{ fromBusinessId: biz }, { toBusinessId: biz }] }, select: { id: true },
 })).map((v) => v.id);
 
 const steps = [
   ["networkEvent",  { OR: [{ actorBusinessId: biz }, { subjectBusinessId: biz }, { vouchId: { in: vouchIds } }] }],
-  ["askFlag",       { OR: [{ askId: { in: askIds } }, { answerId: { in: answerIds } }, { againstBusinessId: biz }, { raisedByBusinessId: biz }, { resolvedByAccountId: { in: accIds } }] }],
-  ["askAnswer",     { id: { in: answerIds } }],
-  ["ask",           { id: { in: askIds } }],
   ["vouchFlag",     { OR: [{ vouchId: { in: vouchIds } }, { againstBusinessId: biz }, { raisedByBusinessId: biz }, { resolvedByAccountId: { in: accIds } }] }],
   ["vouchAction",   { OR: [{ vouchId: { in: vouchIds } }, { actorAccountId: { in: accIds } }] }],
   // Vouch.currentRevisionId -> VouchRevision.id has no cascade; break it first.
@@ -68,10 +60,8 @@ const steps = [
   // cleaned up by it.
   ["profileView",   { OR: [{ viewerId: biz }, { viewedId: biz }] }],
   // Both ends, plus anything proposed by an e2e business against a real one.
-  // Position in this list does not matter for the ask FK — Engagement.askId is
-  // SET NULL, so the ask delete above nulls it rather than being blocked by it.
-  // It DOES matter for the three business FKs, which are RESTRICT like every
-  // other relation here, so this has to run before the business delete.
+  // Position matters: all four business FKs are RESTRICT like every other
+  // relation here, so this has to run before the business delete.
   ["engagement",    { OR: [{ businessAId: biz }, { businessBId: biz }, { proposedById: biz }, { serviceProvidedById: biz }] }],
   ["deferredConnection", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],
   ["emailVerificationToken", { OR: [{ accountId: { in: accIds } }, { businessId: biz }] }],

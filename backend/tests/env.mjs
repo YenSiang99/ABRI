@@ -8,8 +8,7 @@ import fs from "node:fs";
 //
 // which meant eleven files independently decided which database the tests hit,
 // and they all decided "the development one". That is how a browser tab ended
-// up showing `e2e-asker` and "concurrency: 8 answer at once, cap is 6" beside
-// real businesses: the suites were never wrong, they were pointed at the wrong
+// up showing `e2e-primary` and its fixtures beside real businesses: the suites were never wrong, they were pointed at the wrong
 // database, and every `npm test` added another copy of their rows.
 //
 // TEST_DATABASE_URL is that database now. DIRECT_URL stays as the fallback so

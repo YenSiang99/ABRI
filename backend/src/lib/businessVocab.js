@@ -5,13 +5,17 @@
 // no Prisma enums anywhere), so this module is what actually constrains them —
 // the same role CONNECTION_SOURCES plays in lib/connections.js.
 //
-// Why they have to be closed, when they were free text until now: the Asks
-// board routes an ask to the businesses who can answer it by joining
-// Ask.matchCategory/matchLocation against these two columns on equality. A
-// business that typed "PJ", "Petaling jaya" or "petaling  jaya" is a business
-// no ask will ever reach, and it fails silently — they simply never hear about
-// work they could have done. Category was already a <select> on the register
-// form; location was an <input> with a placeholder, which is the whole bug.
+// Why they have to be closed, when they were free text until now: the
+// directory and the service browse both filter on these two columns by
+// equality. A business that typed "PJ", "Petaling jaya" or "petaling  jaya" is
+// a business no filter will ever return, and it fails silently — they simply
+// never appear in a search they should have won. Category was already a
+// <select> on the register form; location was an <input> with a placeholder,
+// which is the whole bug.
+//
+// The asks board was the original reason these were closed, and it is gone.
+// THEY MUST STAY CLOSED ANYWAY — browsing is now the only way anyone is found
+// at all, so an unmatchable value costs more than it did before, not less.
 //
 // No backfill was needed to introduce this: all 22 seeded rows already used
 // exactly these values. It gates new writes only.
@@ -27,10 +31,10 @@ const BUSINESS_CATEGORIES = [
   "IT Consulting",
   // ADDED BECAUSE A REAL BUSINESS WAS ALREADY IN IT. This list gates new
   // writes only, and one member registered under "Design" before that gate
-  // existed — which left them matchable by no ask and findable by no service
-  // filter, silently, which is the exact failure this file was written to
-  // stop. Recategorising somebody's own description of their business would
-  // have been the wrong fix.
+  // existed — which left them findable by no category and no service filter,
+  // silently, which is the exact failure this file was written to stop.
+  // Recategorising somebody's own description of their business would have
+  // been the wrong fix.
   //
   // The four above are still the go-to-market focus (see the note there);
   // this is a fifth the network already contains, not a widening of it. The
@@ -41,16 +45,15 @@ const BUSINESS_CATEGORIES = [
   // THE FIVE ABOVE ARE SUPPLIERS OF PROFESSIONAL SERVICES; THESE ARE THE ONES
   // WHO BUY THEM, and the network does not work without both halves. A
   // directory holding only accountants, lawyers and company secretaries is a
-  // directory where everybody sells the same thing to nobody — every ask reads
-  // "professional-services firm needs professional-services firm", and the
-  // most common real transaction in the corridor (a bakery needs an
-  // accountant) cannot be expressed at all.
+  // directory where everybody sells the same thing to nobody, and the most
+  // common real transaction in the corridor (a bakery needs an accountant)
+  // cannot be expressed at all — neither party is even in the list.
   //
   // This does NOT widen the go-to-market. The blueprint's corridor focus is
   // about where the PAID members come from, and that is still the five above:
   // an accountant sells to many SMEs, so the supply side is where density and
-  // revenue are. What these add is the demand side that makes the asks board
-  // mean something.
+  // revenue are. What these add is the demand side that makes a portfolio
+  // entry mean something: work logged between two halves of a real trade.
   //
   // Widening a closed list is the SAFE direction, the same argument
   // serviceVocab.js makes about growing its catalogue: adding a value can only
@@ -73,9 +76,9 @@ const BUSINESS_CATEGORIES = [
 //
 // This list GROWS, and that is planned rather than a smell: the corridor SSM
 // import will land 15-30 real Klang Valley localities. When it does, the thing
-// to add alongside them is a locality -> region grouping, so matchTierFor in
-// lib/asks.js can match "same region" between "same locality" and "same trade"
-// — six values make an exact category+location match plausible, thirty do not.
+// to add alongside them is a locality -> region grouping, so the directory can
+// offer "same region" between "same locality" and everything — six values make
+// an exact category+location filter plausible, thirty do not.
 //
 // What must NOT happen instead is loosening the join to substring or fuzzy
 // matching. That converts a closed list back into free text by the back door

@@ -23,7 +23,7 @@ import { FeedRow, Empty, PageHeader } from "./FeedCard";
 // machinery at all. Every row is a third-party positive act about somebody
 // else, so there is nothing to advertise on it: no cap, no expiry, no
 // ephemerality, no report button, no moderation queue. Compare the header of
-// routes/asks.js, which needs four mechanisms to hold a board open to
+// a public board, which would need four mechanisms to hold itself open to
 // anyone's own words. Keep it that way — the moment this screen grows a
 // compose box it inherits every one of those problems.
 //

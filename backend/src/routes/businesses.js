@@ -390,7 +390,7 @@ router.get(
 // remove.
 //
 // Declared BEFORE /:id or Express reads "service-catalogue" as a business id —
-// the same collision routes/asks.js documents for /mine.
+// the same collision the /mine listings document.
 //
 // optionalAuth, not requireAuth: the register form needs this too, and there is
 // nothing private in a list of service names.
@@ -939,9 +939,10 @@ router.post(
     }
     // Both are closed lists (lib/businessVocab.js), and this is the only route
     // that writes them. Checked on the server rather than trusted from the
-    // form, because the Asks board routes work by joining these two columns on
-    // equality — a value that isn't in the list is a business no ask can ever
-    // reach, and nothing about that failure is visible to them.
+    // form, because the directory and the service browse both filter on these
+    // two columns by equality — a value that isn't in the list is a business
+    // no filter can ever return, and nothing about that failure is visible to
+    // them.
     if (!isValidCategory(category.trim())) {
       return res.status(400).json({ error: "Pick a category from the list." });
     }

@@ -43,12 +43,12 @@ await db.account.upsert({
 
 // A clean slate for the businesses this file touches, so a re-run doesn't
 // read a previous run's rows. Only ever e2e- ids.
-const CAST = ["asker", "a2", "a3", "a4", "target", "t0", "t1"].map((k) => P + k);
+const CAST = ["primary", "a2", "a3", "a4", "target", "t0", "t1"].map((k) => P + k);
 await db.networkEvent.deleteMany({ where: { OR: [
   { subjectBusinessId: { in: CAST } }, { actorBusinessId: { in: CAST } },
 ] } });
 
-const asker = await login(`${P}asker@e2e.test`);
+const primary = await login(`${P}primary@e2e.test`);
 const a2 = await login(`${P}a2@e2e.test`);
 const a3 = await login(`${P}a3@e2e.test`);
 const admin = await login(`${P}admin@e2e.test`);
@@ -59,12 +59,12 @@ const findByVouch = (events, id) => events.find((e) => e.type === "vouch_publish
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n1. Publishing a vouch puts it in the feed, with its testimonial");
 // Plus, because acceptVouch is a Plus feature and this is about the feed.
-await db.business.updateMany({ where: { id: { in: [`${P}a2`, `${P}asker`] } }, data: { membershipTier: "plus" } });
+await db.business.updateMany({ where: { id: { in: [`${P}a2`, `${P}primary`] } }, data: { membershipTier: "plus" } });
 // A Vouch has four children plus a self-reference (currentRevisionId), so a
 // bare deleteMany trips VouchRevision_vouchId_fkey. Unwind in dependency
 // order, newest pointer first.
 const stale = await db.vouch.findMany({
-  where: { fromBusinessId: `${P}a2`, toBusinessId: `${P}asker` }, select: { id: true },
+  where: { fromBusinessId: `${P}a2`, toBusinessId: `${P}primary` }, select: { id: true },
 });
 for (const { id } of stale) {
   await db.vouch.update({ where: { id }, data: { currentRevisionId: null } });
@@ -76,14 +76,14 @@ for (const { id } of stale) {
 }
 
 let r = await a2("/vouches", { method: "POST", body: {
-  toBusinessId: `${P}asker`, testimonial: "Sharpest corporate lawyers we have worked with." } });
+  toBusinessId: `${P}primary`, testimonial: "Sharpest corporate lawyers we have worked with." } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
 const vouchId = r.data.vouch.id;
-r = await asker(`/vouches/${vouchId}/accept`, { method: "POST" });
+r = await primary(`/vouches/${vouchId}/accept`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
 
-let events = await feed(asker);
-let vouchEvent = events.find((e) => e.type === "vouch_published" && e.subject.id === `${P}asker`);
+let events = await feed(primary);
+let vouchEvent = events.find((e) => e.type === "vouch_published" && e.subject.id === `${P}primary`);
 assert.ok(vouchEvent, "published vouch is in the feed");
 assert.equal(vouchEvent.actor.id, `${P}a2`, "actor is the giver");
 assert.equal(vouchEvent.quote, "Sharpest corporate lawyers we have worked with.");
@@ -101,47 +101,15 @@ console.log("\n2. A vouch that stops being published drops out — no compensati
 const eventsBefore = await db.networkEvent.count({ where: { vouchId } });
 await db.vouch.update({ where: { id: vouchId }, data: { status: "under_review" } });
 
-events = await feed(asker);
+events = await feed(primary);
 assert.ok(!events.some((e) => e.id === vouchEvent.id), "an unpublished vouch is gone from the feed");
 assert.equal(await db.networkEvent.count({ where: { vouchId } }), eventsBefore,
   "the NetworkEvent row is untouched — visibility is a read-time join, not a delete");
 
 await db.vouch.update({ where: { id: vouchId }, data: { status: "published" } });
-events = await feed(asker);
+events = await feed(primary);
 assert.ok(events.some((e) => e.id === vouchEvent.id), "and it comes back when the source does");
 ok("feed follows the vouch's status both ways; its row never moves");
-
-// ─────────────────────────────────────────────────────────────────────────
-console.log("\n3. Accepting an ask answer writes nothing to the feed");
-// Until Sept 2026 this wrote recommendation_published and the accepted answer
-// appeared here. The feature was removed: accepting is the asker settling
-// their own question, and broadcasting it made one member's private choice
-// into a public credential for another. Asserted rather than assumed, because
-// "no row was written" is exactly the kind of absence that quietly comes back.
-r = await asker("/asks", { method: "POST", body: {
-  category: "Service requirement", matchCategory: "Accounting & Tax",
-  matchLocation: "Petaling Jaya", title: "Feed test — need an accountant" } });
-assert.equal(r.status, 201, JSON.stringify(r.data));
-const askId = r.data.ask.id;
-
-r = await a2(`/asks/${askId}/answers`, { method: "POST",
-  body: { recommendedBusinessId: `${P}target`, comment: "They did our annual returns." } });
-assert.equal(r.status, 201, JSON.stringify(r.data));
-const answerId = r.data.answer.id;
-
-const feedBefore = (await feed(asker)).length;
-r = await asker(`/asks/${askId}/answers/${answerId}/accept`, { method: "POST" });
-assert.equal(r.status, 200, JSON.stringify(r.data));
-assert.equal(r.data.ask.status, "answered", "the ask is settled");
-
-events = await feed(asker);
-assert.equal(events.length, feedBefore, "the feed did not grow");
-assert.equal(
-  await db.networkEvent.count({ where: { subjectBusinessId: `${P}target`, type: "recommendation_published" } }),
-  0,
-  "no recommendation_published row exists for the named business",
-);
-ok("accepting settles the ask and writes no network event");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n6. Verification is announced, and revoking it retracts the announcement");
@@ -150,7 +118,7 @@ await db.networkEvent.deleteMany({ where: { subjectBusinessId: `${P}t1` } });
 r = await admin(`/admin/businesses/${P}t1/verify-ssm`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
 
-events = await feed(asker);
+events = await feed(primary);
 const verified = events.find((e) => e.type === "business_verified" && e.subject.id === `${P}t1`);
 assert.ok(verified, "business_verified is in the feed");
 assert.equal(verified.actor, null, "no actor — an admin did this, and staff are not members");
@@ -159,7 +127,7 @@ assert.equal(verified.toVerificationLevel, "L2");
 // A promotion must NOT retract it; only a revocation may. This is the case a
 // plain equality check against toVerificationLevel would get backwards.
 await db.business.update({ where: { id: `${P}t1` }, data: { verificationLevel: "L3" } });
-events = await feed(asker);
+events = await feed(primary);
 assert.ok(events.some((e) => e.id === verified.id), "L2 -> L3 leaves the announcement standing");
 
 // Back to L2 so the route's own guard passes — it refuses to revoke anything
@@ -167,7 +135,7 @@ assert.ok(events.some((e) => e.id === verified.id), "L2 -> L3 leaves the announc
 await db.business.update({ where: { id: `${P}t1` }, data: { verificationLevel: "L2" } });
 r = await admin(`/admin/businesses/${P}t1/revoke-ssm`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
-events = await feed(asker);
+events = await feed(primary);
 assert.ok(!events.some((e) => e.id === verified.id), "revoking SSM retracts the announcement");
 ok("business_verified survives promotion, retracts on revocation");
 
@@ -232,7 +200,7 @@ for (const [i, id] of PAGING_SUBJECTS.entries()) {
 // reproduce the first N ids of a single large read, for as far as that read
 // goes. Asserting more than that would be asserting how much demo data happens
 // to be loaded, which is not a property of the feed.
-const all = (await asker(`/feed?limit=50`)).data;
+const all = (await primary(`/feed?limit=50`)).data;
 assert.ok(all.events.length >= 6, `expected at least 6 events, got ${all.events.length}`);
 // The loop runs until the cursor says stop. MAX_PAGES is a runaway guard, not
 // a page budget — it was 20, which at two per page could only ever see 40
@@ -245,7 +213,7 @@ const seenEvents = [];
 let cursor = null;
 let pages = 0;
 for (; pages < MAX_PAGES; pages++) {
-  const res = await asker(`/feed?limit=2${cursor ? `&cursor=${cursor}` : ""}`);
+  const res = await primary(`/feed?limit=2${cursor ? `&cursor=${cursor}` : ""}`);
   seenEvents.push(...res.data.events);
   cursor = res.data.nextCursor;
   if (!cursor) break;

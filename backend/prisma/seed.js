@@ -37,13 +37,13 @@ const businesses = [
   // ── The everyday SMEs ───────────────────────────────────────────────────
   //
   // THE OTHER HALF OF THE NETWORK. The 22 above all SELL professional
-  // services, which made every seeded ask read "professional-services firm
+  // services, which made every seeded row read "professional-services firm
   // needs professional-services firm" — the most common real transaction in
   // the corridor, a bakery needing an accountant, could not be seeded because
   // neither the category nor the business existed.
   //
   // These are the buyers. They are what makes the directory legible at a
-  // glance: a reader scanning a board of asks can tell a kopitiam chain from a
+  // glance: a reader scanning the directory can tell a kopitiam chain from a
   // furniture maker instantly, and could not tell two company secretaries
   // apart at all.
   { id: "roti-sawan-bakery", name: "Roti Sawan Bakery", category: "Food & Beverage", location: "Petaling Jaya", domain: "rotisawan.my", description: "Neighbourhood bakery running four outlets across PJ and Subang, with a central kitchen supplying cafes and offices.", phone: "03-7877 4412", whatsapp: "60127877441", email: "hello@rotisawan.my", website: "https://rotisawan.my", address: "12 Jalan SS2/24, 47300 Petaling Jaya, Selangor", openingHours: "Mon–Sat 7am–7pm\nSun 7am–2pm" },

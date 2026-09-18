@@ -83,37 +83,6 @@ function resolveVouchFlag(id, { outcome, note } = {}) {
   }).then((data) => data.flag);
 }
 
-// The Asks queue. Two decide routes rather than one, because an ask and an
-// answer are different things with different exits — restore/close for an
-// ask, restore/remove for an answer. `outcome` is never sent: the server
-// derives it from the decision, so an admin cannot record "closed it, but the
-// report was fine".
-function fetchAskReviews({ status } = {}) {
-  const qs = status ? `?status=${status}` : "";
-  return apiFetch(`/admin/ask-reviews${qs}`).then((data) => data.reviews);
-}
-
-function decideAskReview(askId, { decision, note } = {}) {
-  return apiFetch(`/admin/ask-reviews/asks/${askId}/decide`, {
-    method: "POST",
-    body: { decision, note },
-  });
-}
-
-function decideAnswerReview(answerId, { decision, note } = {}) {
-  return apiFetch(`/admin/ask-reviews/answers/${answerId}/decide`, {
-    method: "POST",
-    body: { decision, note },
-  });
-}
-
-// Only for reports that froze nothing. One whose target is still frozen is
-// refused — it has to go through the decision above, so the ruling and the
-// content move together.
-function resolveAskFlag(id, { outcome } = {}) {
-  return apiFetch(`/admin/ask-flags/${id}/resolve`, { method: "POST", body: { outcome } });
-}
-
 export {
   fetchSsmReviews,
   rejectSsm,
@@ -127,8 +96,4 @@ export {
   fetchVouchReviews,
   decideVouchReview,
   resolveVouchFlag,
-  fetchAskReviews,
-  decideAskReview,
-  decideAnswerReview,
-  resolveAskFlag,
 };

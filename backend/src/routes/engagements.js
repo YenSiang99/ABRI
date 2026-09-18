@@ -22,8 +22,7 @@ const router = Router();
 // can never be the one that confirms it. Every route below re-derives that
 // from Engagement.proposedById rather than trusting anything the client sends,
 // because an engagement a business can confirm alone is a self-nomination with
-// extra steps — which is exactly the signal the asks board already produces
-// and cannot use.
+// extra steps, and a self-nomination is exactly what this record must not be.
 
 function fail(status, message) {
   throw Object.assign(new Error(message), { status });
@@ -66,7 +65,7 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const own = await ownBusiness(req);
-    const { businessId, service, note, occurredOn, askId, serviceProvidedById } = req.body ?? {};
+    const { businessId, service, note, occurredOn, serviceProvidedById } = req.body ?? {};
 
     if (!businessId) fail(400, "Say which business you worked with.");
     if (businessId === own.id) fail(400, "You can't log working with yourself.");
@@ -79,10 +78,8 @@ router.post(
       fail(400, "That listing hasn't been claimed yet, so nobody can confirm this.");
     }
 
-    // Validated against the catalogue, not accepted as typed — the same
-    // treatment Ask.matchServices gets in routes/asks.js, and for the same
-    // reason: a service nothing else can hold is a row that can never appear
-    // in an aggregate.
+    // Validated against the catalogue, not accepted as typed: a service
+    // nothing else can hold is a row that can never appear in an aggregate.
     let canonical = null;
     if (service !== undefined && service !== null && service !== "") {
       canonical = canonicalService(service);
@@ -126,22 +123,6 @@ router.post(
       fail(400, "Keep the note to 280 characters or fewer.");
     }
 
-    // The ask is provenance, so it has to be one the caller actually took
-    // part in — otherwise an engagement could cite a stranger's ask as its
-    // origin and borrow its context.
-    let linkedAskId = null;
-    if (askId) {
-      const ask = await prisma.ask.findUnique({
-        where: { id: askId },
-        select: { id: true, askedByBusinessId: true, answers: { select: { answeredByBusinessId: true } } },
-      });
-      if (!ask) fail(404, "Ask not found.");
-      const involved =
-        ask.askedByBusinessId === own.id ||
-        ask.answers.some((a) => a.answeredByBusinessId === own.id);
-      if (!involved) fail(400, "You can only link an ask you took part in.");
-      linkedAskId = ask.id;
-    }
 
     const engagement = await prisma.engagement.create({
       data: {
@@ -151,7 +132,6 @@ router.post(
         serviceProvidedById: provider,
         note: typeof note === "string" && note.trim() ? note.trim() : null,
         occurredOn: month,
-        askId: linkedAskId,
       },
       include: ENGAGEMENT_INCLUDE,
     });
@@ -271,7 +251,7 @@ router.get(
       orderBy: [{ lastActionAt: "desc" }, { id: "desc" }],
     });
 
-    // Swept on read, the same shape routes/vouches.js and routes/asks.js use:
+    // Swept on read, the same shape routes/vouches.js uses:
     // there is no cron, so the list read is where a lapse gets noticed.
     const swept = await Promise.all(rows.map(applyExpiryIfNeeded));
     res.json({ engagements: swept.map((e) => serializeEngagement(e, own.id)) });

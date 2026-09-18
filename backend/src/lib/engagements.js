@@ -24,7 +24,6 @@ const ENGAGEMENT_BUSINESS_SELECT = {
 const ENGAGEMENT_INCLUDE = {
   businessA: { select: ENGAGEMENT_BUSINESS_SELECT },
   businessB: { select: ENGAGEMENT_BUSINESS_SELECT },
-  ask: { select: { id: true, title: true } },
 };
 
 function isExpired(engagement) {
@@ -34,7 +33,7 @@ function isExpired(engagement) {
 
 // Lapses a pending engagement nobody answered. Returns the row either way, so
 // callers can use it inline — the shape applyExpiryIfNeeded has in
-// lib/vouchExpiry.js and lib/askExpiry.js.
+// lib/vouchExpiry.js.
 //
 // Told to the PROPOSER only, and worded to name no culprit: nobody declined
 // this, it just sat there. That distinction is the same one vouch_expired
@@ -87,7 +86,6 @@ function serializeEngagement(engagement, viewerBusinessId = null) {
     occurredOn: engagement.occurredOn,
     createdAt: engagement.createdAt,
     confirmedAt: engagement.confirmedAt,
-    ask: engagement.ask ?? null,
     counterparty: viewerBusinessId ? counterparty : null,
     businessA: engagement.businessA,
     businessB: engagement.businessB,

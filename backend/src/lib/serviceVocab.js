@@ -3,15 +3,16 @@ import { BUSINESS_CATEGORIES } from "./businessVocab.js";
 // What a business actually DOES, one rung below its category.
 //
 // THE SAME ARGUMENT businessVocab.js MAKES, one field along. That file closed
-// category and location because the Asks board joins on them by equality, and
-// a business that typed "PJ" is one no ask will ever reach — silently. Services
-// are where that bug still lives: `Business.services` has been free text
-// entered as a comma-separated string, so "SSM filings", "SSM filing" and
-// "Filing with SSM" are three unrelated values, and nothing can match on any of
-// them. That is why the board can only route on category today.
+// category and location because the directory filters on them by equality, and
+// a business that typed "PJ" is one no filter will ever return — silently.
+// Services are where that bug still lives: `Business.services` has been free
+// text entered as a comma-separated string, so "SSM filings", "SSM filing" and
+// "Filing with SSM" are three unrelated values, and nothing can aggregate any
+// of them. A canonical value is also what lets a portfolio entry be credited
+// to a service at all — see Engagement.service.
 //
 // HYBRID, NOT CLOSED, and that is the one place this departs from
-// businessVocab.js. Google Business Profile — the model asked for — closes its
+// businessVocab.js. Google Business Profile — the model this follows — closes its
 // CATEGORY taxonomy and leaves services open with suggestions, and it is right
 // to: a closed service list is a promise that we can name every professional
 // service in the Klang Valley, which we cannot. So:

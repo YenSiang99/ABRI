@@ -26,7 +26,7 @@ import {
 } from "./verificationLevels.js";
 
 // NetworkEvent.type. String column, so this Set is what actually constrains
-// it — the role ASK_CATEGORIES plays in lib/asks.js.
+// it — the role BUSINESS_CATEGORIES plays in lib/businessVocab.js.
 //
 // "vouch_published" deliberately shares its name with the ActivityEvent type
 // of the same name. It is one real-world event written for two audiences —
@@ -73,9 +73,10 @@ const LEVEL_EVENT_LEVEL = {
 };
 
 // The business fields every feed payload carries. Identical today to
-// ASK_BUSINESS_SELECT in lib/asks.js and COPIED rather than imported, for the
+// ENGAGEMENT_BUSINESS_SELECT in lib/engagements.js and COPIED rather than
+// imported, for the
 // reason that constant's own comment gives: importing it would make the next
-// widening of an ask card change what the feed sends.
+// widening of an engagement row change what the feed sends.
 //
 // Note what it does not select: no contact columns, no membershipTier. That
 // is why publicBusinessView is not needed on this path — there is nothing

@@ -94,26 +94,17 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // Pro feature arrives, it gets its own entry under its own name.
   nfcCard: "plus",
 
-  // What Pro buys on the Asks board, and the ONLY thing it buys there: being
-  // TOLD an ask matches what you do. Server-enforced — GET /asks/alerts
-  // answers 402 below Pro.
+  // PRO CURRENTLY DELIVERS NOTHING SERVER-SIDE, and that is recorded here
+  // rather than hidden. askAlerts sat in this slot until Sept 2026 and was,
+  // by §3 of the checklist, Pro's first and only delivered feature; it went
+  // when the asks board did. The plan is still sold and still upgradeable,
+  // so the tier scaffolding stays — but no can() call resolves to "pro"
+  // today, and a reader of this registry should not have to grep to find
+  // that out.
   //
-  // Posting an ask is gated by T2, which is verification and cannot be bought
-  // (ABRI-feature-checklist.md §6); answering is gated by nothing at all.
-  // Neither is a plan question, so neither appears in this registry, and
-  // routes/asks.js contains no can() call for either.
-  //
-  // Read the LIMIT of this gate before relying on it. What it withholds is a
-  // COUNT the member can recompute in one click by opening the board, which
-  // they are always allowed to do. It sells TIMING, not access — push versus
-  // pull — and it must never grow into hiding asks from anyone: the moment a
-  // Free member cannot SEE an ask, the board stops being a network and
-  // becomes a lead list, which is the thing §6's "never build a marketplace"
-  // rules out.
-  //
-  // It is also, as of this change, Pro's first delivered feature — §3 of the
-  // checklist recorded that Pro had none.
-  askAlerts: "pro",
+  // The same rule the introductions note above states applies to whatever
+  // replaces it: a gate is not a feature. Do not add an entry here until
+  // there is something behind it.
 
   // ─── The viewer-side gates ───────────────────────────────────────────────
   //

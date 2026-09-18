@@ -11,10 +11,10 @@ import { apiFetch } from "./client";
 // Propose one. `service` must be a catalogue value (see api/serviceCatalogue),
 // `occurredOn` any date in the month the work happened — the server floors it
 // to the first of that month.
-function proposeEngagement({ businessId, service, note, occurredOn, askId }) {
+function proposeEngagement({ businessId, service, note, occurredOn }) {
   return apiFetch("/engagements", {
     method: "POST",
-    body: { businessId, service, note, occurredOn, askId },
+    body: { businessId, service, note, occurredOn },
   }).then((d) => d.engagement);
 }
 

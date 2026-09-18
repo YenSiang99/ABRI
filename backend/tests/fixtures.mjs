@@ -8,7 +8,7 @@ const prisma = new PrismaClient({ datasourceUrl: url });
 const P = "e2e-";
 const CAST = [
   // id, name, category, location, verificationLevel
-  ["asker",  "E2E Asker Sdn Bhd",   "Law",              "Petaling Jaya", "L2"],
+  ["primary",  "E2E Primary Sdn Bhd",   "Law",              "Petaling Jaya", "L2"],
   ["t1",     "E2E T1 Answerer",     "Accounting & Tax", "Petaling Jaya", "L1"],
   ["a2",     "E2E Answerer Two",    "Accounting & Tax", "Petaling Jaya", "L2"],
   ["a3",     "E2E Answerer Three",  "Accounting & Tax", "Kuala Lumpur",  "L2"],
