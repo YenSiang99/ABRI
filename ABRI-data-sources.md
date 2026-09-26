@@ -154,6 +154,7 @@ The rule is: build a register scraper only for categories that are still thin, a
 3. **Keep provenance.** Every row carries `source`, `sourceId`, `sourceYear`, `locationBasis`, `sourceType`, and after the merge `primarySource`, `alsoIn`, `confirmed`.
 4. **Skip chains.** Brand-tagged places, and DBKL companies with five or more premises.
 5. **A wrong locality is worse than a missing one.** When unsure, send the row to overflow.
+6. **Names are English-first and clean** (`nameVerdict` in `common.mjs`, decided 26 Sep). The non-Latin half of a bilingual name is stripped, and so is page decoration (`•`, `..`, a dangling `(`, a pasted address). When the Latin half left behind is only a dish ("Mixed Rice"), the original name is kept. When it's only a place ("@ Jinjang", "Old Klang Road"), the row is dropped. Borderline cases are marked `unsure` in each source's `names.csv`, a person rules on them, and the rulings go in `scripts/sources/name-decisions.json`. Rows that are already imported get the new names through `scripts/sync-seed-names.mjs`.
 
 ## Attribution — required before any of this goes live
 

@@ -18,7 +18,7 @@ import path from "node:path";
 import readline from "node:readline";
 import {
   outDir, blankListing, locationFromPostcode, rejectReasons, assignIds,
-  writeOutputs, cleanName,
+  writeOutputs, nameVerdict, nameLog,
 } from "./common.mjs";
 import { isValidLocation } from "../../src/lib/businessVocab.js";
 
@@ -258,6 +258,7 @@ async function main() {
   };
   const candidates = [];
   const overflow = [];
+  const names = nameLog();
 
   const lines = readline.createInterface({ input: fs.createReadStream(src) });
   for await (const line of lines) {
@@ -265,7 +266,7 @@ async function main() {
     stats.raw++;
     if (p.operating_status === "permanently_closed" || p.operating_status === "temporarily_closed") { stats.closed++; continue; }
     if (p.brand) { stats.branded++; continue; }
-    const name = cleanName(p.name);
+    const { name } = names.note(stats, `overture:${p.id}`, p.name, nameVerdict(p.name));
     if (!/[a-z]/i.test(name)) { stats.noName++; continue; }
 
     const category = categoryOf(p);
@@ -311,7 +312,7 @@ async function main() {
   const listings = assignIds(candidates, stats);
   for (const r of listings) delete r._confidence;
 
-  writeOutputs(DIR, listings, overflow, stats);
+  writeOutputs(DIR, listings, overflow, stats, names);
   console.log("Data: Overture Maps Foundation, CDLA-Permissive-2.0 — attribute before publishing.");
 }
 

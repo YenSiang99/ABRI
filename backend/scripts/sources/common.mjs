@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  BUSINESS_LOCATIONS,
   isValidCategory,
   isValidLocation,
 } from "../../src/lib/businessVocab.js";
@@ -153,7 +154,30 @@ export function blankListing() {
 
 // Writes listings.csv, overflow.csv and stats.json for one source, and fills
 // the per-category / per-locality counts every source reports.
-export function writeOutputs(dir, listings, overflow, stats) {
+// "unsure" names a person has ruled on: name-decisions.json → drop is
+// sourceId → original name, for stripped names that turned out to be only a
+// place ("Taman Megah", "Plaza Arkadia").
+const NAME_DECISIONS = JSON.parse(fs.readFileSync(new URL("./name-decisions.json", import.meta.url), "utf8"));
+
+// Every name cleanName changed, with why — the audit trail for the drops
+// and fallbacks. Pass the result as writeOutputs' `names`. note() applies
+// name-decisions.json and returns the verdict to use.
+export function nameLog() {
+  const rows = [];
+  return {
+    rows,
+    note(stats, sourceId, original, result) {
+      if (NAME_DECISIONS.drop[sourceId] !== undefined) result = { name: "", verdict: "place-decided" };
+      const { name, verdict } = result;
+      stats.names = stats.names || {};
+      stats.names[verdict] = (stats.names[verdict] || 0) + 1;
+      if (verdict !== "kept" || name !== String(original ?? "").trim()) rows.push({ sourceId, original, name, verdict });
+      return result;
+    },
+  };
+}
+
+export function writeOutputs(dir, listings, overflow, stats, names) {
   listings.sort((a, b) =>
     a.category.localeCompare(b.category) ||
     a.location.localeCompare(b.location) ||
@@ -172,6 +196,7 @@ export function writeOutputs(dir, listings, overflow, stats) {
   }
   fs.writeFileSync(path.join(dir, "listings.csv"), toCsv(listings, LISTING_COLUMNS));
   fs.writeFileSync(path.join(dir, "overflow.csv"), toCsv(overflow, OVERFLOW_COLUMNS));
+  if (names) fs.writeFileSync(path.join(dir, "names.csv"), toCsv(names.rows, ["sourceId", "original", "name", "verdict"]));
   fs.writeFileSync(path.join(dir, "stats.json"), JSON.stringify(stats, null, 2));
   console.log(JSON.stringify(stats, null, 2));
   console.log(`\nWrote ${path.relative(REPO_ROOT, dir)}/listings.csv and overflow.csv`);
@@ -234,8 +259,30 @@ export function readCsv(file) {
 const NON_LATIN = /[[\p{L}\p{M}\p{Nl}]--[\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]]+|[　-〿ー＀-￯،؛؟٫٬⁰-₟←-⇿∣①-⓿☀-➿\p{Extended_Pictographic}]+/gv;
 
 export function cleanName(name) {
-  const original = String(name ?? "").trim();
-  if (!NON_LATIN.test(original)) return original;
+  return nameVerdict(name).name;
+}
+
+// cleanName with its reasoning, for the sources' stats and the review report.
+// verdict is one of:
+//   "kept"       no non-Latin text; tidied only
+//   "stripped"   non-Latin half dropped, the Latin half is a real name
+//   "fallback"   the Latin half is only a descriptor ("Mixed Rice", "OUG
+//                Branch") — the name was the non-Latin part, so keep the
+//                original, tidied
+//   "separators" under 2 Latin letters left → name is ""
+//   "place"      the Latin half is only where the business is ("@ Jinjang",
+//                "· · · ·Old Klang Road") → name is ""
+//   "unsure"     stripped, but the Latin half looks like a place ("Taman
+//                Minang") — kept, and listed in names.csv for a person
+// The last two are dropped rather than falling back: agreed 26 Sep 2026, a
+// directory card should not open on a Chinese or Arabic name unless there is
+// no other name at all.
+export function nameVerdict(name) {
+  // Fullwidth brackets sit inside NON_LATIN's fullwidth range; make them
+  // ASCII first or "Sdn. Bhd.（Hino)" loses its "(".
+  const original = String(name ?? "").trim().replace(/（/g, " (").replace(/）/g, ") ");
+  NON_LATIN.lastIndex = 0;
+  if (!NON_LATIN.test(original)) return { name: tidyName(original), verdict: "kept" };
   NON_LATIN.lastIndex = 0;
   let s = original.replace(NON_LATIN, " ");
   for (let i = 0; i < 3; i++) {
@@ -248,5 +295,118 @@ export function cleanName(name) {
       .replace(/\s{2,}/g, " ")
       .trim();
   }
-  return (s.match(/\p{Script=Latin}/gu) || []).length >= 2 ? s : "";
+  if ((s.match(/\p{Script=Latin}/gu) || []).length < 2) return { name: "", verdict: "separators" };
+  const introducedByAt = /^[\s•·・∙|~\-–—]*@/.test(s);
+  const t = tidyName(s);
+  const place = placeScore(t);
+  // "某某 @ Jinjang": what follows an "@" is where, not who.
+  if (place === "certain" || (introducedByAt && !BUSINESS_WORD.test(t))) return { name: "", verdict: "place" };
+  if (isDescriptorOnly(t)) return { name: tidyName(original), verdict: "fallback" };
+  // Probably a place, but a real name can look like one ("SS2 Oloiya"):
+  // kept, and listed for a person to decide.
+  if (place === "likely") return { name: t, verdict: "unsure" };
+  return { name: t, verdict: "stripped" };
+}
+
+// Words that make a string a business rather than a place.
+const BUSINESS_WORD = /\b(restaurant|restoran|resto|cafe|caf[eé]|kafe|coffee|kopi|kopitiam|tea|bistro|bar|pub|kitchen|dapur|food|makanan|noodles?|mee|mian|rice|nasi|steamboat|hot ?pot|bbq|grill|bakery|dessert|seafood|dim sum|kedai|shop|store|mart|trading|enterprise|sdn|bhd|plt|clinic|klinik|dental|pharmacy|farmasi|salon|spa|beauty|studio|hotel|auto|motor|garage|tyres?|tayar|services?|servis|school|sekolah|sjk[ct]?|tuition|academy|college|kolej|tadika|gym|florist|hardware|optical|laundry|printing|stall|gerai|warung|canteen|kantin|tuisyen|tuition|fisioterap\w*|physio\w*|ortopedik|akupunktur|acupuncture|pajak|pawn|nails?|sushi|porridge|eatery|pasar|market|hawker|medan selera|foods?|kway|teh|bak|laksa|durian|fruits?|bkt)\b/i;
+
+// Words a place name is built from. Localities, plus the pieces Malaysian
+// addresses and landmarks are made of.
+const PLACE_STRUCTURE = new Set(("taman tmn jalan jln lorong lrg kampung kampong kg desa bandar bdr seksyen sek sec section " +
+  "sg sungai bukit bkt persiaran lebuh lebuhraya road rd street st mall megamall plaza parade avenue city square " +
+  "tol pusat perindustrian industrial park").split(" "));
+const PLACE_FILLER = new Set(("sri seri baru jaya indah utama perdana permai raya lama tengah selatan utara timur barat " +
+  "south north new old kl pj malaysia the at @ of").split(" "));
+const LOCALITIES = ["KL", "PJ", "Kepong", "Cheras", "Jinjang", "Setapak", "Wangsa Maju", "Sri Petaling", "Bukit Jalil",
+  "OUG", "Old Klang Road", "Kuchai Lama", "Sentul", "Segambut", "Damansara", "Kota Damansara", "Mont Kiara",
+  "Bukit Bintang", "Chow Kit", "Pudu", "Brickfields", "Titiwangsa", "Setiawangsa", "Sunway", "Kelana Jaya",
+  "Ara Damansara", "Bandar Utama", "Puchong Jaya", "Taman Desa", "Sri Hartamas", "Desa Parkcity", "Balakong",
+  "Jenjarom", "Meru", "Kapar", "Pandamaran", "Port Klang", "Batu Caves", "Gombak", "Melawati", "Keramat",
+  "Bangsar South", "Mid Valley", "Sungai Besi", "Sg Long", "Pandan Indah", "Pandan Jaya", "Maluri", "Salak South",
+  "Desa Petaling", "Petaling", "Imbi", "Alor", "Ipoh", "Yulek", "Usj", "Taipan", "Subang", "Selangor",
+  "Kuala", "Lumpur", "Velocity", "Botanic", "1 Utama", "One Utama", "IOI", "Rivercity", "Paradigm"];
+const LOCALITY_WORDS = new Set([...BUSINESS_LOCATIONS, ...LOCALITIES]
+  .flatMap((l) => l.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/)).filter(Boolean));
+
+// "certain": every word is a place word — "Jinjang", "Old Klang Road",
+//   "Taman Muda", "SS2", "B1-07".
+// "likely": a place word plus one or two words that could be either —
+//   "Taman Minang", "Jalan Imbi", "SS2 Oloiya".
+// null: anything else.
+function placeScore(name) {
+  if (BUSINESS_WORD.test(name)) return null;
+  if (/^[A-Z]?\d+[A-Z]?-\d+/i.test(name)) return "certain";   // unit number
+  const words = name.toLowerCase().replace(/[^a-z0-9@ ]+/g, " ").split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+  let structure = 0, unknown = 0;
+  for (const w of words) {
+    if (PLACE_STRUCTURE.has(w) || /^(ss|usj|pju|pjs|u)\d+[a-z]?$/.test(w)) structure++;
+    else if (LOCALITY_WORDS.has(w) || PLACE_FILLER.has(w) || /^\d+[a-z]?$/.test(w)) continue;
+    else unknown++;
+  }
+  if (!unknown) return "certain";
+  if (structure && unknown <= 2 && words.length <= 4) return "likely";
+  return null;
+}
+
+// The Latin half names nothing that is this business rather than any other:
+// only menu words ("Mixed Rice", "Roast Duck", "Kopitiam"), or an area plus
+// a branch word ("OUG Branch"). "Restoran Kapar Kopitiam" is not this — an
+// area and a menu word together are how many real names are made.
+const DESCRIPTOR = new Set(("mixed rice chicken duck roast roasted pork char siu siew noodle noodles mee pan " +
+  "restaurant restoran branch kopitiam cafe hot pot hotpot steamboat seafood dessert desserts bak kut teh food " +
+  "court centre kitchen bbq dim sum economy fish head beef curry laksa soup porridge congee dumpling dumplings " +
+  "tea house stall the and &").split(" "));
+const BRANCH = new Set(["branch", "outlet", "hq", "cawangan"]);
+
+function isDescriptorOnly(name) {
+  const words = name.toLowerCase().replace(/[^a-z0-9& ]+/g, " ").split(/\s+/).filter(Boolean);
+  if (!words.length) return false;
+  if (words.every((w) => DESCRIPTOR.has(w))) return true;
+  return words.some((w) => BRANCH.has(w)) &&
+    words.every((w) => DESCRIPTOR.has(w) || BRANCH.has(w) || LOCALITY_WORDS.has(w));
+}
+
+// Page-name decoration that survives on its own or is left behind once the
+// non-Latin half goes: "· · · ·Old Klang Road", "• Mixed Rice •",
+// "BuYaoWen..", "Restaurant 3T (", "Restoran X, Kampung Y, 51000, Gombak,".
+// Bullets between words become spaces ("Cha Cha • Kota Damansara"); pipes
+// and dashes stay — owners use those on purpose. A single trailing "."
+// stays: "Sdn. Bhd.", "Co." are real.
+const EDGE_LEAD = /^[\s•·・∙*#@~_=|\-–—/\\,:;&+.…]+/;
+const EDGE_TRAIL = /(?:[\s•·・∙*#@~_=|\-–—/\\,:;&+(]|\.{2,}|…)+$/;
+
+function balanceBrackets(s) {
+  // Drops a ")" with no "(" before it, closes a "(" left open, and removes a
+  // pair holding nothing but decoration ("My Flavour (· · ·)").
+  let out = "", depth = 0;
+  for (const ch of s) {
+    if (ch === "(") { depth++; out += ch; }
+    else if (ch === ")") { if (depth) { depth--; out += ch; } }
+    else out += ch;
+  }
+  out = out.replace(/\s*\(\s*$/, "").replace(/\(\s+/g, "(").replace(/\s+\)/g, ")");
+  depth = (out.match(/\(/g) || []).length - (out.match(/\)/g) || []).length;
+  if (depth > 0) out = out.trimEnd() + ")".repeat(depth);
+  return out.replace(/\s*\([^\p{L}\p{N}]*\)/gu, "");
+}
+
+export function tidyName(name) {
+  let s = String(name ?? "");
+  // An address pasted in after the name: cut at the first comma whose tail
+  // carries a postcode.
+  const comma = s.search(/,(?=[^,]*,?.*\b\d{5}\b)/);
+  if (comma > 0 && /\b\d{5}\b/.test(s.slice(comma))) s = s.slice(0, comma);
+  s = s
+    .replace(/（/g, " (").replace(/）/g, ") ")   // fullwidth brackets
+    .replace(/\s*(?:\.{2,}|…)\s*/g, " ")          // "Hello..Vet" → "Hello Vet"
+    .replace(/\s*[•·・∙]+\s*/g, " ")                // bullets → space
+    .replace(/\|(?:\s*\|)+/g, "|")                 // "||" → "|"
+    .replace(/\s{2,}/g, " ");
+  for (let i = 0; i < 3; i++) {
+    s = balanceBrackets(s);
+    s = s.replace(EDGE_LEAD, "").replace(EDGE_TRAIL, "").replace(/\s{2,}/g, " ").trim();
+  }
+  return s;
 }

@@ -46,7 +46,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   outDir, blankListing, locationFromPostcode, rejectReasons, assignIds,
-  writeOutputs, cleanName,
+  writeOutputs, nameVerdict, nameLog,
 } from "./common.mjs";
 import { isValidLocation } from "../../src/lib/businessVocab.js";
 
@@ -318,7 +318,7 @@ function displayName(t) {
   // A name with no Latin letters slugs to "", so prefer an English or Malay
   // name tag when the primary one is Chinese- or Tamil-only.
   for (const k of ["name", "name:en", "name:ms"]) {
-    if (t[k] && /[a-z]/i.test(t[k])) return cleanName(t[k]);
+    if (t[k] && /[a-z]/i.test(t[k])) return { original: t[k], ...nameVerdict(t[k]) };
   }
   return null;
 }
@@ -384,11 +384,13 @@ async function main() {
   };
   const candidates = [];
   const overflow = [];
+  const names = nameLog();
 
   for (const [sourceId, el] of elements) {
     const t = el.tags || {};
     if (t.brand || t["brand:wikidata"]) { stats.branded++; continue; }
-    const name = displayName(t);
+    const shown = displayName(t);
+    const name = shown && names.note(stats, `osm:${sourceId}`, shown.original, shown).name;
     if (!name) { stats.noLatinName++; continue; }
 
     const lat = el.lat ?? el.center?.lat;
@@ -446,7 +448,7 @@ async function main() {
 
   // Same name, same locality: a second branch of one business. Keep one.
   const listings = assignIds(candidates, stats);
-  writeOutputs(OUT_DIR, listings, overflow, stats);
+  writeOutputs(OUT_DIR, listings, overflow, stats, names);
   console.log("Data © OpenStreetMap contributors, ODbL — attribute before publishing.");
 }
 
