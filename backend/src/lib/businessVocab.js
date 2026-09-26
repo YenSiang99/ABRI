@@ -70,15 +70,25 @@ const BUSINESS_CATEGORIES = [
   "Health & Wellness",
   "Marketing & Media",
   "Professional Training",
+  // Added Sept 2026 from the seeding pull (ABRI-data-sources.md): workshops,
+  // dealers, tyre and parts shops were the largest group of real corridor
+  // businesses with no category to go in — about 6,000 of them. Another
+  // buyer-side SME, and a heavy user of accountants and insurers.
+  "Automotive",
 ];
 
-// The six localities the seeded corridor covers.
+// The localities of the Klang Valley corridor.
 //
-// This list GROWS, and that is planned rather than a smell: the corridor SSM
-// import will land 15-30 real Klang Valley localities. When it does, the thing
-// to add alongside them is a locality -> region grouping, so the directory can
-// offer "same region" between "same locality" and everything — six values make
-// an exact category+location filter plausible, thirty do not.
+// This list GROWS, and that is planned rather than a smell. The first seven
+// were the seeded corridor; the rest arrived in Sept 2026 with the free-data
+// seeding pull (ABRI-data-sources.md), which found tens of thousands of real
+// businesses in them that had nowhere to go — Klang alone about 10,800.
+//
+// Twenty-odd values is where the note that used to be here said a
+// locality -> region grouping should come in, so the directory can offer
+// "same region" between "same locality" and everything. Nothing filters on
+// location yet, so there is nothing for a grouping to serve; add it with the
+// first filter that does.
 //
 // What must NOT happen instead is loosening the join to substring or fuzzy
 // matching. That converts a closed list back into free text by the back door
@@ -91,10 +101,28 @@ const BUSINESS_LOCATIONS = [
   "Puchong",
   "Bangsar",
   // Same story as "Design" above: a member had already registered here before
-  // the gate existed. This list was always going to grow — see the note above
-  // about the corridor SSM import — so this is the planned direction arriving
-  // one locality early rather than an exception to it.
+  // the gate existed.
   "Ampang",
+  // ── Added Sept 2026 from the seeding pull, largest first ──────────────
+  "Klang",
+  "Kajang",
+  "Selayang",           // includes Batu Caves and Gombak (postcodes 681xx)
+  "Seri Kembangan",
+  "Cheras (Selangor)",  // Batu 9 / Balakong side; Cheras inside KL is "Kuala Lumpur"
+  "Bangi",
+  "Rawang",
+  "Sungai Buloh",
+  "Nilai",              // Negeri Sembilan, but part of the same commuter belt
+  "Putrajaya",
+  "Cyberjaya",
+  "Semenyih",
+  "Dengkil",
+  "Sepang",
+  "Hulu Langat",
+  "Serdang",
+  "Banting",
+  "Puncak Alam",
+  "Ijok",
 ];
 
 const BUSINESS_CATEGORY_SET = new Set(BUSINESS_CATEGORIES);

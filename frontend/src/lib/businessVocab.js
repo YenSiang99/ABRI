@@ -32,6 +32,7 @@ const BUSINESS_CATEGORIES = [
   "Health & Wellness",
   "Marketing & Media",
   "Professional Training",
+  "Automotive",
 ];
 
 const BUSINESS_LOCATIONS = [
@@ -42,6 +43,26 @@ const BUSINESS_LOCATIONS = [
   "Puchong",
   "Bangsar",
   "Ampang",
+  // Added Sept 2026 — see the backend copy.
+  "Klang",
+  "Kajang",
+  "Selayang",
+  "Seri Kembangan",
+  "Cheras (Selangor)",
+  "Bangi",
+  "Rawang",
+  "Sungai Buloh",
+  "Nilai",
+  "Putrajaya",
+  "Cyberjaya",
+  "Semenyih",
+  "Dengkil",
+  "Sepang",
+  "Hulu Langat",
+  "Serdang",
+  "Banting",
+  "Puncak Alam",
+  "Ijok",
 ];
 
 export { BUSINESS_CATEGORIES, BUSINESS_LOCATIONS };

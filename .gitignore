@@ -24,3 +24,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated seed extracts (backend/scripts/osm-extract.mjs)
+data/

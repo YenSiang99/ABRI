@@ -217,6 +217,15 @@ const SERVICES_BY_CATEGORY = {
     "Sales training",
     "Coaching & facilitation",
   ],
+  "Automotive": [
+    "Car servicing & repair",
+    "Tyres & alignment",
+    "Car detailing",
+    "Auto parts",
+    "Vehicle sales",
+    "Motorcycle servicing",
+    "Fleet maintenance",
+  ],
 };
 
 // Every canonical service across every category, for the membership test. A
