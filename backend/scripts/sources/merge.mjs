@@ -60,6 +60,8 @@ function main() {
     const row = { ...best };
     for (const other of rest) {
       for (const f of FILL) if (!row[f] && other[f]) row[f] = other[f];
+      // A point is a pair: take both from one source or neither.
+      if (!row.lat && other.lat && other.lng) { row.lat = other.lat; row.lng = other.lng; }
     }
     const distinct = [...new Set(rows.map((r) => r._source))];
     row.alsoIn = distinct.slice(1).join("+");

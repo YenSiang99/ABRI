@@ -1,15 +1,15 @@
 // Brings already-imported seed listings in line with a rebuilt
-// data/seed/listings.csv after the name rules change (see nameVerdict in
-// scripts/sources/common.mjs).
+// data/seed/listings.csv: names after the name rules change (see nameVerdict
+// in scripts/sources/common.mjs), and the map point (lat/lng).
 //
 //   node scripts/sync-seed-names.mjs --manifest data/seed/imports/<import>.csv            # dry run
 //   node scripts/sync-seed-names.mjs --manifest data/seed/imports/<import>.csv --apply
 //
-// import-seed.mjs is insert-only, so a better name never reaches a row that is
-// already in. This script does exactly two things, and only to rows the given
-// import manifest lists:
-//   - RENAME: the rebuilt CSV has a different name for the row's sourceId.
-//     The id stays — it is the listing's URL.
+// import-seed.mjs is insert-only, so a better name or a new column never
+// reaches a row that is already in. This script does exactly two things, and
+// only to rows the given import manifest lists:
+//   - UPDATE: the rebuilt CSV has a different name or point for the row's
+//     sourceId. The id stays — it is the listing's URL.
 //   - DELETE: the row's sourceId is gone from the CSV because a source's
 //     names.csv says its name was dropped ("separators", "place",
 //     "place-decided"). A sourceId gone for any other reason is reported and
@@ -19,7 +19,8 @@
 // name it has.
 //
 // Every applied change is recorded in data/seed/imports/<db>-names-<stamp>.csv
-// (id, action, old name, new name), which is enough to put names back by hand.
+// (id, action, old and new name and point), which is enough to put them back
+// by hand.
 //
 // ANY DATABASE OTHER THAN backend/.env's needs ABRI_IMPORT_CONFIRM, exactly as
 // in import-seed.mjs.
@@ -93,12 +94,12 @@ async function main() {
   for (let i = 0; i < imported.length; i += BATCH) {
     const found = await prisma.business.findMany({
       where: { id: { in: imported.slice(i, i + BATCH).map((r) => r.id) } },
-      select: { id: true, name: true, verificationLevel: true, _count: { select: { accounts: true } } },
+      select: { id: true, name: true, lat: true, lng: true, verificationLevel: true, _count: { select: { accounts: true } } },
     });
     for (const b of found) current.set(b.id, b);
   }
 
-  const renames = [], deletes = [], unresolved = [];
+  const updates = [], deletes = [], unresolved = [];
   const stats = { inManifest: imported.length, notInDb: 0, touchedSkipped: 0, unchanged: 0 };
   for (const { id, sourceId } of imported) {
     const b = current.get(id);
@@ -106,15 +107,30 @@ async function main() {
     const seed = seedBySource.get(sourceId);
     const wanted = seed ? seed.name : DROPPED.has(verdictBySource.get(sourceId)) ? null : undefined;
     if (wanted === undefined) { unresolved.push({ id, sourceId, name: b.name }); continue; }
-    if (wanted === b.name) { stats.unchanged++; continue; }
+    const lat = seed?.lat ? Number(seed.lat) : null;
+    const lng = seed?.lng ? Number(seed.lng) : null;
+    const was = { oldName: b.name, oldLat: b.lat ?? "", oldLng: b.lng ?? "" };
+    if (wanted === null) {
+      if (b.verificationLevel !== "L0" || b._count.accounts) { stats.touchedSkipped++; continue; }
+      deletes.push({ id, action: "delete", ...was });
+      continue;
+    }
+    const data = {};
+    if (wanted !== b.name) data.name = wanted;
+    if (lat !== b.lat || lng !== b.lng) Object.assign(data, { lat, lng });
+    if (!Object.keys(data).length) { stats.unchanged++; continue; }
     if (b.verificationLevel !== "L0" || b._count.accounts) { stats.touchedSkipped++; continue; }
-    if (wanted === null) deletes.push({ id, action: "delete", oldName: b.name, newName: "" });
-    else renames.push({ id, action: "rename", oldName: b.name, newName: wanted });
+    updates.push({ id, action: "update", data, ...was, newName: data.name ?? "", newLat: data.lat ?? "", newLng: data.lng ?? "" });
   }
-  console.log({ ...stats, rename: renames.length, delete: deletes.length, unresolved: unresolved.length });
+  console.log({
+    ...stats, update: updates.length,
+    renamed: updates.filter((u) => "name" in u.data).length,
+    pointSet: updates.filter((u) => "lat" in u.data).length,
+    delete: deletes.length, unresolved: unresolved.length,
+  });
   for (const u of unresolved.slice(0, 20)) console.log("  unresolved:", u);
   if (!APPLY) {
-    for (const r of [...renames.slice(0, 15), ...deletes.slice(0, 15)]) console.log(`  ${r.action}: ${JSON.stringify(r.oldName)} → ${JSON.stringify(r.newName)}`);
+    for (const r of [...updates.slice(0, 10), ...deletes.slice(0, 10)]) console.log(`  ${r.action} ${r.id}:`, r.data ?? "");
     console.log("Dry run — nothing written. Re-run with --apply.");
     return;
   }
@@ -122,10 +138,28 @@ async function main() {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const log = path.join(REPO_ROOT, "data", "seed", "imports", `${host}-${port}-${dbName}-names-${stamp}.csv`);
   const done = [];
-  for (const r of renames) {
-    // Re-checked in the write itself: a claim between the read and now wins.
-    const { count } = await prisma.business.updateMany({ where: { id: r.id, ...UNTOUCHED }, data: { name: r.newName } });
-    if (count) done.push(r);
+  // One statement per BATCH rows — a point backfill is ~126k rows, too many
+  // round trips through the dev tunnel one at a time. The untouched check is
+  // in the statement itself: a claim between the read and now wins.
+  for (let i = 0; i < updates.length; i += BATCH) {
+    const batch = updates.slice(i, i + BATCH);
+    const updated = await prisma.$queryRaw`
+      UPDATE "Business" b
+         SET name = COALESCE(v.name, b.name),
+             lat  = CASE WHEN v.setpoint THEN v.lat ELSE b.lat END,
+             lng  = CASE WHEN v.setpoint THEN v.lng ELSE b.lng END
+        FROM unnest(${batch.map((r) => r.id)}::text[],
+                    ${batch.map((r) => r.data.name ?? null)}::text[],
+                    ${batch.map((r) => "lat" in r.data)}::boolean[],
+                    ${batch.map((r) => r.data.lat ?? null)}::float8[],
+                    ${batch.map((r) => r.data.lng ?? null)}::float8[]) AS v(id, name, setpoint, lat, lng)
+       WHERE b.id = v.id
+         AND b."verificationLevel" = 'L0'
+         AND NOT EXISTS (SELECT 1 FROM "Account" a WHERE a."businessId" = b.id)
+      RETURNING b.id`;
+    const ok = new Set(updated.map((u) => u.id));
+    done.push(...batch.filter((r) => ok.has(r.id)));
+    process.stdout.write(`\r  updated ${Math.min(i + BATCH, updates.length)}/${updates.length}`);
   }
   for (let i = 0; i < deletes.length; i += BATCH) {
     const batch = deletes.slice(i, i + BATCH);
@@ -134,8 +168,8 @@ async function main() {
     await prisma.business.deleteMany({ where: { id: { in: [...still] }, ...UNTOUCHED } });
     done.push(...batch.filter((r) => still.has(r.id)));
   }
-  fs.writeFileSync(log, toCsv(done, ["id", "action", "oldName", "newName"]));
-  console.log(`Renamed ${done.filter((r) => r.action === "rename").length}, deleted ${done.filter((r) => r.action === "delete").length}. Business rows now: ${await prisma.business.count()}.`);
+  fs.writeFileSync(log, toCsv(done, ["id", "action", "oldName", "newName", "oldLat", "oldLng", "newLat", "newLng"]));
+  console.log(`\nUpdated ${done.filter((r) => r.action === "update").length}, deleted ${done.filter((r) => r.action === "delete").length}. Business rows now: ${await prisma.business.count()}.`);
   console.log(`Log: ${path.relative(REPO_ROOT, log)}`);
 }
 

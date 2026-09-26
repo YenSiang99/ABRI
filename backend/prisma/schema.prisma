@@ -97,6 +97,13 @@ model Business {
   email        String?
   website      String?
   address      String?
+  // Where the pin goes on the profile map. Public, like address. Filled from
+  // the seed source's own point (Overture, OSM) — never geocoded from the
+  // address text, so a row without one simply has no map. Not editable by
+  // the member; PATCH /me clears both when the address changes, because a
+  // source's old pin next to a new address is worse than no pin.
+  lat          Float?
+  lng          Float?
   // One free-text string, deliberately not Json and not String[] — nothing
   // queries or computes on opening hours (no "open now", no filter, no
   // booking), and the real answers include "By appointment only", which a

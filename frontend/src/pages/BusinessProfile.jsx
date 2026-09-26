@@ -486,6 +486,27 @@ function BusinessProfile({ inApp = false }) {
         )}
       </div>
 
+      {/* Unclaimed listings (almost all of them imported) show where the
+          business is — address, map, website, hours — and nothing else: the
+          tabs would all be empty. contactLocked is false because there is no
+          phone/WhatsApp/email to gate; imports never carry them. The note
+          under it says the details are unconfirmed, and is the owner's way
+          in when they spot something wrong. */}
+      {isUnclaimed && (business.address || business.website || business.openingHours || business.lat != null) && (
+        <div className="mt-8 space-y-3">
+          <ContactDetails business={business} contactLocked={false} />
+          <p className="text-[13px] text-grey-600 dark:text-muted-foreground">
+            Not yet confirmed by the owner.{" "}
+            <Link
+              to={`/register?business=${business.id}`}
+              className="underline underline-offset-4 hover:text-grey-600 dark:hover:text-muted-foreground"
+            >
+              Is this your business? Claim it to correct these details.
+            </Link>
+          </p>
+        </div>
+      )}
+
       {!isUnclaimed && (
         <Tabs value={tab} onValueChange={setTab} className="mt-8">
           <TabsList>

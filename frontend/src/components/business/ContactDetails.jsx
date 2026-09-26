@@ -1,12 +1,18 @@
+import { lazy, Suspense } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Clock, Globe, Lock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+
+// Lazy so Leaflet (~40 KB) only loads on a profile that has a pin.
+const LocationMap = lazy(() => import("./LocationMap.jsx"));
 
 
 // One business's contact block, used on the public profile and on the NFC tap
 // page. Two groups of fields with two different rules, which is why they're
 // rendered by one component rather than pasted into each page:
 //
-//   PUBLIC  — website, address, opening hours. Always sent, always shown.
+//   PUBLIC  — website, address, opening hours, map pin. Always sent, always
+//             shown. The pin (lat/lng) exists only where a seed source gave
+//             one; no pin, no map.
 //   GATED   — phone, WhatsApp, email. The server withholds these unless the
 //             OWNER is on Plus or above AND the viewer is logged in. When it
 //             withholds them the KEYS ARE ABSENT, not null, so there is no
@@ -46,9 +52,10 @@ function hostOf(website) {
 
 function ContactDetails({ business, contactLocked, contactLockedReason, ownerView = false }) {
   const location = useLocation();
-  const { name, phone, whatsapp, email, website, address, openingHours } = business;
+  const { name, phone, whatsapp, email, website, address, openingHours, lat, lng } = business;
 
-  const hasPublic = Boolean(website || address || openingHours);
+  const hasPin = lat != null && lng != null;
+  const hasPublic = Boolean(website || address || openingHours || hasPin);
   const hasGated = Boolean(phone || whatsapp || email);
 
   // Three states, not two. "Withheld" and "the owner hasn't added any" must
@@ -162,6 +169,23 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
                   per day, so the newlines they typed have to survive. */}
               <span className="whitespace-pre-line">{openingHours}</span>
             </ContactRow>
+          )}
+          {hasPin && (
+            <div className="sm:col-span-2">
+              <Suspense fallback={<div className="h-52 w-full rounded-xl bg-grey-100 dark:bg-muted" />}>
+                <LocationMap lat={lat} lng={lng} label={name} />
+              </Suspense>
+              {/* A plain link, not an embed: no key, no script, and the reader
+                  gets directions in the app they already use. */}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className={`mt-2 inline-block text-sm ${linkClass}`}
+              >
+                Open in Google Maps
+              </a>
+            </div>
           )}
         </div>
       )}

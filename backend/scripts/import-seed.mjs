@@ -19,7 +19,7 @@
 // from the manifest below, never by guessing.
 //
 // WHAT IS WRITTEN: id, name, category, location, website, address,
-// openingHours. Everything else stays at its default — L0, free tier, no
+// openingHours, lat, lng. Everything else stays at its default — L0, free tier, no
 // services. `domain`, phone, whatsapp and email are never written even if
 // the CSV had them: see ABRI-data-sources.md → "Rules for imported data".
 //
@@ -165,6 +165,8 @@ async function main() {
         website: r.website || null,
         address: r.address || null,
         openingHours: r.openingHours || null,
+        lat: r.lat ? Number(r.lat) : null,
+        lng: r.lng ? Number(r.lng) : null,
       })),
       // A row that appeared between the read above and this write (a member
       // registering mid-import) is skipped, not overwritten.

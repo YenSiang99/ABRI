@@ -18,7 +18,7 @@ import path from "node:path";
 import readline from "node:readline";
 import {
   outDir, blankListing, locationFromPostcode, rejectReasons, assignIds,
-  writeOutputs, nameVerdict, nameLog,
+  writeOutputs, nameVerdict, nameLog, point,
 } from "./common.mjs";
 import { isValidLocation } from "../../src/lib/businessVocab.js";
 
@@ -297,6 +297,7 @@ async function main() {
       name, category, location,
       website: site,
       address: address(p),
+      ...point(p.lat, p.lon),
       source: `Overture Maps (${(p.datasets || []).join("+")})`,
       sourceId,
       sourceYear: String(p.updated || "").slice(0, 4),

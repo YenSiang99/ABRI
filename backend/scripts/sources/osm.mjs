@@ -46,7 +46,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   outDir, blankListing, locationFromPostcode, rejectReasons, assignIds,
-  writeOutputs, nameVerdict, nameLog,
+  writeOutputs, nameVerdict, nameLog, point,
 } from "./common.mjs";
 import { isValidLocation } from "../../src/lib/businessVocab.js";
 
@@ -437,6 +437,7 @@ async function main() {
       website: site,
       address: address(t),
       openingHours: (t.opening_hours || "").trim(),
+      ...point(lat, lon),
       source: "OpenStreetMap",
       sourceId: `osm:${sourceId}`,
       sourceYear: (t["check_date"] || t["survey:date"] || "").slice(0, 4),

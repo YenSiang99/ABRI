@@ -812,6 +812,17 @@ router.patch(
     const { data, error } = normalizeBusinessEdit(req.body);
     if (error) return res.status(400).json({ error });
 
+    // The map pin came from the seed source and belongs to the old address.
+    // Compared, not just "present": the profile form sends every field on
+    // every save, and an unchanged address must keep its pin.
+    if ("address" in data) {
+      const current = await prisma.business.findUnique({
+        where: { id: req.account.businessId },
+        select: { address: true },
+      });
+      if ((current?.address ?? null) !== (data.address ?? null)) Object.assign(data, { lat: null, lng: null });
+    }
+
     await prisma.business.update({
       where: { id: req.account.businessId },
       data,

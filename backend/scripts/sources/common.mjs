@@ -42,6 +42,8 @@ export function slugify(str) {
 export const LISTING_COLUMNS = [
   "id", "name", "category", "location", "domain", "description", "services",
   "ssm", "phone", "whatsapp", "email", "website", "address", "openingHours",
+  // The source's own point, for the profile map. Never geocoded.
+  "lat", "lng",
   // Provenance — not in the intake sheet. Kept so every row can be
   // attributed, audited, or removed by source later.
   "source", "sourceId", "sourceYear", "locationBasis", "sourceType",
@@ -149,7 +151,20 @@ export function blankListing() {
     domain: "", description: "", services: "", ssm: "",
     phone: "", whatsapp: "", email: "",
     website: "", address: "", openingHours: "",
+    lat: "", lng: "",
   };
+}
+
+// The same Klang Valley box overture_fetch.py pulls. A point outside it is a
+// source error (a page pinned to 0,0, a swapped lat/lon), and no pin beats a
+// pin in the sea. Rounded to 6 places — about 10 cm, far past what any
+// source here is accurate to.
+const KV_BOX = { west: 101.35, east: 101.85, south: 2.75, north: 3.35 };
+export function point(lat, lng) {
+  const y = Number(lat), x = Number(lng);
+  if (lat == null || lng == null || !Number.isFinite(y) || !Number.isFinite(x)) return { lat: "", lng: "" };
+  if (y < KV_BOX.south || y > KV_BOX.north || x < KV_BOX.west || x > KV_BOX.east) return { lat: "", lng: "" };
+  return { lat: String(+y.toFixed(6)), lng: String(+x.toFixed(6)) };
 }
 
 // Writes listings.csv, overflow.csv and stats.json for one source, and fills

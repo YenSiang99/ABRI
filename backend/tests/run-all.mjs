@@ -48,6 +48,7 @@ const SUITES = [
   "lookup.mjs",
   "directory.mjs",
   "tiers.mjs",
+  "map-pin.mjs",
   // This suite creates and confirms portfolio entries between the e2e
   // businesses and cleans none of them up — they are fixtures' rows to remove,
   // not this file's, and teardown-e2e.mjs knows about the table.

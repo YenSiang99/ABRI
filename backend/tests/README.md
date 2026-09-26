@@ -34,6 +34,7 @@ prints the failing output at the end. It exits non-zero if any suite failed.
 | `lookup.mjs` | check a business — identifier matching, the honest miss, the rate limit |
 | `directory.mjs` | paging, the cap, and the anonymous→member ladder |
 | `tiers.mjs` | the Plus and Pro rungs, and that Plus only ever *adds* |
+| `map-pin.mjs` | the profile map pin: public, not member-editable, cleared when the address changes |
 | `portfolio.mjs` | the portfolio record — propose, confirm, and who gets credited for a service |
 
 ## Two things about the order

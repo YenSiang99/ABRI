@@ -119,6 +119,10 @@ const PUBLIC_BUSINESS_FIELDS = [
   "domain",
   "website",
   "address",
+  // The map pin. Where the door is, like address — and no more precise than
+  // the address already printed next to it.
+  "lat",
+  "lng",
   "openingHours",
   "createdAt",
   "updatedAt",
