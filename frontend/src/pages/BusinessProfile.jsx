@@ -20,6 +20,7 @@ import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { ContactDetails } from "@/components/business/ContactDetails";
+import { UnclaimedAbout } from "@/components/business/UnclaimedAbout";
 import {
   PortfolioList,
 } from "@/components/business/PortfolioList";
@@ -461,15 +462,10 @@ function BusinessProfile({ inApp = false }) {
             </div>
           </div>
         ) : (
-          <div className="mt-6 rounded-md border border-grey-200 bg-surface p-5 dark:border-border dark:bg-muted">
-            <p className="text-sm font-bold text-ink dark:text-foreground">
-              This listing hasn't been claimed yet.
-            </p>
-            <p className="mt-1 text-[13.5px] text-grey-600 dark:text-muted-foreground">
-              Are you the owner? Claim this business to verify it and start
-              building your vouch reputation.
-            </p>
-          </div>
+          // One card for an unclaimed listing: the header above, its About
+          // below. The Unclaimed pill and the Claim button already say it
+          // isn't claimed, so there is no separate banner repeating it.
+          <UnclaimedAbout business={business} />
         )}
 
         {isPendingVerification && (
@@ -485,27 +481,6 @@ function BusinessProfile({ inApp = false }) {
           </div>
         )}
       </div>
-
-      {/* Unclaimed listings (almost all of them imported) show where the
-          business is — address, map, website, hours — and nothing else: the
-          tabs would all be empty. contactLocked is false because there is no
-          phone/WhatsApp/email to gate; imports never carry them. The note
-          under it says the details are unconfirmed, and is the owner's way
-          in when they spot something wrong. */}
-      {isUnclaimed && (business.address || business.website || business.openingHours || business.lat != null) && (
-        <div className="mt-8 space-y-3">
-          <ContactDetails business={business} contactLocked={false} />
-          <p className="text-[13px] text-grey-600 dark:text-muted-foreground">
-            Not yet confirmed by the owner.{" "}
-            <Link
-              to={`/register?business=${business.id}`}
-              className="underline underline-offset-4 hover:text-grey-600 dark:hover:text-muted-foreground"
-            >
-              Is this your business? Claim it to correct these details.
-            </Link>
-          </p>
-        </div>
-      )}
 
       {!isUnclaimed && (
         <Tabs value={tab} onValueChange={setTab} className="mt-8">

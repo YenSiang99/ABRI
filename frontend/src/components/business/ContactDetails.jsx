@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { hostOf, linkClass } from "@/lib/contactDisplay";
 import { Clock, Globe, Lock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
 // Lazy so Leaflet (~40 KB) only loads on a profile that has a pin.
@@ -36,18 +37,25 @@ function ContactRow({ icon: Icon, label, children }) {
   );
 }
 
-const linkClass =
-  "underline underline-offset-4 hover:text-grey-600 dark:hover:text-muted-foreground";
-
-// The scheme is stripped for display only — the href keeps the full absolute
-// URL the server normalised and validated (http/https only, enforced in
-// backend/src/lib/contactFields.js).
-function hostOf(website) {
-  try {
-    return new URL(website).host;
-  } catch {
-    return website;
-  }
+// The map plus a directions link. Shared with the unclaimed About section.
+function PinMap({ lat, lng, name, className = "" }) {
+  return (
+    <div className={className}>
+      <Suspense fallback={<div className="h-52 w-full rounded-xl bg-grey-100 dark:bg-muted" />}>
+        <LocationMap lat={lat} lng={lng} label={name} />
+      </Suspense>
+      {/* A plain link, not an embed: no key, no script, and the reader
+          gets directions in the app they already use. */}
+      <a
+        href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={`mt-2 inline-block text-sm ${linkClass}`}
+      >
+        Open in Google Maps
+      </a>
+    </div>
+  );
 }
 
 function ContactDetails({ business, contactLocked, contactLockedReason, ownerView = false }) {
@@ -170,23 +178,7 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
               <span className="whitespace-pre-line">{openingHours}</span>
             </ContactRow>
           )}
-          {hasPin && (
-            <div className="sm:col-span-2">
-              <Suspense fallback={<div className="h-52 w-full rounded-xl bg-grey-100 dark:bg-muted" />}>
-                <LocationMap lat={lat} lng={lng} label={name} />
-              </Suspense>
-              {/* A plain link, not an embed: no key, no script, and the reader
-                  gets directions in the app they already use. */}
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                className={`mt-2 inline-block text-sm ${linkClass}`}
-              >
-                Open in Google Maps
-              </a>
-            </div>
-          )}
+          {hasPin && <PinMap lat={lat} lng={lng} name={name} className="sm:col-span-2" />}
         </div>
       )}
 
@@ -195,4 +187,4 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
   );
 }
 
-export { ContactDetails };
+export { ContactDetails, ContactRow, PinMap };
