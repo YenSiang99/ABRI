@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { fetchBusinessPage } from "@/lib/api/businesses";
-import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/Pagination";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
 import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
@@ -38,13 +39,37 @@ function Directory() {
   const [catalogue, setCatalogue] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(24);
+
+  // The page lives in the URL (?page=3), so Back returns to it and a page can
+  // be linked. Filters and search don't, and changing one starts again at 1.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const goTo = useCallback(
+    (n, { replace = false } = {}) => {
+      setSearchParams(n > 1 ? { page: String(n) } : {}, { replace });
+    },
+    [setSearchParams],
+  );
+
+  // Compared by value, not run on every render of its dependencies:
+  // setSearchParams (inside goTo) changes identity whenever the URL does, so
+  // keying this on goTo would send every page click straight back to page 1.
+  // The first render records the filters without resetting, so a visitor
+  // arriving on ?page=3 stays on page 3.
+  const filterKey = JSON.stringify([query, verificationLevelFilter, serviceFilter, confirmedOnly]);
+  const lastFilterKey = useRef(filterKey);
+  useEffect(() => {
+    if (lastFilterKey.current === filterKey) return;
+    lastFilterKey.current = filterKey;
+    goTo(1, { replace: true });
+  }, [filterKey, goTo]);
 
   // Paged since Sep 2026. This route used to return every matching row on
   // every request, unauthenticated — the whole member list in one call, which
-  // is the asset the product sells.
+  // is the asset the product sells. Numbered pages since Sep 2026 too: one
+  // page replaces the last rather than piling up under it.
   const load = useCallback(
     async (page) => {
       const filter =
@@ -56,13 +81,16 @@ function Directory() {
         confirmedOnly: serviceFilter ? confirmedOnly : undefined,
         page,
       });
-      setBusinesses((prev) =>
-        page > 1 ? [...prev, ...data.businesses] : data.businesses,
-      );
-      setHasMore(data.hasMore);
-      setPage(data.page);
+      setBusinesses(data.businesses);
+      setTotal(data.total ?? data.businesses.length);
+      setPageSize(data.pageSize ?? 24);
+      // Past the end (an old link, or the list shrank): go to the last page
+      // rather than showing an empty one that says nothing matches.
+      if (data.businesses.length === 0 && data.total > 0) {
+        goTo(Math.ceil(data.total / (data.pageSize ?? 24)), { replace: true });
+      }
     },
-    [query, verificationLevelFilter, serviceFilter, confirmedOnly],
+    [query, verificationLevelFilter, serviceFilter, confirmedOnly, goTo],
   );
 
   useEffect(() => {
@@ -79,7 +107,7 @@ function Directory() {
     let cancelled = false;
     setStatus("loading");
     const timer = setTimeout(() => {
-      load(1)
+      load(page)
         .then(() => !cancelled && setStatus("ready"))
         .catch(() => !cancelled && setStatus("error"));
     }, 300);
@@ -87,9 +115,17 @@ function Directory() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [load]);
+  }, [load, page]);
 
   const q = query.trim();
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = (page - 1) * pageSize + 1;
+  const to = from + businesses.length - 1;
+
+  function changePage(n) {
+    goTo(n);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-16">
@@ -193,10 +229,16 @@ function Directory() {
         </div>
       )}
 
-      {status === "ready" && (
-        <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
-          {businesses.length}{" "}
-          {businesses.length === 1 ? "business" : "businesses"}
+      {/* The pager is at the top as well as the bottom, so a reader who
+          knows they want page 40 doesn't scroll past 24 cards to get there. */}
+      {status === "ready" && total > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-[13px] text-grey-500 dark:text-muted-foreground">
+            {totalPages > 1
+              ? `Showing ${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()} businesses`
+              : `${total.toLocaleString()} ${total === 1 ? "business" : "businesses"}`}
+          </div>
+          <Pagination page={page} totalPages={totalPages} onChange={changePage} />
         </div>
       )}
 
@@ -214,19 +256,16 @@ function Directory() {
               </div>
             ))}
           </div>
-          {hasMore && (
-            <div className="mt-8 flex justify-center">
-              <Button
-                variant="outline"
-                disabled={loadingMore}
-                onClick={() => {
-                  setLoadingMore(true);
-                  load(page + 1).finally(() => setLoadingMore(false));
-                }}
-              >
-                {loadingMore ? "Loading…" : "Load more"}
-              </Button>
-            </div>
+          <Pagination
+            className="mt-10"
+            page={page}
+            totalPages={totalPages}
+            onChange={changePage}
+          />
+          {totalPages > 1 && (
+            <p className="mt-3 text-center text-[12px] text-grey-500 dark:text-muted-foreground">
+              Page {page.toLocaleString()} of {totalPages.toLocaleString()}
+            </p>
           )}
         </>
       ) : (

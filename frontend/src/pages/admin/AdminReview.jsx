@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { Check, Lock } from "lucide-react";
+import { Check, ChevronRight, Lock, Search } from "lucide-react";
 
 import {
   fetchAdminClaims,
@@ -280,31 +280,6 @@ function ReviewTimeline({
   );
 }
 
-function ClaimCard({ account, business, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier }) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <div className="font-bold text-foreground">{business.name}</div>
-      <div className="mt-0.5 text-[13px] text-muted-foreground">
-        {business.category} · {business.location}
-        {business.ssm ? ` · SSM ${business.ssm}` : ""}
-      </div>
-      <ClaimantLine account={account} />
-
-      <div className="mt-4 border-t border-border pt-4">
-        <ReviewTimeline
-          account={account}
-          business={business}
-          onApprove={onApprove}
-          onRemove={onRemove}
-          onVerifySsm={onVerifySsm}
-          onRevokeSsm={onRevokeSsm}
-          onSetMembershipTier={onSetMembershipTier}
-        />
-      </div>
-    </div>
-  );
-}
-
 function claimQueue(account, business) {
   if (account.claimStatus === "pending") return "pendingClaim";
   if (!business) return null;
@@ -313,24 +288,141 @@ function claimQueue(account, business) {
   return null;
 }
 
-function QueueList({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier }) {
+const STAGE_LABEL = {
+  pendingClaim: "Claim pending",
+  pendingSsm: "SSM pending",
+  verified: "Verified",
+};
+
+function StagePill({ stage }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold",
+        stage === "verified"
+          ? "border-foreground bg-foreground text-background"
+          : "border-yellow bg-yellow/15 text-foreground",
+      )}
+    >
+      {STAGE_LABEL[stage]}
+    </span>
+  );
+}
+
+function submittedOn(iso) {
+  return iso
+    ? new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+}
+
+// A table, one row per claim, because a queue is scanned before it is worked:
+// the admin wants to see forty claims at a glance and open the one they're
+// acting on, not scroll past forty timelines to reach it. Clicking a row opens
+// the same step-by-step timeline the cards used to show, with each step's
+// approve/deny next to it — the actions didn't move, only the default view.
+function ClaimTable({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier }) {
+  const [open, setOpen] = useState(() => new Set());
+
   if (claims.length === 0) {
     return <p className="mt-10 text-sm text-muted-foreground">Nothing in this queue right now.</p>;
   }
+
+  function toggle(id) {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const th = "px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider text-muted-foreground";
+
   return (
-    <div className="mt-6 flex flex-col gap-3">
-      {claims.map(({ account, business }) => (
-        <ClaimCard
-          key={account.id}
-          account={account}
-          business={business}
-          onApprove={onApprove}
-          onRemove={onRemove}
-          onVerifySsm={onVerifySsm}
-          onRevokeSsm={onRevokeSsm}
-          onSetMembershipTier={onSetMembershipTier}
-        />
-      ))}
+    <div className="mt-6 overflow-x-auto rounded-lg border border-border">
+      <table className="w-full border-collapse text-[13px]">
+        <thead className="bg-muted/50">
+          <tr>
+            <th className="w-8" aria-label="Expand" />
+            <th className={th}>Business</th>
+            <th className={cn(th, "hidden md:table-cell")}>Claimant</th>
+            <th className={cn(th, "hidden sm:table-cell")}>Submitted</th>
+            <th className={th}>Stage</th>
+            <th className={cn(th, "hidden md:table-cell")}>Tier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {claims.map(({ account, business }) => {
+            const isOpen = open.has(account.id);
+            return (
+              <Fragment key={account.id}>
+                <tr
+                  onClick={() => toggle(account.id)}
+                  className="cursor-pointer border-t border-border hover:bg-muted/40"
+                >
+                  <td className="px-3 py-3 align-top">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? `Collapse ${business.name}` : `Expand ${business.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(account.id);
+                      }}
+                      className="text-muted-foreground"
+                    >
+                      <ChevronRight className={cn("size-4 transition-transform", isOpen && "rotate-90")} />
+                    </button>
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <div className="font-bold text-foreground">{business.name}</div>
+                    <div className="text-[12px] text-muted-foreground">
+                      {business.category} · {business.location}
+                    </div>
+                  </td>
+                  <td className="hidden px-3 py-3 align-top md:table-cell">
+                    <div className="text-foreground">{account.name}</div>
+                    <div className="text-[12px] text-muted-foreground">{account.email}</div>
+                  </td>
+                  <td className="hidden whitespace-nowrap px-3 py-3 align-top text-muted-foreground sm:table-cell">
+                    {submittedOn(account.createdAt)}
+                  </td>
+                  <td className="px-3 py-3 align-top">
+                    <StagePill stage={claimQueue(account, business)} />
+                  </td>
+                  <td className="hidden px-3 py-3 align-top text-muted-foreground md:table-cell">
+                    {account.claimStatus === "approved"
+                      ? membershipTierLabel[business.membershipTier] ?? business.membershipTier
+                      : "—"}
+                  </td>
+                </tr>
+                {isOpen && (
+                  <tr className="border-t border-dashed border-border bg-muted/20">
+                    <td />
+                    <td colSpan={5} className="px-3 pt-3 pb-5">
+                      <div className="text-[13px] text-muted-foreground">
+                        {business.ssm ? `SSM ${business.ssm}` : "No SSM number submitted"}
+                      </div>
+                      <ClaimantLine account={account} />
+                      <div className="mt-4">
+                        <ReviewTimeline
+                          account={account}
+                          business={business}
+                          onApprove={onApprove}
+                          onRemove={onRemove}
+                          onVerifySsm={onVerifySsm}
+                          onRevokeSsm={onRevokeSsm}
+                          onSetMembershipTier={onSetMembershipTier}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -339,6 +431,7 @@ function AdminReview() {
   const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [accounts, setAccounts] = useState([]);
+  const [query, setQuery] = useState("");
 
   // GET /admin/claims embeds the raw Business row, billing columns and all.
   // This page used to pair each claim with a row from GET /businesses
@@ -395,9 +488,19 @@ function AdminReview() {
   const onSetMembershipTier = (businessId, fields) =>
     withRefresh(() => setBusinessMembershipTier(businessId, fields));
 
-  const claims = accounts
+  const allClaims = accounts
     .filter((account) => account.business)
     .map((account) => ({ account, business: account.business }));
+  // Narrows every tab at once, so the counts on the tabs answer "how many
+  // match" while a search is typed.
+  const q = query.trim().toLowerCase();
+  const claims = q
+    ? allClaims.filter(({ account, business }) =>
+        [business.name, business.ssm, account.name, account.email].some((v) =>
+          String(v ?? "").toLowerCase().includes(q),
+        ),
+      )
+    : allClaims;
 
   const queues = {
     pendingClaim: claims.filter((c) => claimQueue(c.account, c.business) === "pendingClaim"),
@@ -408,7 +511,7 @@ function AdminReview() {
   const queueProps = { onApprove, onRemove, onVerifySsm, onRevokeSsm, onSetMembershipTier };
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="mx-auto max-w-5xl px-6 py-12">
       <h1 className="text-2xl font-extrabold tracking-[-0.02em] text-foreground">
         Claim &amp; verification review
       </h1>
@@ -417,29 +520,41 @@ function AdminReview() {
         separate step after that. Removing a claim reverts the listing to unclaimed and revokes
         the claimant's login.
       </p>
-      {claims.length === 0 ? (
+      {allClaims.length === 0 ? (
         <p className="mt-10 text-sm text-muted-foreground">No claims to review yet.</p>
       ) : (
-        <Tabs className="mt-8" defaultValue="pendingClaim">
-          <TabsList variant="line" className="border-b border-border">
-            <TabsTrigger value="pendingClaim">
-              Pending claim ({queues.pendingClaim.length})
-            </TabsTrigger>
-            <TabsTrigger value="pendingSsm">
-              Pending SSM ({queues.pendingSsm.length})
-            </TabsTrigger>
-            <TabsTrigger value="verified">Verified ({queues.verified.length})</TabsTrigger>
-          </TabsList>
-          <TabsContent value="pendingClaim">
-            <QueueList claims={queues.pendingClaim} {...queueProps} />
-          </TabsContent>
-          <TabsContent value="pendingSsm">
-            <QueueList claims={queues.pendingSsm} {...queueProps} />
-          </TabsContent>
-          <TabsContent value="verified">
-            <QueueList claims={queues.verified} {...queueProps} />
-          </TabsContent>
-        </Tabs>
+        <>
+          <div className="relative mt-8 max-w-sm">
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search business, SSM, claimant or email"
+              className="w-full rounded-md border border-border bg-card py-2 pr-3 pl-9 text-[13px] text-foreground outline-none focus:border-ring"
+            />
+          </div>
+          <Tabs className="mt-4" defaultValue="pendingClaim">
+            <TabsList variant="line" className="border-b border-border">
+              <TabsTrigger value="pendingClaim">
+                Pending claim ({queues.pendingClaim.length})
+              </TabsTrigger>
+              <TabsTrigger value="pendingSsm">
+                Pending SSM ({queues.pendingSsm.length})
+              </TabsTrigger>
+              <TabsTrigger value="verified">Verified ({queues.verified.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="pendingClaim">
+              <ClaimTable claims={queues.pendingClaim} {...queueProps} />
+            </TabsContent>
+            <TabsContent value="pendingSsm">
+              <ClaimTable claims={queues.pendingSsm} {...queueProps} />
+            </TabsContent>
+            <TabsContent value="verified">
+              <ClaimTable claims={queues.verified} {...queueProps} />
+            </TabsContent>
+          </Tabs>
+        </>
       )}
     </div>
   );

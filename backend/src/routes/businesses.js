@@ -204,6 +204,10 @@ router.get(
     // narrowing one.
     let rows;
     let hasMore;
+    // How many match in all, for numbered pages ("page 3 of 6,044") and a
+    // jump to the last one. It says how big the directory is, not who is in
+    // it, and page= already reached every page one at a time.
+    let total;
     let confirmedByBusiness = new Map();
 
     if (canonicalServiceFilter) {
@@ -256,6 +260,7 @@ router.get(
       // every business without portfolio entries would be empty today and would
       // punish new members for being new.
       if (confirmedOnly) ordered = ordered.filter((o) => o.confirmed > 0);
+      total = ordered.length;
 
       const pageIds = ordered.slice((page - 1) * limit, page * limit + 1);
       hasMore = pageIds.length > limit;
@@ -270,15 +275,19 @@ router.get(
       const byId = new Map(fetched.map((b) => [b.id, b]));
       rows = idsForPage.map((id) => byId.get(id)).filter(Boolean);
     } else {
-      const fetched = await prisma.business.findMany({
-        where,
-        include: BUSINESS_INCLUDE,
-        orderBy: { name: "asc" },
-        skip: (page - 1) * limit,
-        // Over-fetch by one to learn whether there is a next page, rather than
-        // running a second count query against the same predicate.
-        take: limit + 1,
-      });
+      // The over-fetch by one still answers hasMore; the count beside it is
+      // for the page numbers, which need the end, not just the next step.
+      const [fetched, count] = await Promise.all([
+        prisma.business.findMany({
+          where,
+          include: BUSINESS_INCLUDE,
+          orderBy: { name: "asc" },
+          skip: (page - 1) * limit,
+          take: limit + 1,
+        }),
+        prisma.business.count({ where }),
+      ]);
+      total = count;
       hasMore = fetched.length > limit;
       rows = hasMore ? fetched.slice(0, limit) : fetched;
     }
@@ -345,6 +354,8 @@ router.get(
           : {}),
       })),
       page,
+      pageSize: limit,
+      total,
       hasMore,
     });
   }),

@@ -101,6 +101,14 @@ assert.equal(new Set(seen).size, seen.length, "no business appears on two pages"
 const total = await db.business.count();
 assert.equal(seen.length, total, `walked every row (${seen.length} of ${total})`);
 ok(`paged ${seen.length} businesses five at a time, no duplicates, no gaps`);
+// The numbered pager reads `total` to know where the last page is.
+assert.equal(r.data.total, total, "total counts every match, not just this page");
+assert.equal(r.data.pageSize, 5);
+const last = Math.ceil(total / 5);
+const lastPage = await dir(free, `?limit=5&page=${last}`);
+assert.equal(lastPage.data.businesses.length, total - (last - 1) * 5);
+assert.equal(lastPage.data.hasMore, false);
+ok(`total ${total} → last page ${last} holds the remainder and says there's no more`);
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n5. The cap is clamped, not honoured");
