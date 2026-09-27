@@ -109,6 +109,14 @@ const lastPage = await dir(free, `?limit=5&page=${last}`);
 assert.equal(lastPage.data.businesses.length, total - (last - 1) * 5);
 assert.equal(lastPage.data.hasMore, false);
 ok(`total ${total} → last page ${last} holds the remainder and says there's no more`);
+// Browsing puts members (claimed or verified) ahead of unclaimed listings —
+// lib/directoryOrder.js. The walk above already proved the rotating order
+// never repeats a business across pages.
+const members = await db.business.count({ where: { verificationLevel: { not: "L0" } } });
+const firstPages = seen.slice(0, members);
+const levels = await db.business.findMany({ where: { id: { in: firstPages } }, select: { verificationLevel: true } });
+assert.ok(levels.every((b) => b.verificationLevel !== "L0"), "every member is listed before any unclaimed business");
+ok(`the first ${members} businesses browsed are all members`);
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n5. The cap is clamped, not honoured");

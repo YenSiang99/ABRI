@@ -104,6 +104,9 @@ model Business {
   // source's old pin next to a new address is worse than no pin.
   lat          Float?
   lng          Float?
+  // The directory's browse order for today — see lib/directoryOrder.js.
+  // Recomputed for every row once a day; never read for anything else.
+  directoryKey Int?
   // One free-text string, deliberately not Json and not String[] — nothing
   // queries or computes on opening hours (no "open now", no filter, no
   // booking), and the real answers include "By appointment only", which a
@@ -238,6 +241,7 @@ model Business {
   // not a table that has become large.
   @@index([ssmNormalized])
   @@index([domain])
+  @@index([directoryKey, id])
 }
 
 model Account {

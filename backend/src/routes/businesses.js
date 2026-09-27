@@ -14,6 +14,7 @@ import { publicBusinessView } from "../lib/accountView.js";
 import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
+import { ensureDirectoryOrder } from "../lib/directoryOrder.js";
 import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
 import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
@@ -275,13 +276,20 @@ router.get(
       const byId = new Map(fetched.map((b) => [b.id, b]));
       rows = idsForPage.map((id) => byId.get(id)).filter(Boolean);
     } else {
+      // Browsing (no search) uses the daily rotating order; a search keeps
+      // A–Z. See lib/directoryOrder.js. The id tiebreak makes the order total,
+      // so no business can sit on two pages.
+      if (!search) await ensureDirectoryOrder();
+      const orderBy = search
+        ? [{ name: "asc" }, { id: "asc" }]
+        : [{ directoryKey: { sort: "asc", nulls: "last" } }, { id: "asc" }];
       // The over-fetch by one still answers hasMore; the count beside it is
       // for the page numbers, which need the end, not just the next step.
       const [fetched, count] = await Promise.all([
         prisma.business.findMany({
           where,
           include: BUSINESS_INCLUDE,
-          orderBy: { name: "asc" },
+          orderBy,
           skip: (page - 1) * limit,
           take: limit + 1,
         }),

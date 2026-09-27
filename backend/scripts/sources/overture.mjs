@@ -267,7 +267,7 @@ async function main() {
     if (p.operating_status === "permanently_closed" || p.operating_status === "temporarily_closed") { stats.closed++; continue; }
     if (p.brand) { stats.branded++; continue; }
     const { name } = names.note(stats, `overture:${p.id}`, p.name, nameVerdict(p.name));
-    if (!/[a-z]/i.test(name)) { stats.noName++; continue; }
+    if (!name) { stats.noName++; continue; }
 
     const category = categoryOf(p);
     if (category === SKIP) { stats.notBusiness++; continue; }

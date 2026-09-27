@@ -315,12 +315,10 @@ function locationFromBoundary(boundary, lat, lon) {
 // ── Row building ──────────────────────────────────────────────────────────
 
 function displayName(t) {
-  // A name with no Latin letters slugs to "", so prefer an English or Malay
-  // name tag when the primary one is Chinese- or Tamil-only.
-  for (const k of ["name", "name:en", "name:ms"]) {
-    if (t[k] && /[a-z]/i.test(t[k])) return { original: t[k], ...nameVerdict(t[k]) };
-  }
-  return null;
+  // The name as written on the signboard, in whatever script — the English or
+  // Malay tag only when there is no primary name at all.
+  const k = ["name", "name:en", "name:ms"].find((key) => t[key]?.trim());
+  return k ? { original: t[k], ...nameVerdict(t[k]) } : null;
 }
 
 function address(t) {
@@ -379,7 +377,7 @@ async function main() {
   }
 
   const stats = {
-    tiles, raw: elements.size, branded: 0, noLatinName: 0, duplicate: 0,
+    tiles, raw: elements.size, branded: 0, noName: 0, duplicate: 0,
     byBasis: {},
   };
   const candidates = [];
@@ -391,7 +389,7 @@ async function main() {
     if (t.brand || t["brand:wikidata"]) { stats.branded++; continue; }
     const shown = displayName(t);
     const name = shown && names.note(stats, `osm:${sourceId}`, shown.original, shown).name;
-    if (!name) { stats.noLatinName++; continue; }
+    if (!name) { stats.noName++; continue; }
 
     const lat = el.lat ?? el.center?.lat;
     const lon = el.lon ?? el.center?.lon;

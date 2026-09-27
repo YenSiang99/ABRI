@@ -154,7 +154,12 @@ The rule is: build a register scraper only for categories that are still thin, a
 3. **Keep provenance.** Every row carries `source`, `sourceId`, `sourceYear`, `locationBasis`, `sourceType`, and after the merge `primarySource`, `alsoIn`, `confirmed`.
 4. **Skip chains.** Brand-tagged places, and DBKL companies with five or more premises.
 5. **A wrong locality is worse than a missing one.** When unsure, send the row to overflow.
-6. **Names are English-first and clean** (`nameVerdict` in `common.mjs`, decided 26 Sep). The non-Latin half of a bilingual name is stripped, and so is page decoration (`•`, `..`, a dangling `(`, a pasted address). When the Latin half left behind is only a dish ("Mixed Rice"), the original name is kept. When it's only a place ("@ Jinjang", "Old Klang Road"), the row is dropped. Borderline cases are marked `unsure` in each source's `names.csv`, a person rules on them, and the rulings go in `scripts/sources/name-decisions.json`. Rows that are already imported get the new names through `scripts/sync-seed-names.mjs`.
+6. **Names are kept as the source wrote them** (`nameVerdict` in `common.mjs`, decided 27 Sep, reversing the 26 Sep strip-to-English rule). Chinese, Tamil, Arabic, Japanese, Korean and Thai names stay, including names with no English at all (id `biz-<source id>`). What still changes:
+   - Fancy maths/fullwidth letters become plain.
+   - Text in other scripts (Burmese, Bengali) is removed.
+   - Decoration is tidied: symbols at either end, extra spaces, trailing dots, broken brackets, and an address pasted after the name (cut at the street word).
+   - A listing is dropped when its name is only a place ("Taman Asa Jaya", "Lorong Keramat 12"), starts like an address ("Taman…", "Kampung…", "Unit…", reviewed over 1,242 examples), or says it's closed. Malls stay.
+   - One-off rulings go in `scripts/sources/name-decisions.json`, and already-imported rows are updated with `scripts/sync-seed-names.mjs`.
 
 ## Attribution — required before any of this goes live
 
