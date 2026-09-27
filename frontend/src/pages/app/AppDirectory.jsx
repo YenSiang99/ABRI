@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { fetchBusinessPage } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
-import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
-import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
+import { CategoryAreaFilters } from "@/components/directory/CategoryAreaFilters";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { NoRecordPanel } from "@/components/business/InviteToClaim";
 import { NetworkOverlap } from "@/components/business/NetworkOverlap";
@@ -27,37 +25,13 @@ import { UNCLAIMED } from "@/lib/verificationLevels";
 // them which to use — so this one learned the other's tricks and the other
 // was deleted. The public /check followed on 27 Sep 2026 and now redirects
 // to /directory, whose search matches the same things.
-// Why this business is where it is in the list.
-//
-// SHOWN EVEN WHEN ZERO, and that is the honest half. A ranked list whose
-// reasons are invisible is a list that looks arbitrary; one that shows only
-// the winners' numbers reads as a leaderboard. "Nobody has confirmed this yet"
-// is a real, useful answer about a business that says it does the work.
-//
-// Counts DIFFERENT businesses, never portfolio entries — ten confirmations from one
-// friend is one counterparty. See portfolioSummaryFor in
-// backend/src/lib/portfolio.js.
-function ConfirmedForService({ confirmed }) {
-  if (!confirmed) return null;
-  const n = confirmed.counterparties;
-  return (
-    <p className="mt-1.5 text-xs text-muted-foreground">
-      {n === 0
-        ? `No confirmed ${confirmed.service.toLowerCase()} work yet`
-        : `${confirmed.service} confirmed by ${n} ${n === 1 ? "business" : "different businesses"}`}
-    </p>
-  );
-}
-
 function AppDirectory() {
   const { business } = useAuth();
   const { connectionStateWith, connect } = useConnections();
   const [query, setQuery] = useState("");
-  const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
-  const [serviceFilter, setServiceFilter] = useState("");
-  const [confirmedOnly, setConfirmedOnly] = useState(false);
-  const [catalogue, setCatalogue] = useState(null);
+  const [place, setPlace] = useState({ category: "", location: "" });
   const [businesses, setBusinesses] = useState([]);
+  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("loading");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -87,13 +61,10 @@ function AppDirectory() {
   // finished typing.
   const load = useCallback(
     async (page) => {
-      const filter =
-        verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
       const data = await fetchBusinessPage({
         search: query.trim(),
-        verificationLevel: filter,
-        service: serviceFilter || undefined,
-        confirmedOnly: serviceFilter ? confirmedOnly : undefined,
+        category: place.category || undefined,
+        location: place.location || undefined,
         page,
       });
       // Your own business is never a search result — you cannot connect to,
@@ -104,22 +75,10 @@ function AppDirectory() {
       setBusinesses((prev) => (page > 1 ? [...prev, ...rows] : rows));
       setHasMore(data.hasMore);
       setPage(data.page);
+      setTotal(data.total ?? rows.length);
     },
-    [query, verificationLevelFilter, serviceFilter, confirmedOnly, business.id],
+    [query, place.category, place.location, business.id],
   );
-
-  // The whole catalogue, every category — this browse is not scoped to the
-  // member's own trade. Someone looking for a company secretary is not an
-  // accountant looking at accountants.
-  useEffect(() => {
-    let live = true;
-    fetchServiceCatalogue()
-      .then((data) => live && setCatalogue(data))
-      .catch(() => live && setCatalogue({ others: [] }));
-    return () => {
-      live = false;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,86 +146,16 @@ function AppDirectory() {
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {VERIFICATION_LEVEL_FILTERS.map((filter) => (
-          <button
-            key={filter.value}
-            type="button"
-            onClick={() => setVerificationLevelFilter(filter.value)}
-            className={cn(
-              "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-              verificationLevelFilter === filter.value
-                ? "border-foreground bg-foreground text-background"
-                : "border-border text-muted-foreground hover:bg-muted",
-            )}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
-
-      {/* SERVICES ARE A SELECT, NOT CHIPS, unlike the four above. There are
-          four verification levels and forty-odd services — rendering them the
-          same way would bury the level filter under three rows of chips and
-          make the cheaper filter look like the more important one. */}
-      {catalogue && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="service-filter"
-            className="text-[13px] text-muted-foreground"
-          >
-            Doing
-          </label>
-          <select
-            id="service-filter"
-            value={serviceFilter}
-            onChange={(e) => setServiceFilter(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-[13px] text-foreground outline-none focus:border-ring"
-          >
-            <option value="">any service</option>
-            {(catalogue.others ?? []).map((group) => (
-              <optgroup key={group.category} label={group.category}>
-                {group.services.map((sv) => (
-                  <option key={sv} value={sv}>
-                    {sv}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          {serviceFilter && (
-            <button
-              type="button"
-              onClick={() => setServiceFilter("")}
-              className="text-[13px] text-muted-foreground underline underline-offset-4 hover:text-foreground"
-            >
-              Clear
-            </button>
-          )}
-          {/* RANKING IS ALREADY ON whenever a service is chosen — this only
-              hides the unconfirmed tail. Off by default, because a directory
-              that showed only businesses somebody has confirmed would be
-              nearly empty today and would punish every new member for being
-              new. The count next to each card is the honest version; this is
-              for a reader who has decided they only want evidence. */}
-          {serviceFilter && (
-            <label className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={confirmedOnly}
-                onChange={(e) => setConfirmedOnly(e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              Confirmed only
-            </label>
-          )}
-        </div>
-      )}
+      <CategoryAreaFilters
+        className="mt-4"
+        category={place.category}
+        location={place.location}
+        onChange={setPlace}
+      />
 
       {status === "ready" && (
         <div className="mt-4 text-sm text-muted-foreground">
-          {businesses.length}{" "}
-          {businesses.length === 1 ? "business" : "businesses"}
+          {total.toLocaleString()} {total === 1 ? "business" : "businesses"}
         </div>
       )}
 
@@ -307,7 +196,6 @@ function AppDirectory() {
                   vouchers={b.vouchersInYourNetwork}
                   basePath="/app/business"
                 />
-                <ConfirmedForService confirmed={b.confirmedForService} />
                 {/* Pro. STILL A SIBLING OF THE CARD, NOT A CHILD — BusinessCard
                     is a <Link>, and a button inside an anchor both navigates
                     and fires. It used to sit in its own row below the card,

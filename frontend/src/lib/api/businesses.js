@@ -22,6 +22,8 @@ function fetchBusinesses(options = {}) {
 // here would silently turn every business into the latter.
 function fetchBusinessPage({
   search,
+  category,
+  location,
   verificationLevel,
   service,
   confirmedOnly,
@@ -30,6 +32,10 @@ function fetchBusinessPage({
 } = {}) {
   const params = new URLSearchParams();
   if (search) params.set("search", search);
+  // Closed lists, validated server-side: an unknown value is a 400, not an
+  // empty page.
+  if (category) params.set("category", category);
+  if (location) params.set("location", location);
   // Key must match GET /businesses exactly: an unrecognised param there is
   // NO FILTER, not a 400, so a mismatch fails silently and wide.
   if (verificationLevel) params.set("verificationLevel", verificationLevel);
@@ -60,6 +66,17 @@ function submitSsm(ssm) {
   return apiFetch("/businesses/me/ssm", { method: "POST", body: { ssm } });
 }
 
+// The directory's filter options — only categories and areas that have
+// businesses, each with its count, each counted within the other filter.
+// `{ categories: [{ value, count }], locations: [{ value, count }] }`.
+function fetchDirectoryFacets({ category, location } = {}) {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  if (location) params.set("location", location);
+  const qs = params.toString();
+  return apiFetch(`/businesses/facets${qs ? `?${qs}` : ""}`);
+}
+
 function fetchBusiness(id) {
   return apiFetch(`/businesses/${id}`).then((data) => data.business);
 }
@@ -87,6 +104,7 @@ function updateMyBusiness(payload) {
 export {
   fetchBusinesses,
   fetchBusinessPage,
+  fetchDirectoryFacets,
   submitSsm,
   fetchBusiness,
   submitBusinessClaim,

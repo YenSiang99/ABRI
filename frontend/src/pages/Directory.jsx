@@ -1,42 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 import { fetchBusinessPage } from "@/lib/api/businesses";
 import { Pagination } from "@/components/Pagination";
 import { BusinessCard } from "@/components/business/BusinessCard";
-import { VERIFICATION_LEVEL_FILTERS } from "@/lib/directoryFilter";
-import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
-
-// Why this business is where it is in the list.
-//
-// SHOWN EVEN WHEN ZERO, and that is the honest half. A ranked list whose
-// reasons are invisible is a list that looks arbitrary; one that shows only
-// the winners' numbers reads as a leaderboard. "Nobody has confirmed this yet"
-// is a real, useful answer about a business that says it does the work.
-//
-// Counts DIFFERENT businesses, never portfolio entries — ten confirmations from one
-// friend is one counterparty. See portfolioSummaryFor in
-// backend/src/lib/portfolio.js.
-function ConfirmedForService({ confirmed }) {
-  if (!confirmed) return null;
-  const n = confirmed.counterparties;
-  return (
-    <p className="mt-1.5 text-xs text-grey-600 dark:text-muted-foreground">
-      {n === 0
-        ? `No confirmed ${confirmed.service.toLowerCase()} work yet`
-        : `${confirmed.service} confirmed by ${n} ${n === 1 ? "business" : "different businesses"}`}
-    </p>
-  );
-}
+import { CategoryAreaFilters } from "@/components/directory/CategoryAreaFilters";
 
 function Directory() {
   const [query, setQuery] = useState("");
-  const [verificationLevelFilter, setVerificationLevelFilter] = useState("all");
-  const [serviceFilter, setServiceFilter] = useState("");
-  const [confirmedOnly, setConfirmedOnly] = useState(false);
-  const [catalogue, setCatalogue] = useState(null);
+  const [place, setPlace] = useState({ category: "", location: "" });
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
   const [total, setTotal] = useState(0);
@@ -58,7 +31,7 @@ function Directory() {
   // keying this on goTo would send every page click straight back to page 1.
   // The first render records the filters without resetting, so a visitor
   // arriving on ?page=3 stays on page 3.
-  const filterKey = JSON.stringify([query, verificationLevelFilter, serviceFilter, confirmedOnly]);
+  const filterKey = JSON.stringify([query, place.category, place.location]);
   const lastFilterKey = useRef(filterKey);
   useEffect(() => {
     if (lastFilterKey.current === filterKey) return;
@@ -72,13 +45,10 @@ function Directory() {
   // page replaces the last rather than piling up under it.
   const load = useCallback(
     async (page) => {
-      const filter =
-        verificationLevelFilter === "all" ? undefined : verificationLevelFilter;
       const data = await fetchBusinessPage({
         search: query.trim(),
-        verificationLevel: filter,
-        service: serviceFilter || undefined,
-        confirmedOnly: serviceFilter ? confirmedOnly : undefined,
+        category: place.category || undefined,
+        location: place.location || undefined,
         page,
       });
       setBusinesses(data.businesses);
@@ -90,18 +60,8 @@ function Directory() {
         goTo(Math.ceil(data.total / (data.pageSize ?? 24)), { replace: true });
       }
     },
-    [query, verificationLevelFilter, serviceFilter, confirmedOnly, goTo],
+    [query, place.category, place.location, goTo],
   );
-
-  useEffect(() => {
-    let live = true;
-    fetchServiceCatalogue()
-      .then((data) => live && setCatalogue(data))
-      .catch(() => live && setCatalogue({ others: [] }));
-    return () => {
-      live = false;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,83 +111,12 @@ function Directory() {
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {VERIFICATION_LEVEL_FILTERS.map((filter) => (
-          <button
-            key={filter.value}
-            type="button"
-            onClick={() => setVerificationLevelFilter(filter.value)}
-            className={cn(
-              "rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors",
-              verificationLevelFilter === filter.value
-                ? "border-ink bg-ink text-yellow dark:border-grey-700 dark:bg-grey-700"
-                : "border-grey-300 text-grey-600 hover:bg-surface-2 dark:border-border dark:text-muted-foreground dark:hover:bg-muted",
-            )}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
-
-      {/* PUBLIC, AND THAT IS THE POINT. This is the only filter on this page a
-          visitor who has never heard of ABRI would actually arrive with: they
-          do not want "a business", they want someone who does company
-          incorporation. The service vocabulary is what makes that answerable
-          — see backend/src/lib/serviceVocab.js — and this is the surface where
-          it earns its keep. */}
-      {catalogue && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label
-            htmlFor="public-service-filter"
-            className="text-[13px] text-grey-600 dark:text-muted-foreground"
-          >
-            Doing
-          </label>
-          <select
-            id="public-service-filter"
-            value={serviceFilter}
-            onChange={(e) => setServiceFilter(e.target.value)}
-            className="rounded-lg border border-grey-300 bg-white px-3 py-1.5 text-[13px] text-ink outline-none focus:border-ink dark:border-border dark:bg-background dark:text-foreground dark:focus:border-ring"
-          >
-            <option value="">any service</option>
-            {(catalogue.others ?? []).map((group) => (
-              <optgroup key={group.category} label={group.category}>
-                {group.services.map((sv) => (
-                  <option key={sv} value={sv}>
-                    {sv}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          {serviceFilter && (
-            <button
-              type="button"
-              onClick={() => setServiceFilter("")}
-              className="text-[13px] text-grey-600 underline underline-offset-4 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground"
-            >
-              Clear
-            </button>
-          )}
-          {/* RANKING IS ALREADY ON whenever a service is chosen — this only
-              hides the unconfirmed tail. Off by default, because a directory
-              that showed only businesses somebody has confirmed would be
-              nearly empty today and would punish every new member for being
-              new. The count next to each card is the honest version; this is
-              for a reader who has decided they only want evidence. */}
-          {serviceFilter && (
-            <label className="inline-flex items-center gap-1.5 text-[13px] text-grey-600 dark:text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={confirmedOnly}
-                onChange={(e) => setConfirmedOnly(e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              Confirmed only
-            </label>
-          )}
-        </div>
-      )}
+      <CategoryAreaFilters
+        className="mt-4"
+        category={place.category}
+        location={place.location}
+        onChange={setPlace}
+      />
 
       {/* The pager is at the top as well as the bottom, so a reader who
           knows they want page 40 doesn't scroll past 24 cards to get there. */}
@@ -252,7 +141,6 @@ function Directory() {
             {businesses.map((business) => (
               <div key={business.id} className="flex h-full flex-col">
                 <BusinessCard business={business} />
-                <ConfirmedForService confirmed={business.confirmedForService} />
               </div>
             ))}
           </div>

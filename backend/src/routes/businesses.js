@@ -15,7 +15,7 @@ import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
 import { normalizeBusinessEdit } from "../lib/contactFields.js";
 import { ensureDirectoryOrder } from "../lib/directoryOrder.js";
-import { isValidCategory, isValidLocation } from "../lib/businessVocab.js";
+import { isValidCategory, isValidLocation, BUSINESS_CATEGORIES, BUSINESS_LOCATIONS } from "../lib/businessVocab.js";
 import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
@@ -101,6 +101,17 @@ function vouchFieldsFor(counts, viewer) {
   };
 }
 
+// The directory's category and area filters. Closed lists, so an unknown value
+// is a 400 rather than no filter — the same rule `service` follows below:
+// "no results" and "your filter was nonsense" must not look the same.
+// Returns the Prisma clause, or an error message.
+function categoryAreaFilter(query) {
+  const { category, location } = query;
+  if (category && !isValidCategory(category)) return { error: `"${category}" isn't a category.` };
+  if (location && !isValidLocation(location)) return { error: `"${location}" isn't an area.` };
+  return { where: { ...(category ? { category } : {}), ...(location ? { location } : {}) } };
+}
+
 // Directory paging. A page size a browse screen can render, and a hard cap so
 // a caller cannot ask for the whole table by setting limit=100000 — which is
 // what this route did on every request before it had one.
@@ -153,7 +164,11 @@ router.get(
     );
     const page = Math.max(Number(req.query.page) || 1, 1);
 
+    const place = categoryAreaFilter(req.query);
+    if (place.error) return res.status(400).json({ error: place.error });
+
     const where = {
+      ...place.where,
       // NOTE: an unrecognised query key is simply NO FILTER here, not a
       // 400 — so a client and server that disagree about this param name
       // fail silently and wide. That is not hypothetical: Register.jsx
@@ -419,6 +434,39 @@ router.get(
 //
 // optionalAuth, not requireAuth: the register form needs this too, and there is
 // nothing private in a list of service names.
+// What the directory can be filtered by, with how many businesses each option
+// would show: only categories and areas that have at least one. The dropdowns
+// are built from this, so they offer what is actually there — a filter that
+// always comes back empty makes a directory look deserted — and they grow on
+// their own as the directory does.
+//
+// Each list honours the OTHER filter: pick "Law" and the areas are counted
+// among law firms. In the vocab's own order, not by count, so the list
+// doesn't reshuffle as numbers move.
+//
+// Declared before /:id for the same reason as the catalogue below.
+router.get(
+  "/facets",
+  optionalAuth,
+  asyncHandler(async (req, res) => {
+    const place = categoryAreaFilter(req.query);
+    if (place.error) return res.status(400).json({ error: place.error });
+    const { category, location } = place.where;
+    const [byCategory, byLocation] = await Promise.all([
+      prisma.business.groupBy({ by: ["category"], where: location ? { location } : {}, _count: { _all: true } }),
+      prisma.business.groupBy({ by: ["location"], where: category ? { category } : {}, _count: { _all: true } }),
+    ]);
+    const ordered = (vocab, rows, key) => {
+      const counts = new Map(rows.map((r) => [r[key], r._count._all]));
+      return vocab.filter((v) => counts.get(v) > 0).map((value) => ({ value, count: counts.get(value) }));
+    };
+    res.json({
+      categories: ordered(BUSINESS_CATEGORIES, byCategory, "category"),
+      locations: ordered(BUSINESS_LOCATIONS, byLocation, "location"),
+    });
+  }),
+);
+
 router.get(
   "/service-catalogue",
   optionalAuth,

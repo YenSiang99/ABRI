@@ -197,5 +197,22 @@ for (const [label, cookie] of [["anonymous", null], ["free", free], ["pro", pro]
 }
 ok("no phone, whatsapp, membershipTier or ssmNormalized for anyone");
 
+// ─────────────────────────────────────────────────────────────────────────
+console.log("\n10. Category and area filters, and the counts behind them");
+const facets = await fetch(`${API}/businesses/facets`).then((x) => x.json());
+const dbTotal = await db.business.count();
+assert.equal(facets.categories.reduce((n, c) => n + c.count, 0), dbTotal, "category counts add up to every business");
+assert.equal(facets.locations.reduce((n, c) => n + c.count, 0), dbTotal, "area counts add up to every business");
+assert.ok(facets.categories.every((c) => c.count > 0) && facets.locations.every((c) => c.count > 0), "no empty option is offered");
+const cat = facets.categories[0];
+r = await dir(null, `?category=${encodeURIComponent(cat.value)}&limit=50`);
+assert.equal(r.data.total, cat.count, "the filtered total matches the facet count");
+assert.ok(r.data.businesses.every((b) => b.category === cat.value), "only that category comes back");
+const within = await fetch(`${API}/businesses/facets?category=${encodeURIComponent(cat.value)}`).then((x) => x.json());
+assert.equal(within.locations.reduce((n, c) => n + c.count, 0), cat.count, "areas are counted within the chosen category");
+r = await dir(null, "?category=Not%20A%20Category");
+assert.equal(r.status, 400, "an unknown category is refused, not ignored");
+ok(`${facets.categories.length} categories and ${facets.locations.length} areas offered; "${cat.value}" filters to ${cat.count}`);
+
 console.log(`\n${pass} checks passed.`);
 await db.$disconnect();
