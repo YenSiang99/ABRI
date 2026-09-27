@@ -375,6 +375,12 @@ router.get(
 // a short ranked list out. See lib/businessLookup.js for why this is a
 // separate route from the directory search above rather than a wider OR.
 //
+// DORMANT SINCE 27 SEP 2026. The public /check screen came off the site:
+// with no SSM-verified members yet, every answer was "unverified", which
+// read as a warning about real businesses. Nothing in the frontend calls
+// this now; it stays (and stays tested) for when verified members make the
+// answer worth giving.
+//
 // DECLARED ABOVE GET /:id, AND IT HAS TO BE. Express matches in order, so
 // with these swapped every request for /businesses/lookup would arrive at the
 // :id handler as a business whose id is the literal string "lookup" and

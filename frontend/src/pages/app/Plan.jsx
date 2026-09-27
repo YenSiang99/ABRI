@@ -122,7 +122,7 @@ function TierCard({ tier, currentTier }) {
               <span>
                 <span className="text-foreground">{f.label}</span>
                 {/* A colon, not a dash. A label can already contain an em
-                    dash ("Check a business — by name, SSM number or website"),
+                    dash ("Trust feed — vouches and verifications as they happen"),
                     and joining with another one reads as a third clause
                     rather than as the value. */}
                 {f.detail && <span className="text-muted-foreground">: {f.detail}</span>}

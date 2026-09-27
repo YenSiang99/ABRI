@@ -48,22 +48,6 @@ function fetchBusinessPage({
   return apiFetch(`/businesses${qs ? `?${qs}` : ""}`);
 }
 
-// Check a business — GET /businesses/lookup.
-//
-// Returns the WHOLE envelope, unlike fetchBusinesses above, because the
-// echoed `query` is part of the answer: the miss state has to say WHICH name
-// ABRI has no record of, and reading that off local input state would show
-// the half-typed value the member has moved on from rather than the one the
-// server actually searched.
-//
-// A miss is `{ matches: [] }` and a 200 — never a 404, never a throw. The
-// caller must render that as "no record on ABRI" and NOT as an error, and not
-// as anything stronger: ABRI has no registry access, so an empty list says
-// nothing whatsoever about whether the business is real.
-function lookupBusinesses(query) {
-  return apiFetch(`/businesses/lookup?q=${encodeURIComponent(query)}`);
-}
-
 // Submit this business's SSM registration number for review.
 //
 // Resolves to the same shape as getMe(), so follow it with refreshAccount()
@@ -103,7 +87,6 @@ function updateMyBusiness(payload) {
 export {
   fetchBusinesses,
   fetchBusinessPage,
-  lookupBusinesses,
   submitSsm,
   fetchBusiness,
   submitBusinessClaim,

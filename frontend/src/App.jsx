@@ -8,7 +8,6 @@ import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/auth/Login";
 import { Directory } from "@/pages/Directory";
 import { BusinessProfile } from "@/pages/BusinessProfile";
-import { CheckBusiness } from "@/pages/CheckBusiness";
 import { CardTap } from "@/pages/CardTap";
 import { Register } from "@/pages/auth/Register";
 import { VerifyClaimLink } from "@/pages/auth/VerifyClaimLink";
@@ -51,12 +50,12 @@ function App() {
           <Route path="/directory" element={<Directory />} />
           <Route path="/business/:id" element={<BusinessProfile />} />
           <Route path="/m/:businessId" element={<CardTap />} />
-          {/* Public, and that is the feature. The invite this screen produces
-              is an unsolicited message with a link in it — the shape of a
-              scam — so the recipient has to be able to check the sender
-              without creating an account first. See
-              backend/src/routes/businesses.js's /lookup handler. */}
-          <Route path="/check" element={<CheckBusiness />} />
+          {/* "Check a business" was taken off the site on 27 Sep 2026: with
+              no SSM-verified members yet, every check came back "unverified"
+              and read as a warning about perfectly real businesses. The
+              directory search matches names, SSM numbers and websites, so old
+              /check links land there. */}
+          <Route path="/check" element={<Navigate to="/directory" replace />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-claim/:token" element={<VerifyClaimLink />} />
         </Route>

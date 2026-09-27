@@ -50,7 +50,7 @@ const UPGRADE_COPY = {
   networkOverlap: {
     title: "Seeing who you both know is part of Plus",
     description:
-      "When you check a business, Plus shows which of the members vouching for them are already in your network. A badge says a document was checked; this says somebody you trust has worked with them.",
+      "When you look at a business, Plus shows which of the members vouching for them are already in your network. A badge says a document was checked; this says somebody you trust has worked with them.",
   },
   watchBusinesses: {
     title: "Watching a business is part of Pro",

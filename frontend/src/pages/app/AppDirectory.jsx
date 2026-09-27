@@ -25,8 +25,8 @@ import { UNCLAIMED } from "@/lib/verificationLevels";
 // state with an invite; this one browsed by name and category and dead-ended
 // on a miss. Two boxes for one person in one session, and nothing to tell
 // them which to use — so this one learned the other's tricks and the other
-// was deleted. The public /check survives, because a stranger who cannot log
-// in still needs a door.
+// was deleted. The public /check followed on 27 Sep 2026 and now redirects
+// to /directory, whose search matches the same things.
 // Why this business is where it is in the list.
 //
 // SHOWN EVEN WHEN ZERO, and that is the honest half. A ranked list whose

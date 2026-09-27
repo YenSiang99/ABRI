@@ -75,18 +75,10 @@ const MEMBERSHIP_TIER_FEATURES = [
   // direction: the table is usually accused of promising more than the
   // product has, and here it was quietly delivering more than it sold.
   //
-  // The first two are true in all four columns ON PURPOSE. Checking a
-  // business is open to everyone including logged-out
-  // visitors — an invite that cannot be verified without joining is
-  // self-defeating — and the feed is open to every member. Four ticks says
-  // "not gated", which is a thing worth saying on a pricing page.
-  {
-    label: "Check a business — by name, SSM number or website",
-    free: true,
-    plus: true,
-    pro: true,
-    enterprise: true,
-  },
+  // The first is true in all four columns ON PURPOSE: the feed is open to
+  // every member, and four ticks says "not gated", which is a thing worth
+  // saying on a pricing page. ("Check a business" sat above it until 27 Sep
+  // 2026, when the public check screen came off the site.)
   {
     label: "Trust feed — vouches and verifications as they happen",
     free: true,
