@@ -1,4 +1,5 @@
 import { Routes, Route, Outlet, Navigate } from "react-router-dom";
+import { ThemePreviewSwitch } from "@/components/ThemePreviewSwitch";
 
 import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
@@ -43,6 +44,7 @@ function App() {
   return (
     <>
       <ScrollToTop />
+      {import.meta.env.DEV && <ThemePreviewSwitch />}
       <Routes>
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Landing />} />
