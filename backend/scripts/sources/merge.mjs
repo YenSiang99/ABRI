@@ -25,8 +25,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  REPO_ROOT, LISTING_COLUMNS, readCsv, nameKey, assignIds, writeOutputs,
+  REPO_ROOT, LISTING_COLUMNS, readCsv, toCsv, nameKey, assignIds, writeOutputs,
 } from "./common.mjs";
+import { nonBusinessReason } from "./nonBusiness.mjs";
 
 // Lower number wins. Anything not listed (future register scrapers) is
 // treated as a register — the most authoritative kind of source.
@@ -72,8 +73,17 @@ function main() {
     merged.push(row);
   }
 
-  const stats = { sources: perSource, duplicate: 0 };
-  const listings = assignIds(merged, stats);
+  // Not businesses — see nonBusiness.mjs. Recorded, not silently dropped.
+  const removed = [];
+  const businesses = merged.filter((row) => {
+    const reason = nonBusinessReason(row);
+    if (reason) removed.push({ reason, name: row.name, category: row.category, location: row.location, address: row.address, website: row.website, sourceType: row.sourceType, sourceId: row.sourceId });
+    return !reason;
+  });
+
+  const stats = { sources: perSource, duplicate: 0, nonBusiness: {} };
+  for (const r of removed) stats.nonBusiness[r.reason] = (stats.nonBusiness[r.reason] || 0) + 1;
+  const listings = assignIds(businesses, stats);
   const dir = path.join(REPO_ROOT, "data", "seed");
   fs.mkdirSync(dir, { recursive: true });
 
@@ -91,6 +101,7 @@ function main() {
   const columns = [...LISTING_COLUMNS, "primarySource", "alsoIn", "confirmed"];
   LISTING_COLUMNS.splice(0, LISTING_COLUMNS.length, ...columns);
   writeOutputs(dir, listings, [], stats);
+  fs.writeFileSync(path.join(dir, "nonbusiness.csv"), toCsv(removed, ["reason", "name", "category", "location", "address", "website", "sourceType", "sourceId"]));
 }
 
 main();

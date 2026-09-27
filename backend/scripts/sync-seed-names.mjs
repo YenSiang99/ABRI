@@ -5,6 +5,9 @@
 //   node scripts/sync-seed-names.mjs --manifest data/seed/imports/<import>.csv            # dry run
 //   node scripts/sync-seed-names.mjs --manifest data/seed/imports/<import>.csv --apply
 //
+// Refuses to apply when it would delete more than a tenth of the manifest's
+// rows (see below); --force overrides.
+//
 // import-seed.mjs is insert-only, so a better name or a new column never
 // reaches a row that is already in. This script does exactly two things, and
 // only to rows the given import manifest lists:
@@ -19,7 +22,8 @@
 //     names.csv says its name was dropped ("place", "place-decided",
 //     "closed", "empty"), or because its source still lists it but the merge
 //     folded it into another row with the same name and locality — a
-//     duplicate. A sourceId gone for any other
+//     duplicate — or because merge.mjs removed it as not a business
+//     (nonBusiness.mjs, reason in data/seed/nonbusiness.csv). A sourceId gone for any other
 //     reason is reported and left alone.
 // Either way only untouched rows are written — L0, no account — the same rule
 // as import-seed.mjs --remove. A listing somebody has claimed keeps whatever
@@ -97,6 +101,10 @@ async function main() {
   // International Sdn Bhd" beside "TROIS International") is in neither — it
   // is found by name and locality instead.
   const seedByKey = new Map(seedRows.map((r) => [`${nameKey(r.name)}|${r.location}`, r]));
+  // Removed by merge.mjs as not a business (nonBusiness.mjs), with a reason.
+  const nonBusiness = new Map();
+  const nbFile = path.join(REPO_ROOT, "data", "seed", "nonbusiness.csv");
+  if (fs.existsSync(nbFile)) for (const r of readCsv(nbFile)) nonBusiness.set(r.sourceId, r.reason);
   const inSources = new Set();
   for (const source of fs.readdirSync(SOURCES)) {
     const file = path.join(SOURCES, source, "listings.csv");
@@ -128,15 +136,16 @@ async function main() {
     if (!b) { stats.notInDb++; continue; }
     const seed = seedBySource.get(sourceId);
     const twin = !seed && seedByKey.get(`${nameKey(b.name)}|${b.location}`);
-    const duplicate = !seed && (inSources.has(sourceId) || (twin && twin.sourceId !== sourceId));
-    const wanted = seed ? seed.name : DROPPED.has(verdictBySource.get(sourceId)) || duplicate ? null : undefined;
+    const notBusiness = !seed && nonBusiness.get(sourceId);
+    const duplicate = !seed && !notBusiness && (inSources.has(sourceId) || (twin && twin.sourceId !== sourceId));
+    const wanted = seed ? seed.name : DROPPED.has(verdictBySource.get(sourceId)) || duplicate || notBusiness ? null : undefined;
     if (wanted === undefined) { unresolved.push({ id, sourceId, name: b.name }); continue; }
     const lat = seed?.lat ? Number(seed.lat) : null;
     const lng = seed?.lng ? Number(seed.lng) : null;
     const was = { oldName: b.name, oldLat: b.lat ?? "", oldLng: b.lng ?? "" };
     if (wanted === null) {
       if (b.verificationLevel !== "L0" || b._count.accounts) { stats.touchedSkipped++; continue; }
-      deletes.push({ id, action: duplicate ? "delete-duplicate" : "delete", ...was });
+      deletes.push({ id, action: notBusiness ? `delete-not-business (${notBusiness})` : duplicate ? "delete-duplicate" : "delete", ...was });
       continue;
     }
     const data = {};
@@ -172,9 +181,18 @@ async function main() {
     idChanged: updates.filter((u) => "id" in u.data).length,
     delete: deletes.length,
     duplicate: deletes.filter((d) => d.action === "delete-duplicate").length,
+    notBusiness: deletes.filter((d) => d.action.startsWith("delete-not-business")).length,
     unresolved: unresolved.length,
   });
   for (const u of unresolved.slice(0, 20)) console.log("  unresolved:", u);
+  // A mass delete is almost always a broken input — a manifest the CSV
+  // reader mangled, the wrong CSV — not a real change. Seen once already: a
+  // manifest rewritten with \r\n line endings matched no sourceId, and every
+  // row read as a duplicate.
+  if (APPLY && deletes.length > imported.length * 0.1 && !process.argv.includes("--force")) {
+    console.error(`Refusing: this would delete ${deletes.length} of ${imported.length} rows. Check the inputs, or pass --force.`);
+    process.exit(1);
+  }
   if (!APPLY) {
     for (const r of [...updates.slice(0, 10), ...deletes.slice(0, 10)]) console.log(`  ${r.action} ${r.id}:`, r.data ?? "");
     console.log("Dry run — nothing written. Re-run with --apply.");
@@ -260,9 +278,14 @@ async function main() {
   for (const [oldId, newId] of moved) if (!newId) moved.delete(oldId);
   fs.writeFileSync(log, toCsv(done, ["id", "action", "newId", "oldName", "newName", "oldLat", "oldLng", "newLat", "newLng"]));
   // The manifest is how the next run (and import-seed.mjs --remove) finds
-  // these rows, so it follows the ids too.
-  if (moved.size) {
-    const rewritten = imported.map((r) => ({ ...r, id: moved.get(r.id) ?? r.id }));
+  // these rows, so it follows the ids too — and forgets the deleted ones.
+  // Otherwise a row that moves onto a deleted row's old id would be read,
+  // next run, as that deleted row and removed.
+  const deleted = new Set(done.filter((r) => r.action.startsWith("delete")).map((r) => r.id));
+  if (moved.size || deleted.size) {
+    const rewritten = imported
+      .filter((r) => !deleted.has(r.id))
+      .map((r) => ({ ...r, id: moved.get(r.id) ?? r.id }));
     fs.writeFileSync(manifestPath, toCsv(rewritten, Object.keys(imported[0])));
   }
   console.log(`\nUpdated ${done.filter((r) => r.action === "update").length} (${moved.size} new ids), deleted ${done.filter((r) => r.action.startsWith("delete")).length}. Business rows now: ${await prisma.business.count()}.`);
