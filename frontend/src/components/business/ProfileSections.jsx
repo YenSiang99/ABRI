@@ -47,6 +47,28 @@ export function Section({ layout, title, subtitle, children, first = false }) {
   );
 }
 
+// The one call to action on an unclaimed listing, directly under the facts:
+// what claiming gets the owner, not just the word "claim". It replaced the
+// header's bare "Claim your business" button (28 Sep 2026), so there is one
+// prompt, not two. "Free" is true — the Free plan is RM0 — and the badge is
+// deliberately not promised here: SSM verification sits on the paid plans.
+export function ClaimStrip({ business }) {
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-yellow/60 bg-yellow/10 p-4">
+      <p className="max-w-xl text-sm text-ink dark:text-foreground">
+        <span className="font-semibold">Is this your business?</span> Claim it for free to add your phone number,
+        services and description, and to correct anything that's wrong.
+      </p>
+      <Link
+        to={`/register?business=${business.id}`}
+        className="inline-flex shrink-0 items-center rounded-md bg-yellow px-4 py-2 text-sm font-semibold text-yellow-ink hover:opacity-90"
+      >
+        Claim this business
+      </Link>
+    </div>
+  );
+}
+
 // The three facts a visitor checks first, the same three for everyone.
 export function KeyFacts({ business }) {
   const stage = profileStage(business);
@@ -71,10 +93,10 @@ export function KeyFacts({ business }) {
   );
 }
 
-export function AboutSection({ layout, business, first }) {
+export function AboutSection({ layout, business }) {
   const services = business.services ?? [];
   return (
-    <Section layout={layout} title="About" first={first}>
+    <Section layout={layout} title="About">
       <div className="grid gap-4">
         <ContactRow icon={FileText} label="Description">
           {business.description ? (
@@ -104,7 +126,7 @@ export function AboutSection({ layout, business, first }) {
   );
 }
 
-export function ContactSection({ layout, business }) {
+export function ContactSection({ layout, business, first }) {
   const stage = profileStage(business);
   const { name, website, address, openingHours, lat, lng } = business;
   const hasPin = lat != null && lng != null;
@@ -118,7 +140,7 @@ export function ContactSection({ layout, business }) {
   const showGatedPlaceholders = stage === "unclaimed" || (!business.contactLocked && !business.phone && !business.whatsapp && !business.email);
 
   return (
-    <Section layout={layout} title="Contact & location">
+    <Section layout={layout} title="Contact & location" first={first}>
       <div className="grid gap-4 sm:grid-cols-2">
         <ContactRow icon={Globe} label="Website">
           {website ? (

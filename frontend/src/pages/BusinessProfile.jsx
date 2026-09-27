@@ -18,6 +18,7 @@ import { ExplainBadge } from "@/components/badge/BadgeExplainer";
 import {
   AboutSection,
   CardSection,
+  ClaimStrip,
   ContactSection,
   KeyFacts,
   PortfolioSection,
@@ -242,8 +243,11 @@ function BusinessProfile({ inApp = false }) {
   // The standard sections, in order — see components/business/ProfileSections.jsx.
   const sections = (
     <>
-      <AboutSection layout={layout} business={business} first />
-      <ContactSection layout={layout} business={business} />
+      {/* Contact first: finding or reaching the business is why most
+          visitors land here, and on a seeded listing it's most of what
+          there is. */}
+      <ContactSection layout={layout} business={business} first />
+      <AboutSection layout={layout} business={business} />
       <VerificationSection layout={layout} business={business} />
       <VouchesSection layout={layout} business={business} VouchCard={VouchCard} />
       <PortfolioSection layout={layout} business={business} />
@@ -374,19 +378,10 @@ function BusinessProfile({ inApp = false }) {
             </div>
           </div>
 
-          {isUnclaimed && (
-            <div className="text-right">
-              <Button
-                render={<Link to={`/register?business=${business.id}`} />}
-                nativeButton={false}
-              >
-                Claim your business
-              </Button>
-            </div>
-          )}
         </div>
 
         <KeyFacts business={business} />
+        {isUnclaimed && <ClaimStrip business={business} />}
 
         {layout === "single" && sections}
       </div>
