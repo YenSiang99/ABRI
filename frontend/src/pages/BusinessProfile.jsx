@@ -5,30 +5,30 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
-import { ArrowLeft, MapPin, Building2, Radio, Clock } from "lucide-react";
+import { ArrowLeft, MapPin, Building2, Clock } from "lucide-react";
 
 import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
-import { verificationLevelLabel } from "@/lib/trustLabels";
-import { VerificationTimeline } from "@/components/business/VerificationTimeline";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useFollows } from "@/context/FollowsContext";
 import { SOURCE_DIRECTORY } from "@/lib/connectionSources";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VerificationBadge } from "@/components/badge/VerificationBadge";
 import { ExplainBadge } from "@/components/badge/BadgeExplainer";
-import { LockedFeature } from "@/components/app/LockedFeature";
-import { ContactDetails } from "@/components/business/ContactDetails";
-import { UnclaimedAbout } from "@/components/business/UnclaimedAbout";
 import {
-  PortfolioList,
-} from "@/components/business/PortfolioList";
+  AboutSection,
+  CardSection,
+  ContactSection,
+  KeyFacts,
+  PortfolioSection,
+  VerificationSection,
+  VouchesSection,
+} from "@/components/business/ProfileSections";
 import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
-import { CLAIMED, UNCLAIMED } from "@/lib/verificationLevels";
+import { UNCLAIMED } from "@/lib/verificationLevels";
 
 function VouchCard({ vouch }) {
   return (
@@ -59,64 +59,6 @@ function VouchCard({ vouch }) {
   );
 }
 
-// Who this business has actually worked with, confirmed by the other side.
-//
-// THE HEADLINE IS COUNTERPARTIES, NOT ENGAGEMENTS, and that is the anti-gaming
-// design rather than a wording choice. Two businesses can confirm work that
-// never happened — it costs them a colluder, which is more than a
-// self-nomination costs, but it is possible. Reporting "12 portfolio entries" would
-// make the cheapest possible fake look like the strongest possible signal;
-// "12 portfolio entries with 2 businesses" lets a reader judge it for themselves.
-// Never replace this with a single total.
-//
-// NOT A RATING, for the same reason the verification record is not a score.
-// These rows say two businesses worked together on a date. Whether the work
-// was any good is what a vouch is for, and conflating them would let the
-// cheaper artifact borrow the dearer one's meaning.
-function PortfolioRecord({ entries, summary, businessName, businessId }) {
-  if (!entries || entries.length === 0) return null;
-
-  const top = summary?.services?.slice(0, 3) ?? [];
-
-  return (
-    <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-      <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
-        Portfolio
-      </h2>
-      <p className="mt-1 text-sm text-grey-500 dark:text-muted-foreground">
-        Confirmed by the business on the other side, not self-reported.
-      </p>
-
-      {top.length > 0 && (
-        <ul className="mt-4 space-y-1.5">
-          {top.map((g) => (
-            <li
-              key={g.service}
-              className="text-sm text-ink dark:text-foreground"
-            >
-              <span className="font-semibold">{g.service}</span>
-              <span className="text-grey-500 dark:text-muted-foreground">
-                {" \u2014 "}
-                {g.entries}{" "}
-                {g.entries === 1 ? "job" : "jobs"} with{" "}
-                {g.counterparties}{" "}
-                {g.counterparties === 1 ? "business" : "different businesses"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <PortfolioList
-        entries={entries}
-        businessName={businessName}
-        businessId={businessId}
-        className="mt-4 border-t border-grey-200 pt-4 dark:border-border"
-      />
-    </div>
-  );
-}
-
 // Arriving via a Link that set state={{ from, label }} (the NFC tap page,
 // the Network tab) returns you there instead of always dropping back to
 // the directory — a bookmark or direct visit has no such state, so it
@@ -136,19 +78,16 @@ function BusinessProfile({ inApp = false }) {
   const { connectionStateWith, connect, disconnect } = useConnections();
   const { isFollowing, follow, unfollow } = useFollows();
   const [vouchOpen, setVouchOpen] = useState(false);
-  // Controlled rather than defaultValue, so ?tab=vouches is a link target.
-  // Same shape Vouches.jsx uses: unknown values fall back, and the default tab
-  // omits the param entirely.
-  const [tabParams, setTabParams] = useSearchParams();
-  const PROFILE_TABS = ["overview", "vouches", "card"];
-  const tab = PROFILE_TABS.includes(tabParams.get("tab"))
-    ? tabParams.get("tab")
-    : "overview";
-  const setTab = (value) => {
-    const next = new URLSearchParams(tabParams);
-    if (value === "overview") next.delete("tab");
-    else next.set("tab", value);
-    setTabParams(next, { replace: true });
+  // Two designs of the same standard sections, being compared (28 Sep 2026):
+  // "cards" (each section its own card) and "single" (one card). ?layout=single
+  // picks the second; the switch that sets it only renders in development.
+  const [layoutParams, setLayoutParams] = useSearchParams();
+  const layout = layoutParams.get("layout") === "single" ? "single" : "cards";
+  const setLayout = (value) => {
+    const next = new URLSearchParams(layoutParams);
+    if (value === "cards") next.delete("layout");
+    else next.set("layout", value);
+    setLayoutParams(next, { replace: true });
   };
   const [business, setBusiness] = useState(null);
   const [error, setError] = useState(null);
@@ -299,16 +238,18 @@ function BusinessProfile({ inApp = false }) {
   }
 
   const isUnclaimed = business.verificationLevel === UNCLAIMED;
-  const isPendingVerification = business.verificationLevel === CLAIMED;
-  // vouchCount comes from the server rather than vouchesReceived.length:
-  // on a free business the array is withheld but the count is not, and
-  // conflating them is what would silently show "0 vouches" for a business
-  // that has twelve.
-  const { services, vouchesReceived, ssm, vouchCount, testimonialsLocked } =
-    business;
-  const { contactLocked, contactLockedReason } = business;
-  // Defaulted, because this profile is also rendered from the NFC tap page
-  // and by the app-side route, and an older cached payload has neither key.
+
+  // The standard sections, in order — see components/business/ProfileSections.jsx.
+  const sections = (
+    <>
+      <AboutSection layout={layout} business={business} first />
+      <ContactSection layout={layout} business={business} />
+      <VerificationSection layout={layout} business={business} />
+      <VouchesSection layout={layout} business={business} VouchCard={VouchCard} />
+      <PortfolioSection layout={layout} business={business} />
+      <CardSection layout={layout} business={business} />
+    </>
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -319,6 +260,21 @@ function BusinessProfile({ inApp = false }) {
         <ArrowLeft className="size-4" />
         {backLink.label}
       </Link>
+
+      {import.meta.env.DEV && (
+        <div className="float-right inline-flex rounded-full border border-grey-300 p-0.5 text-xs dark:border-border">
+          {[["cards", "Cards"], ["single", "One card"]].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setLayout(value)}
+              className={`rounded-full px-3 py-1 font-semibold ${layout === value ? "bg-ink text-yellow dark:bg-grey-700" : "text-grey-600 dark:text-muted-foreground"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6 rounded-3xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -430,203 +386,12 @@ function BusinessProfile({ inApp = false }) {
           )}
         </div>
 
-        {!isUnclaimed ? (
-          <div className="mt-6 grid gap-4 border-t border-grey-200 pt-6 dark:border-border sm:grid-cols-3">
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
-                SSM Record
-              </div>
-              <div className="mt-1 font-mono text-sm text-ink dark:text-foreground">
-                {ssm ? `Reg. ${ssm}` : "Not yet provided"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
-                Vouches Received
-              </div>
-              <div className="mt-1 text-sm text-ink dark:text-foreground">
-                {isPendingVerification
-                  ? "Unlocks after SSM verification"
-                  : vouchCount > 0
-                    ? `${vouchCount} peers`
-                    : "No vouches yet"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
-                Category
-              </div>
-              <div className="mt-1 text-sm text-ink dark:text-foreground">
-                {business.category}
-              </div>
-            </div>
-          </div>
-        ) : (
-          // One card for an unclaimed listing: the header above, its About
-          // below. The Unclaimed pill and the Claim button already say it
-          // isn't claimed, so there is no separate banner repeating it.
-          <UnclaimedAbout business={business} />
-        )}
+        <KeyFacts business={business} />
 
-        {isPendingVerification && (
-          <div className="mt-4 rounded-md border border-dashed border-grey-300 bg-surface p-4 dark:border-border dark:bg-muted">
-            <p className="text-[13.5px] font-bold text-ink dark:text-foreground">
-              Claimed · SSM verification pending
-            </p>
-            <p className="mt-1 text-[13px] text-grey-600 dark:text-muted-foreground">
-              This business was recently claimed by its owner. We're manually
-              verifying it against SSM records — vouches and the NFC card unlock
-              once that's complete.
-            </p>
-          </div>
-        )}
+        {layout === "single" && sections}
       </div>
 
-      {!isUnclaimed && (
-        <Tabs value={tab} onValueChange={setTab} className="mt-8">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="vouches">
-              Vouches ({isPendingVerification ? 0 : vouchCount})
-            </TabsTrigger>
-            <TabsTrigger value="card">NFC Card</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="mt-6 space-y-6">
-            <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-              <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
-                About
-              </h2>
-              <p className="mt-3 text-sm leading-relaxed text-grey-600 dark:text-muted-foreground">
-                {business.description}
-              </p>
-            </div>
-            <VerificationTimeline entries={business.verificationTimeline} />
-            {/* Directly under the verification record: both are the factual
-                half of this profile — what a registry said, and what a
-                counterparty confirmed. The evaluative half (vouches) lives in
-                its own tab. */}
-            <PortfolioRecord
-              entries={business.entries}
-              summary={business.portfolioSummary}
-              businessName={business.name}
-              businessId={business.id}
-            />
-            {/* No tier lock of its own here. On T0 this whole tab isn't
-                rendered (the unclaimed panel replaces it), and on T1 the
-                plan gate already covers it via reason "owner_plan". The
-                verification-beats-plan rule used on the vouches and card
-                tabs applies to features verification actually UNLOCKS —
-                contact details aren't one of those. */}
-            <ContactDetails
-              business={business}
-              contactLocked={contactLocked}
-              contactLockedReason={contactLockedReason}
-            />
-            {services.length > 0 && (
-              <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-                <h2 className="text-lg font-semibold tracking-tight text-ink dark:text-foreground">
-                  Services
-                </h2>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {services.map((s) => (
-                    <span
-                      key={s}
-                      className="rounded-full border border-grey-200 bg-surface px-3 py-1 text-sm text-grey-700 dark:border-border dark:bg-secondary dark:text-secondary-foreground"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent
-            value="vouches"
-            className="mt-6 grid gap-4 md:grid-cols-2"
-          >
-            {/* Tier lock wins when both apply: a T1 business can't have
-                published vouches at all, so "get verified" is the more
-                useful thing to say than "this is on a paid plan". */}
-            {isPendingVerification ? (
-              <div className="md:col-span-2">
-                <LockedFeature
-                  title="Vouches locked"
-                  description="Vouches unlock once this business is SSM-verified."
-                />
-              </div>
-            ) : testimonialsLocked && vouchCount > 0 ? (
-              // Deliberately not an upgrade pitch. A visitor reading
-              // someone else's profile is the wrong person to sell to —
-              // the pressure belongs on the owner, who sees it on their
-              // own /app/profile. The "N peers" count above is what
-              // actually does the work here.
-              <div className="md:col-span-2">
-                <LockedFeature
-                  title="Written vouches not shown"
-                  description={`${vouchCount} ${vouchCount === 1 ? "business has" : "businesses have"} vouched for this company. Their written vouches aren't displayed on this profile.`}
-                />
-              </div>
-            ) : vouchesReceived.length > 0 ? (
-              vouchesReceived.map((v) => <VouchCard key={v.id} vouch={v} />)
-            ) : (
-              <p className="text-sm text-grey-500 dark:text-muted-foreground">
-                No vouches yet.
-              </p>
-            )}
-          </TabsContent>
-
-          <TabsContent value="card" className="mt-6">
-            {isPendingVerification ? (
-              <LockedFeature
-                title="NFC card locked"
-                description="The physical trust token unlocks once this business is SSM-verified."
-              />
-            ) : (
-              <div className="rounded-3xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
-                <div className="text-xs font-medium uppercase tracking-wider text-grey-500 dark:text-muted-foreground">
-                  Physical trust token
-                </div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink dark:text-foreground">
-                  Verified via NFC
-                </h2>
-                <p className="mt-2 text-sm text-grey-600 dark:text-muted-foreground">
-                  This business carries an ABRI card. Verification status
-                  renders before contact details on every tap.
-                </p>
-
-                <div className="mt-6 max-w-md">
-                  <div className="relative aspect-[1.586/1] overflow-hidden rounded-2xl border border-ink/10 bg-ink p-6 text-yellow shadow-lg dark:border-foreground/10 dark:bg-foreground dark:text-background">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="text-[10px] font-medium uppercase tracking-widest opacity-60">
-                          ABRI · Verified
-                        </div>
-                        <div className="mt-6 text-xl font-semibold">
-                          {business.name}
-                        </div>
-                        <div className="text-xs opacity-70">
-                          {business.category}
-                        </div>
-                      </div>
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow text-sm font-bold text-yellow-ink dark:bg-accent dark:text-accent-foreground">
-                        A
-                      </div>
-                    </div>
-                    <div className="absolute right-6 bottom-5 left-6 flex items-end justify-between font-mono text-[10px] opacity-70">
-                      <span>{ssm ? `SSM ${ssm}` : "SSM pending"}</span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Radio className="h-3 w-3" /> TAP TO VERIFY
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
+      {layout === "cards" && <div className="mt-6 space-y-6">{sections}</div>}
 
       {canVouch && (
         <>

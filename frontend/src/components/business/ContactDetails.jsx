@@ -58,12 +58,11 @@ function PinMap({ lat, lng, name, className = "" }) {
   );
 }
 
-function ContactDetails({ business, contactLocked, contactLockedReason, ownerView = false }) {
+// The phone / WhatsApp / email group, on its own so the business profile's
+// Contact section can use it too. Returns null when there is nothing to say.
+function GatedContact({ business, contactLocked, contactLockedReason, ownerView = false }) {
   const location = useLocation();
-  const { name, phone, whatsapp, email, website, address, openingHours, lat, lng } = business;
-
-  const hasPin = lat != null && lng != null;
-  const hasPublic = Boolean(website || address || openingHours || hasPin);
+  const { name, phone, whatsapp, email } = business;
   const hasGated = Boolean(phone || whatsapp || email);
 
   // Three states, not two. "Withheld" and "the owner hasn't added any" must
@@ -151,7 +150,24 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
     );
   }
 
-  if (!gated && !hasPublic) return null;
+  return gated ?? null;
+}
+
+function ContactDetails({ business, contactLocked, contactLockedReason, ownerView = false }) {
+  const { name, website, address, openingHours, lat, lng } = business;
+  const hasPin = lat != null && lng != null;
+  const hasPublic = Boolean(website || address || openingHours || hasPin);
+  const gated = (
+    <GatedContact
+      business={business}
+      contactLocked={contactLocked}
+      contactLockedReason={contactLockedReason}
+      ownerView={ownerView}
+    />
+  );
+  const hasGated = Boolean(contactLocked || business.phone || business.whatsapp || business.email || ownerView);
+
+  if (!hasGated && !hasPublic) return null;
 
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-6 dark:border-border dark:bg-card">
@@ -182,9 +198,9 @@ function ContactDetails({ business, contactLocked, contactLockedReason, ownerVie
         </div>
       )}
 
-      {gated && <div className={hasPublic ? "mt-5 border-t border-grey-200 pt-5 dark:border-border" : "mt-3"}>{gated}</div>}
+      {hasGated && <div className={hasPublic ? "mt-5 border-t border-grey-200 pt-5 dark:border-border" : "mt-3"}>{gated}</div>}
     </div>
   );
 }
 
-export { ContactDetails, ContactRow, PinMap };
+export { ContactDetails, ContactRow, GatedContact, PinMap };
