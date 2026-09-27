@@ -163,6 +163,7 @@ The rule is: build a register scraper only for categories that are still thin, a
 7. **Only businesses** (`scripts/sources/nonBusiness.mjs`, decided 27 Sep). The test: could this listing claim its page, pass SSM verification and want other businesses to find it? Removed by `merge.mjs`, and recorded with a reason in `data/seed/nonbusiness.csv`:
    - government schools, public universities, and public hospitals, wards and government clinics
    - government offices, places of worship, residences, street markets (pasar malam/tani/pagi), and public sports fields, pools and courts
+   - added in a second sweep: public housing and quarters, military, police and prison sites, hawker centres and Ramadan bazaars, LRT/MRT/KTM stations and toll plazas, statutory bodies (Lembaga…), GIATMARA and other government skills institutes, and street addresses standing in for a name
    - office-floor addresses and landmarks
    - associations and non-profits. These are kept as a partner lead list in `ABRI-associations.xlsx`, since trade bodies speak for many businesses.
    - When a listing is borderline it stays. Any name with a trading word (`Kafe Pemuda Masjid`, `IIUM Bookshop`) is kept, and so are private hospitals and schools, food courts, malls, petrol stations and company head offices (`Wisma …`).
