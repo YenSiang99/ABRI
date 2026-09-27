@@ -28,7 +28,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import {
   outDir, blankListing, locationFromPostcode, rejectReasons, assignIds,
-  writeOutputs, titleCase, nameKey,
+  writeOutputs, titleCase, capitalise, nameKey,
 } from "./common.mjs";
 
 const DIR = outDir("dbkl");
@@ -190,7 +190,9 @@ async function main() {
       location = null;
     }
 
-    const name = titleCase(co);
+    // titleCase handles the register's ALL-CAPS names; capitalise the
+    // lowercase ones ("ngai seng motor") the same way every other source is.
+    const name = capitalise(titleCase(co));
     const reasons = rejectReasons({ category, location, outside, what: activity });
     if (reasons.length) {
       if (!seenOverflow.has(premKey)) {

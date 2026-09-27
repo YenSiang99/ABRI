@@ -331,8 +331,34 @@ export function nameVerdict(name) {
   // goes; one that only ENDS in a place word ("SS2 Fatty Duck", "Park
   // Lounge") stays.
   if (place === "likely" && ADDRESS_FIRST_WORD.test(s) && !mall) return { name: "", verdict: "place" };
+  s = capitalise(s);
   if (verdict === "kept" && s !== original) verdict = "tidied";
   return { name: s, verdict };
+}
+
+// Every word starts with a capital, bar the small joining words mid-name —
+// "restoran ali dan anak" → "Restoran Ali dan Anak" (asked for 27 Sep 2026:
+// a lowercase name reads as unfinished). Only all-lowercase words change: a
+// word with any capital already ("iPhone", "McDonald's", "UHY") was written
+// that way on purpose and is left alone, and so is an ALL-CAPS name.
+// Abbreviations people write in capitals go fully upper ("kl" → "KL",
+// "ss2" → "SS2"). Other scripts have no case and pass through.
+const MINOR_WORDS = new Set("and or of the at in on for by to a an with from via dan di ke dari untuk n".split(" "));
+const UPPER_WORDS = /^(kl|pj|klcc|ttdi|oug|ioi|plt|hq|usj\d*[a-z]?|ss\d+[a-z]?|pju\d*[a-z]?|pjs\d*[a-z]?|klia\d?|uk|usa|diy|bbq|ktv|mrt|lrt|ktm|atm|pc|tv|ac|cctv|seo)$/;
+
+export function capitalise(name) {
+  let first = true;
+  return name.replace(/[\p{L}\p{N}][\p{L}\p{N}'’&-]*/gu, (word, at) => {
+    const isFirst = first;
+    first = false;
+    if (word !== word.toLowerCase() || !/^\p{Ll}/u.test(word)) return word;
+    const bare = word.replace(/['’]+$/, "");
+    if (UPPER_WORDS.test(bare)) return word.toUpperCase();
+    // A letter in an initialism ("a.k.a") isn't a joining word.
+    const dotted = name[at - 1] === "." || name[at + word.length] === ".";
+    if (!isFirst && !dotted && MINOR_WORDS.has(bare)) return word;
+    return word[0].toUpperCase() + word.slice(1);
+  });
 }
 
 const ADDRESS_FIRST_WORD = /^(taman|tmn|kampung|kampong|kg\.?|desa|bandar|bdr|bukit|bkt|jalan|jln|lorong|lrg|seksyen|section|sek|sg\.?|sungai|pulau|blok|block|lot|unit|no|persiaran|batu|plaza tol)\b/i;

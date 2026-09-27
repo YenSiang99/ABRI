@@ -156,6 +156,7 @@ The rule is: build a register scraper only for categories that are still thin, a
 5. **A wrong locality is worse than a missing one.** When unsure, send the row to overflow.
 6. **Names are kept as the source wrote them** (`nameVerdict` in `common.mjs`, decided 27 Sep, reversing the 26 Sep strip-to-English rule). Chinese, Tamil, Arabic, Japanese, Korean and Thai names stay, including names with no English at all (id `biz-<source id>`). What still changes:
    - Fancy maths/fullwidth letters become plain.
+   - Every word starts with a capital, except joining words in the middle ("and", "of", "dan", "di"). Words that already have a capital (`iPhone`, `McDonald's`) and ALL-CAPS names are left alone, and abbreviations go fully uppercase (`KL`, `SS2`, `PLT`). This applies to DBKL names too.
    - Text in other scripts (Burmese, Bengali) is removed.
    - Decoration is tidied: symbols at either end, extra spaces, trailing dots, broken brackets, and an address pasted after the name (cut at the street word).
    - A listing is dropped when its name is only a place ("Taman Asa Jaya", "Lorong Keramat 12"), starts like an address ("Taman…", "Kampung…", "Unit…", reviewed over 1,242 examples), or says it's closed. Malls stay.
