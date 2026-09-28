@@ -6,7 +6,7 @@ function NfcSection() {
           <div className="relative mx-auto h-[300px] w-[360px]">
             <div className="absolute top-4 left-0 z-1 flex h-[182px] w-[300px] -rotate-6 flex-col justify-between rounded-lg border border-black bg-linear-to-br from-[#1d1c19] to-ink p-[22px] text-[#f3f1ec] shadow-md">
               <div>
-                <div className="font-mono text-[9px] tracking-[0.16em] text-[#7d7970] uppercase">
+                <div className="text-[9.5px] font-semibold tracking-[0.12em] text-[#7d7970] uppercase">
                   Verified business network
                 </div>
                 <div className="mt-2 text-[19px] font-extrabold">
@@ -16,7 +16,7 @@ function NfcSection() {
                 </div>
               </div>
               <div className="flex items-end justify-between">
-                <span className="font-mono text-[10.5px] text-[#7d7970]">
+                <span className="text-[11px] font-medium text-[#7d7970]">
                   tap to verify ›››
                 </span>
                 <span className="text-sm font-extrabold">
@@ -41,7 +41,7 @@ function NfcSection() {
                   Meridian Accounting
                 </div>
               </div>
-              <div className="mt-2.5 rounded-md border border-yellow bg-yellow-soft px-[7px] py-[5px] font-mono text-[8.5px] text-yellow-ink">
+              <div className="mt-2.5 rounded-md border border-yellow bg-yellow-soft px-[7px] py-[5px] text-[9px] font-semibold tracking-[0.04em] text-yellow-ink">
                 ✓ SSM-VERIFIED · ACTIVE
               </div>
               <div className="mt-2 h-1.5 rounded-full bg-surface-2 dark:bg-muted" />
@@ -74,7 +74,7 @@ function NfcSection() {
             >
               See membership
             </a>
-            <span className="mt-3 block font-mono text-xs text-grey-500 dark:text-muted-foreground">
+            <span className="mt-3 block text-[13px] text-grey-500 dark:text-muted-foreground">
               card included with membership
             </span>
           </div>

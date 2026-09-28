@@ -88,7 +88,9 @@
   --ink: #141413;
   --ink-pure: #000000;
   --white: #ffffff;
-  --surface: #f8f7f4;
+  /* Warm cream, shared with the member app since the 28 Sep 2026 theme
+     unification (it was #f8f7f4). */
+  --surface: oklch(0.985 0.008 90);
   --surface-2: #f1f0ec;
   --grey-100: #eceae5;
   --grey-200: #e2dfd9;
@@ -128,7 +130,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.875rem;
+  --radius: 0.75rem;
   --sidebar: var(--white);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--ink);
@@ -194,8 +196,10 @@
 
 /* ---- Member workspace (/app) theme, ported verbatim from the Lovable
    dashboard build — near-black primary, yellow accent, warm cream
-   sidebar. Distinct from the marketing site's yellow-primary palette
-   above, so it's scoped to .app-theme rather than merged into :root. ---- */
+   sidebar. Its button colours stay distinct from the marketing site's
+   yellow-primary palette above, so it's scoped to .app-theme rather than
+   merged into :root. Type, corners and the cream background are shared with
+   the site since 28 Sep 2026. ---- */
 .app-theme {
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
@@ -206,18 +210,16 @@
   --radius-3xl: 1.5rem;
   --radius-4xl: 1.75rem;
 
-  /* Lovable's styles.css never registers a custom font — it renders in the
-     plain system stack, unlike the marketing site's Manrope/IBM Plex Mono.
-     --font-sans alone won't retheme text: html already applies font-sans as
-     a resolved value that just inherits down, so it has to be re-applied
-     here too. */
+  /* The app used the plain system font (as Lovable's build did) until the
+     28 Sep 2026 unification; it now uses the site's Manrope / IBM Plex Mono,
+     so the product reads as one thing on both sides of the login. Re-applied
+     here because html already resolved font-sans before .app-theme's
+     variables existed. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    "Manrope Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
   --font-heading: var(--font-sans);
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   font-family: var(--font-sans);
   line-height: 1.5;
 
@@ -281,32 +283,4 @@
   --sidebar-accent-foreground: oklch(0.94 0.01 85);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.83 0.16 82);
-}
-
-/* ---- Unified-theme PREVIEW (28 Sep 2026) ----
-   One look for the public site and the member app, being compared against
-   the current two. Switched on by <html data-theme-preview="unified">, which
-   the development-only switch in components/ThemePreviewSwitch.jsx sets.
-   Yellow and every button colour are deliberately untouched; this only
-   unifies the type, the corners and the background:
-   - the app takes the site's Manrope / IBM Plex Mono instead of the system font
-   - the site takes the app's softer corners
-   - the site takes the app's cream background (light mode) */
-html[data-theme-preview="unified"] {
-  /* Tailwind's @theme inline resolves every rounded-* to calc(var(--radius) * n),
-     so this one value is what sets the corners — the app's --radius-* list
-     above has no effect beyond it. */
-  --radius: 0.75rem;
-}
-html[data-theme-preview="unified"]:not(.dark) {
-  --surface: oklch(0.985 0.008 90);
-  --background: oklch(0.985 0.008 90);
-}
-html[data-theme-preview="unified"] .app-theme {
-  --font-sans:
-    "Manrope Variable", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    system-ui, sans-serif;
-  --font-heading: var(--font-sans);
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  font-family: var(--font-sans);
 }
