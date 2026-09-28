@@ -17,7 +17,12 @@ function Hero() {
           <h1 className="mt-3 text-[clamp(40px,5.2vw,62px)] leading-[1.06] font-extrabold tracking-[-0.028em] text-ink dark:text-foreground">
             Do business with companies you can{" "}
             <span className="relative whitespace-nowrap">
-              <span className="absolute inset-x-[-2px] bottom-[5px] -z-10 h-4 rounded-[3px] bg-yellow-soft dark:opacity-90" />
+              {/* A brand-yellow underline below the word, not a band behind
+                  it: the old pale band sat under the bottom half of the
+                  letters, which washed the word out in dark mode and all but
+                  vanished in light mode. Yellow is the "verified" colour, so
+                  it ties the headline to the badge. */}
+              <span className="absolute inset-x-0 -bottom-[3px] h-[6px] rounded-full bg-yellow" aria-hidden />
               trust
             </span>
             .
