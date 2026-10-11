@@ -11,17 +11,29 @@
 #
 # Every write touches only untouched listings (L0, no account).
 #
-# Usage, from backend/:
-#   DEV_DATABASE_URL='postgresql://USER:PASSWORD@localhost:5433/abri_dev' \
-#     bash scripts/load-dev-data.sh
+# Usage, from anywhere:
+#   bash backend/scripts/load-dev-data.sh
+#
+# The database URL is read from the host's /etc/abri/dev.env (the one the
+# dev container uses) and pointed at the tunnel, so the password is never
+# typed or printed. DEV_DATABASE_URL overrides it.
 #
 # It opens the SSH tunnel (local 5433 → host 5432) itself and closes it at
 # the end.
 set -euo pipefail
 
-: "${DEV_DATABASE_URL:?set DEV_DATABASE_URL to the abri_dev URL on localhost:5433}"
 KEY="${ABRI_SSH_KEY:-$HOME/Downloads/abri.pem}"
 HOST="${ABRI_SSH_HOST:-ec2-user@ec2-43-216-217-161.ap-southeast-5.compute.amazonaws.com}"
+if [ -z "${DEV_DATABASE_URL:-}" ]; then
+  REMOTE_URL=$(ssh -i "$KEY" "$HOST" "sudo grep -E '^DATABASE_URL=' /etc/abri/dev.env | head -1 | cut -d= -f2-" | tr -d "\"'")
+  # Whatever host:port the container uses becomes the tunnel's end.
+  DEV_DATABASE_URL=$(printf '%s' "$REMOTE_URL" | sed -E 's#@[^/]+/#@localhost:5433/#')
+  [ -n "$DEV_DATABASE_URL" ] || { echo "No DATABASE_URL in /etc/abri/dev.env"; exit 1; }
+  case "$DEV_DATABASE_URL" in
+    */abri_dev*) ;;
+    *) echo "dev.env's DATABASE_URL isn't abri_dev; stopping"; exit 1 ;;
+  esac
+fi
 MANIFEST="data/seed/imports/localhost-5433-abri_dev-2026-09-26T05-43-30-859Z.csv"
 STAMP=$(date +%Y%m%d-%H%M)
 
