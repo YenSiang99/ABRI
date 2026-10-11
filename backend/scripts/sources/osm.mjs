@@ -27,10 +27,10 @@
 //    domain hands a stranger somebody else's listing. OSM's URL goes to
 //    `website`, which is harmless; `domain` waits for a higher-trust source.
 //
-// 2. `phone`, `whatsapp` and `email` ARE ALWAYS EMPTY, even where OSM has
-//    them. lib/contactVisibility.js puts those behind the paid tier, so
-//    bulk-loading them would sell unconsented contact data — the blueprint's
-//    "no scraping personal data" line.
+// 2. `phone`, `whatsapp` and `email` ARE COPIED from OSM's phone/email tags
+//    (and their contact:* forms) since 3 Oct 2026, at the owner's direction.
+//    Until then they were always empty, because lib/contactVisibility.js puts
+//    contact details behind the paid tier.
 //
 // 3. CHAIN BRANCHES ARE DROPPED. Anything carrying a `brand` tag is a
 //    McDonald's, a 7-Eleven or a bank branch; four hundred of them would bury
@@ -154,6 +154,14 @@ const OFFICE = {
   educational_institution: "Education",
   tutoring: "Education",
   training: "Professional Training",
+  // Added Oct 2026 with the new categories (businessVocab.js)
+  insurance: "Finance & Insurance",
+  financial: "Finance & Insurance",
+  financial_services: "Finance & Insurance",
+  employment_agency: "Business Services",
+  coworking: "Business Services",
+  security: "Business Services",
+  travel_agent: "Travel & Hospitality",
 };
 
 const AMENITY = {
@@ -179,6 +187,26 @@ const AMENITY = {
   university: "Education",
   childcare: "Education",
   training: "Professional Training",
+  bank: "Finance & Insurance",
+  bureau_de_change: "Finance & Insurance",
+  money_transfer: "Finance & Insurance",
+  nightclub: "Events & Entertainment",
+  cinema: "Events & Entertainment",
+  theatre: "Events & Entertainment",
+  events_venue: "Events & Entertainment",
+};
+
+// Shops that are a new category's, not Retail's (Oct 2026).
+const SHOP_OTHER = {
+  travel_agency: "Travel & Hospitality",
+  laundry: "Personal & Home Services",
+  dry_cleaning: "Personal & Home Services",
+  pet_grooming: "Personal & Home Services",
+  funeral_directors: "Personal & Home Services",
+  tattoo: "Personal & Home Services",
+  money_lender: "Finance & Insurance",
+  pawnbroker: "Finance & Insurance",
+  wholesale: "Wholesale & Distribution",
 };
 
 const SHOP_FOOD = new Set([
@@ -222,6 +250,10 @@ function categoryOf(t) {
   if (t.man_made === "works") return "Manufacturing";
   if (t.shop && SHOP_AUTO.has(t.shop)) return "Automotive";
   if (t.amenity === "car_wash") return "Automotive";
+  if (t.shop && SHOP_OTHER[t.shop]) return SHOP_OTHER[t.shop];
+  if (t.tourism === "hotel" || t.tourism === "hostel" || t.tourism === "guest_house" || t.tourism === "motel") {
+    return "Travel & Hospitality";
+  }
   if (t.shop && !SHOP_SKIP.has(t.shop)) {
     if (SHOP_FOOD.has(t.shop)) return "Food & Beverage";
     if (SHOP_HEALTH.has(t.shop)) return "Health & Wellness";
@@ -319,6 +351,17 @@ function displayName(t) {
   // Malay tag only when there is no primary name at all.
   const k = ["name", "name:en", "name:ms"].find((key) => t[key]?.trim());
   return k ? { original: t[k], ...nameVerdict(t[k]) } : null;
+}
+
+// OSM's phone/email tags, first value only (they are ;-separated lists).
+function contacts(t) {
+  const first = (...keys) => String(keys.map((k) => t[k]).find(Boolean) ?? "").split(";")[0].trim();
+  const email = first("email", "contact:email").toLowerCase();
+  return {
+    phone: first("phone", "contact:phone", "contact:mobile"),
+    whatsapp: first("contact:whatsapp").replace(/[^\d]/g, ""),
+    email: /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) ? email : "",
+  };
 }
 
 function address(t) {
@@ -433,6 +476,7 @@ async function main() {
       ...blankListing(),
       name, category, location,
       website: site,
+      ...contacts(t),
       address: address(t),
       openingHours: (t.opening_hours || "").trim(),
       ...point(lat, lon),

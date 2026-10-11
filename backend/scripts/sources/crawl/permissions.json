@@ -1,0 +1,3 @@
+{
+  "_readme": "Commercial crawlers run only for sites listed here. Add an entry once the site has agreed: { \"granted\": \"YYYY-MM-DD\", \"by\": \"name, role, company\", \"scope\": \"what they agreed to\", \"gapMs\": agreed ms between requests (optional; else robots.txt Crawl-delay), \"overridesRobots\": true only if they agreed in writing to paths robots.txt disallows }"
+}

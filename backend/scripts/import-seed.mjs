@@ -19,9 +19,19 @@
 // from the manifest below, never by guessing.
 //
 // WHAT IS WRITTEN: id, name, category, location, website, address,
-// openingHours, lat, lng. Everything else stays at its default — L0, free tier, no
-// services. `domain`, phone, whatsapp and email are never written even if
-// the CSV had them: see ABRI-data-sources.md → "Rules for imported data".
+// openingHours, lat, lng, phone, whatsapp, email. Everything else stays at its
+// default — L0, free tier, no services. Phone, WhatsApp and email have been
+// written since 3 Oct 2026, at the owner's direction, when a source has them.
+// `domain` is never written (lib/domainVerification.js auto-approves claims
+// against it). Nor is `ssm`: on this table a number in `ssm` means "the owner
+// submitted this for verification" (see POST /businesses/me/ssm), so a
+// register's number there would put an unsubmitted number in the admin queue
+// the moment the listing is claimed.
+//
+// NO ADDRESS, NO LOCALITY. A register that gives no address (MDEC) produces
+// rows with location "" — written as-is, never guessed. Such a row is skipped
+// when a business with the same name exists anywhere, since there is no
+// locality to tell the two apart.
 //
 // THE MANIFEST. The Business table has no source column, and the licences
 // need one (OSM's ODbL may require separating OSM-derived rows later). Every
@@ -124,16 +134,18 @@ async function main() {
   const existing = await prisma.business.findMany({ select: { id: true, name: true, location: true } });
   const existingIds = new Set(existing.map((b) => b.id));
   const existingNames = new Set(existing.map((b) => `${nameKey(b.name)}|${b.location}`));
+  const existingAnyName = new Set(existing.map((b) => nameKey(b.name)));
 
   const stats = { inFile: rows.length, existingBefore: existing.length, invalid: 0, idExists: 0, nameExists: 0, toInsert: 0 };
   const toInsert = [];
   for (const r of rows) {
-    if (!SLUG.test(r.id) || !r.name || !isValidCategory(r.category) || !isValidLocation(r.location)) {
+    if (!SLUG.test(r.id) || !r.name || !isValidCategory(r.category) || !(isValidLocation(r.location) || (r.location === "" && !r.address))) {
       stats.invalid++;
       continue;
     }
     if (existingIds.has(r.id)) { stats.idExists++; continue; }
     if (existingNames.has(`${nameKey(r.name)}|${r.location}`)) { stats.nameExists++; continue; }
+    if (r.location === "" && existingAnyName.has(nameKey(r.name))) { stats.nameExists++; continue; }
     toInsert.push(r);
   }
   stats.toInsert = toInsert.length;
@@ -164,6 +176,9 @@ async function main() {
         location: r.location,
         website: r.website || null,
         address: r.address || null,
+        phone: r.phone || null,
+        whatsapp: r.whatsapp || null,
+        email: r.email || null,
         openingHours: r.openingHours || null,
         lat: r.lat ? Number(r.lat) : null,
         lng: r.lng ? Number(r.lng) : null,

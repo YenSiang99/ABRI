@@ -5,8 +5,10 @@
 //
 // THE RULES EVERY EXTRACTOR FOLLOWS (why each one exists is in
 // ABRI-data-sources.md → "Rules for imported data"):
-//   - firms only; never a person's name, mobile or personal email
-//   - phone, whatsapp, email always empty
+//   - firms only; never a person's name
+//   - phone, whatsapp and email are copied when the source record has them
+//     (changed 3 Oct 2026 at the owner's direction; until then they were
+//     always empty). Still never a contact person's own name.
 //   - domain only from a regulator's own record of the firm — never from a
 //     POI dataset or a licence list (lib/domainVerification.js auto-approves
 //     claims against it)
@@ -79,6 +81,15 @@ export function locationFromPostcode(pc) {
   if (n >= 47100 && n <= 47199) return "Puchong";
   if (n >= 40000 && n <= 40999) return "Shah Alam";
   if (n === 68000) return "Ampang";
+  // Kuala Langat and Kuala Selangor postcodes inside the 41000–42999 Klang
+  // block: their own towns, not Klang. Banting and Puncak Alam are in the
+  // vocab; the others have no locality there yet, so they go to overflow by
+  // name rather than being filed under Klang.
+  if (p3 === 427) return "Banting";
+  if (p3 === 423) return "Puncak Alam";
+  if (p3 === 425) return { outside: "Telok Panglima Garang" };
+  if (p3 === 426) return { outside: "Jenjarom" };
+  if (p3 === 428) return { outside: "Tanjong Sepat" };
   const outside = [
     [41000, 42999, "Klang"],
     [43000, 43099, "Kajang"],
@@ -148,10 +159,13 @@ export function assignIds(rows, stats) {
     const short = /^[0-9a-f]{8}-/.test(tail) ? tail.slice(0, 8) : slugify(tail);
     const latin = slugify(row.name);
     const base = !OTHER_SCRIPT_LETTER.test(row.name) ? latin : latin ? `${latin}-${short}` : `biz-${short}`;
+    // A row with no locality (a register with no address) takes its source
+    // id instead, or the suffix would be empty.
+    const where = slugify(row.location) || short;
     let id = base;
-    if (ids.has(id)) id = `${base}-${slugify(row.location)}`;
+    if (ids.has(id)) id = `${base}-${where}`;
     let k = 2;
-    while (ids.has(id)) id = `${base}-${slugify(row.location)}-${k++}`;
+    while (ids.has(id)) id = `${base}-${where}-${k++}`;
     ids.add(id);
     row.id = id;
     kept.push(row);

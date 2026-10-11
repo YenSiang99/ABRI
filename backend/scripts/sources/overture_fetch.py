@@ -56,8 +56,8 @@ def main():
         """)
 
     out = os.path.join(RAW, "kv_places.ndjson")
-    # Only the fields overture.mjs uses. Phones and emails are deliberately
-    # not exported at all — they are never written to a listing.
+    # Only the fields overture.mjs uses. Phones and emails have been exported
+    # since 3 Oct 2026, when the owner allowed contact details from sources.
     rows = con.execute(f"""
         SELECT
           id,
@@ -68,6 +68,8 @@ def main():
           taxonomy.primary                 AS category,
           taxonomy.hierarchy               AS hierarchy,
           websites,
+          phones,
+          emails,
           addresses[1].freeform            AS street,
           addresses[1].locality            AS locality,
           addresses[1].postcode            AS postcode,

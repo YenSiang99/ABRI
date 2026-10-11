@@ -50,6 +50,8 @@ node scripts/sources/overture.mjs
 node scripts/sources/osm.mjs                # Overpass; cached in data/sources/osm/raw
 node scripts/sources/dbkl.mjs               # downloads the DBKL xlsx once
 node scripts/sources/merge.mjs              # → data/seed/listings.csv
+node scripts/sources/crawl/websites.mjs     # contacts off listings' own websites
+node scripts/sources/merge.mjs              # again, to fold those in
 ```
 
 Each source writes `data/sources/<name>/listings.csv`, `overflow.csv` and `stats.json` (all gitignored). Shared helpers — slugs, postcode → locality, vocab checks, CSV — are in `backend/scripts/sources/common.mjs`.
@@ -89,6 +91,15 @@ Each source writes `data/sources/<name>/listings.csv`, `overflow.csv` and `stats
 | What it is | 55,530 trade licences, 36,589 companies, 427 activity types, each with company name and premises address |
 | Kept | **19,497** after dropping chains (companies with ≥ 5 KL premises) and the 13,400 generic "business office" licences with no stated trade |
 | Caveats | **Dated 2019**, so some businesses have since closed. **Names are legal names** ("… Sdn Bhd"), not trading names. When Overture or OSM has the same business, the merge takes their name. 17,687 DBKL rows are found in no other source; treat those as the least certain |
+
+### Listings' own websites (12 Oct 2026)
+| | |
+|---|---|
+| What it is | Phone, WhatsApp and email read off each listing's own website, for listings with a website but no phone or no email |
+| How | `crawl/websites.mjs`: robots.txt obeyed, the listed page plus up to two contact/about pages, one request a second per site. 401/403, challenge pages and CAPTCHAs end that site; nothing is worked around. Sites that redirect to another domain (parked, expired) give nothing |
+| Skipped | Chain websites shared by 3+ listings (head office numbers), social and marketplace pages, and in the merge any website two listings share |
+| Email rule | Strict, because a listing's email can claim it by code: the site's own domain, or a personal mailbox when it is the only one on the site, or the only address the site links with mailto. Rules in `websiteContacts.mjs`; candidates are all kept in `raw/sites.jsonl`, so a rule change is a re-merge, not a re-crawl |
+| Provenance | Each filled listing gets a "website" SourceRecord keyed on its URL |
 
 ## The merge
 

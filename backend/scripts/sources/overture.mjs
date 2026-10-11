@@ -10,7 +10,8 @@
 // rows come from Meta's business pages, which is also why it needs the
 // confidence filter below: an abandoned Facebook page is still a "place".
 //
-// What it does NOT take, per common.mjs: phones, emails, and `domain`.
+// What it does NOT take, per common.mjs: `domain`. Phones, emails and a
+// wa.me WhatsApp link are copied when Overture has them (since 3 Oct 2026).
 // Websites go to `website` only.
 
 import fs from "node:fs";
@@ -36,6 +37,7 @@ const B2B = new Set([
   "Corporate Secretarial", "Accounting & Tax", "Law", "IT Consulting",
   "Design", "Marketing & Media", "Property", "Logistics", "Manufacturing",
   "Construction & Trades", "Professional Training", "Automotive",
+  "Business Services", "Wholesale & Distribution", "Finance & Insurance",
 ]);
 
 // ── Category ──────────────────────────────────────────────────────────────
@@ -101,8 +103,8 @@ const BY_CATEGORY = {
   pharmacy: "Health & Wellness", veterinarian: "Health & Wellness",
   gym: "Health & Wellness", fitness_trainer: "Health & Wellness",
   yoga_studio: "Health & Wellness", pilates_studio: "Health & Wellness",
-  tattoo_and_piercing: null, shoe_repair: null, life_coach: null,
-  image_consultant: null,
+  tattoo_and_piercing: "Personal & Home Services", shoe_repair: "Personal & Home Services",
+  life_coach: "Personal & Home Services", image_consultant: "Personal & Home Services",
   // Construction & Trades (home_service is mixed — only the trades)
   contractor: "Construction & Trades", hvac_service: "Construction & Trades",
   electrician: "Construction & Trades", carpenter: "Construction & Trades",
@@ -124,6 +126,69 @@ const BY_CATEGORY = {
   // Retail exceptions
   shopping_mall: SKIP, parking: SKIP,
   fueling_station: "Retail",
+
+  // ── The six categories added Oct 2026 (businessVocab.js) ──────────────
+  // Travel & Hospitality (lodging is a whole branch, below; these are the
+  // travel firms, which sit under travel_and_transportation with the
+  // stations and airports)
+  travel_service: "Travel & Hospitality", travel_agent: "Travel & Hospitality",
+  travel_company: "Travel & Hospitality", tour_operator: "Travel & Hospitality",
+  sightseeing_tour_agency: "Travel & Hospitality",
+  passport_and_visa_service: "Travel & Hospitality",
+  // Events & Entertainment — but not public or gambling venues
+  wedding_planning: "Events & Entertainment",
+  casino: SKIP, betting_center: SKIP, lottery_vendor: SKIP,
+  adult_entertainment_venue: SKIP, museum: SKIP, art_museum: SKIP,
+  history_museum: SKIP, sculpture_statue: SKIP, observatory: SKIP,
+  visitor_center: SKIP, stadium_arena: SKIP, football_stadium: SKIP,
+  soccer_stadium: SKIP, track_stadium: SKIP, fairgrounds: SKIP,
+  // Finance & Insurance
+  bank_or_credit_union: "Finance & Insurance", bank: "Finance & Insurance",
+  credit_union: "Finance & Insurance", insurance_agency: "Finance & Insurance",
+  auto_insurance: "Finance & Insurance", financial_advising: "Finance & Insurance",
+  investing: "Finance & Insurance", installment_loans: "Finance & Insurance",
+  money_transfer_service: "Finance & Insurance", currency_exchange: "Finance & Insurance",
+  mortgage_broker: "Finance & Insurance", stock_and_bond_broker: "Finance & Insurance",
+  broker: "Finance & Insurance", trusts: "Finance & Insurance",
+  credit_and_debt_counseling: "Finance & Insurance", collection_agency: "Finance & Insurance",
+  atm: SKIP,
+  // Business Services
+  professional_service: "Business Services",
+  corporate_or_business_office: "Business Services",
+  b2b_service: "Business Services", b2b_business_management_service: "Business Services",
+  business_consulting: "Business Services", b2b_human_resource_service: "Business Services",
+  employment_agency: "Business Services", translation_service: "Business Services",
+  coworking_space: "Business Services", cleaning_service: "Business Services",
+  janitorial_service: "Business Services", merchandising_service: "Business Services",
+  occupational_safety: "Business Services",
+  // Personal & Home Services (the trades above win first)
+  laundromat: "Personal & Home Services", laundry_service: "Personal & Home Services",
+  dry_cleaning: "Personal & Home Services", sewing_and_alterations: "Personal & Home Services",
+  tailor: "Personal & Home Services", funeral_service: "Personal & Home Services",
+  pet_groomer: "Personal & Home Services", pet_boarding: "Personal & Home Services",
+  pet_sitting: "Personal & Home Services", dog_trainer: "Personal & Home Services",
+  pet_breeder: "Personal & Home Services", home_cleaning: "Personal & Home Services",
+  pest_control_service: "Personal & Home Services", carpet_cleaning: "Personal & Home Services",
+  pool_cleaning: "Personal & Home Services", appliance_repair_service: "Personal & Home Services",
+  furniture_assembly: "Personal & Home Services", mover: "Personal & Home Services",
+  damage_restoration: "Personal & Home Services", bike_repair_maintenance: "Personal & Home Services",
+  // Wholesale & Distribution
+  food_beverage_distributor: "Wholesale & Distribution", wholesale_grocer: "Wholesale & Distribution",
+  meat_wholesaler: "Wholesale & Distribution", wholesaler: "Wholesale & Distribution",
+  restaurant_wholesale: "Wholesale & Distribution", computer_wholesaler: "Wholesale & Distribution",
+  supplier_or_distributor: "Wholesale & Distribution", b2b_food_products: "Wholesale & Distribution",
+  metal_supplier: "Wholesale & Distribution", electronic_equipment_supplier: "Wholesale & Distribution",
+  restaurant_equipment_and_supply: "Wholesale & Distribution",
+  beauty_product_supplier: "Wholesale & Distribution",
+  b2b_surgical_appliances_and_supplies: "Wholesale & Distribution",
+  laboratory_equipment_supplier: "Wholesale & Distribution",
+  business_office_supplies_and_stationery: "Wholesale & Distribution",
+  hotel_supply_service: "Wholesale & Distribution", vending_machine_supplier: "Wholesale & Distribution",
+  granite_supplier: "Wholesale & Distribution",
+  b2b_international_trade_service: "Wholesale & Distribution",
+  // Existing categories that were missing these
+  day_care_preschool: "Education", child_care_and_day_care: "Education",
+  retirement_home: "Health & Wellness",
 };
 
 const BY_BRANCH = {
@@ -144,7 +209,12 @@ const BY_BRANCH = {
   sport_or_fitness_facility: "Health & Wellness",
   food_and_drink: "Food & Beverage",
   food_service: "Food & Beverage",
-  event_or_party_service: null,
+  event_or_party_service: "Events & Entertainment",
+  arts_and_entertainment: "Events & Entertainment",
+  lodging: "Travel & Hospitality",
+  financial_service: "Finance & Insurance",
+  animal_or_pet_service: "Personal & Home Services",
+  home_service: "Personal & Home Services",
   vehicle_service: "Automotive",
   vehicle_dealer: "Automotive",
   shopping: "Retail",
@@ -236,6 +306,16 @@ function website(p) {
   return "";
 }
 
+// The first phone and email Overture has, and a WhatsApp number from a
+// wa.me link among its websites (website() skips those as not the business's
+// own site).
+function contacts(p) {
+  const phone = String((p.phones || [])[0] ?? "").trim();
+  const email = String((p.emails || [])[0] ?? "").trim().toLowerCase();
+  const wa = (p.websites || []).map((w) => String(w).match(/wa\.me\/\+?(\d{8,15})/)?.[1]).find(Boolean) ?? "";
+  return { phone, email: /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email) ? email : "", whatsapp: wa };
+}
+
 function address(p) {
   const street = (p.street || "").trim();
   if (!street) return "";
@@ -296,6 +376,7 @@ async function main() {
       ...blankListing(),
       name, category, location,
       website: site,
+      ...contacts(p),
       address: address(p),
       ...point(p.lat, p.lon),
       source: `Overture Maps (${(p.datasets || []).join("+")})`,
