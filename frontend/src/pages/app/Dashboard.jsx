@@ -23,6 +23,7 @@ import { VouchDialog } from "@/components/app/VouchDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
 import { fetchMyActivity } from "@/lib/api/activity";
+import { fetchProfileViewers } from "@/lib/api/watches";
 import { isVouchable } from "@/lib/vouchRules";
 import { activityLink } from "@/lib/activityLinks";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,9 @@ function Dashboard() {
   const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
   const [needsYouCount, setNeedsYouCount] = useState(0);
   const [activity, setActivity] = useState([]);
+  // GET /watches/viewers: the count answers on every plan (only the names
+  // are Pro). null until it arrives, so the card shows a dash, not a zero.
+  const [views, setViews] = useState(null);
 
   // Derived from the feed rather than the context's unreadCount, which
   // markAllRead has already zeroed by the time this renders. It also counts
@@ -162,6 +166,14 @@ function Dashboard() {
     await refreshAccount();
     loadSuggestions();
   }
+
+  // Outside the effect below: a business waiting on SSM review is still
+  // listed, still opened, and the count is just as real.
+  useEffect(() => {
+    fetchProfileViewers()
+      .then(setViews)
+      .catch(() => {});
+  }, [business.id]);
 
   useEffect(() => {
     if (pending) return;
@@ -217,20 +229,45 @@ function Dashboard() {
         </Link>
       </div>
 
-      {pending && (
+      {/* Two different states, and the banner used to say the second to
+          both: "no action needed" to a member who has never given us a
+          number, so nothing was ever going to happen. Business.ssm on an L1
+          row is the submitted-and-waiting signal — the same column the admin
+          SSM queue reads, so this and that queue cannot disagree. */}
+      {pending && business.ssm && (
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-dashed border-border bg-card/50 p-5">
           <Clock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div>
             <div className="text-sm font-semibold text-foreground">
-              Claimed · SSM verification pending
+              Claimed · SSM number {business.ssm} waiting on review
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Our team is manually cross-checking your registration against SSM
-              e-Info records — usually within a couple of business days. Vouching
-              and your NFC card unlock once that's done. No action needed from you.
+              Our team cross-checks it against the SSM register by hand, usually
+              within a couple of business days. Vouching and your NFC card unlock
+              once that's done. No action needed from you.
             </p>
           </div>
         </div>
+      )}
+      {pending && !business.ssm && (
+        <Link
+          to="/app/verify"
+          className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
+        >
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
+            <div>
+              <div className="text-sm font-semibold text-foreground">
+                Add your SSM registration number
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                We can't verify your business until we have it. Vouching and your
+                NFC card unlock once it's checked.
+              </p>
+            </div>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
       )}
 
       {/* A prompt, not a stat — the dashboard previously surfaced pending
@@ -271,10 +308,17 @@ function Dashboard() {
           icon={TrendingUp}
         />
         <StatCard
-          label="Profile views (7d)"
-          value={47}
-          hint="Petaling Jaya corridor"
+          label={`Profile views (${views?.windowDays ?? 30}d)`}
+          value={views ? views.viewerCount : "—"}
+          hint={
+            !views
+              ? "Businesses that opened your page"
+              : views.viewerCount === 1
+                ? "1 business opened your page"
+                : `${views.viewerCount} businesses opened your page`
+          }
           icon={Eye}
+          to="/app/checks?tab=viewers"
         />
         {/* Both cards show the LABEL as the value and the machine detail as
             the hint. They used to disagree — this one rendered the raw code

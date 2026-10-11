@@ -6,16 +6,21 @@ import { requireAdmin } from "../middleware/requireAdmin.js";
 import {
   approveClaimAndRejectRivals,
   revokeApprovedClaim,
+  emailRejectedClaimant,
+  verifyBusinessSsm,
 } from "../lib/businessClaim.js";
+import { normalizeSsm } from "../lib/businessLookup.js";
+import { getFoundingSettings, setFoundingSettings, parseDate } from "../lib/founding.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { sendVerificationEmail } from "../lib/mailer.js";
+import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
 import { serializeVouch, VOUCH_INCLUDE, BUSINESS_SELECT } from "../lib/vouchTurn.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
 import { createNetworkEvent } from "../lib/networkEvents.js";
 import { notifyWatchers } from "../lib/businessWatch.js";
 import { MEMBERSHIP_TIER_RANK } from "../lib/entitlements.js";
-import { CLAIMED, SSM_VERIFIED } from "../lib/verificationLevels.js";
+import { CLAIMED, SSM_VERIFIED, VOUCHABLE_VERIFICATION_LEVELS } from "../lib/verificationLevels.js";
+import { startPaidYear } from "../lib/businessClaim.js";
 
 const router = Router();
 
@@ -38,16 +43,66 @@ router.get(
   "/claims",
   asyncHandler(async (req, res) => {
     const claims = await prisma.account.findMany({
-      where: { claimStatus: { not: null } },
+      // Rejected claims have no business left to review.
+      where: { claimStatus: { in: ["pending", "approved"] } },
       include: { business: true },
       orderBy: [{ businessId: "asc" }, { createdAt: "asc" }],
     });
-    res.json({ claims: claims.map(({ passwordHash, ...c }) => c) });
+
+    // The register check for each PENDING claim (ABRI-launch-access-plan.md
+    // step 3), so one review can rule on the claim and the SSM number
+    // together:
+    //   listed    — the SSM numbers public registers give for THIS listing
+    //   match     — whether the claimant's number is one of them (null when
+    //               the registers give none, which is most listings)
+    //   elsewhere — other listings the registers file under the claimant's
+    //               number: a borrowed number shows up here
+    const pending = claims.filter((c) => c.claimStatus === "pending");
+    const keys = [...new Set(pending.map((c) => normalizeSsm(c.claimSsm)).filter(Boolean))];
+    const [listedRows, elsewhereRows] = await Promise.all([
+      prisma.sourceRecord.findMany({
+        where: { businessId: { in: pending.map((c) => c.businessId) }, ssmNormalized: { not: null } },
+        select: { businessId: true, source: true, ssm: true, ssmNormalized: true },
+      }),
+      keys.length
+        ? prisma.sourceRecord.findMany({
+            where: { ssmNormalized: { in: keys } },
+            select: { businessId: true, source: true, ssmNormalized: true, business: { select: { name: true } } },
+          })
+        : [],
+    ]);
+    // One register number can be written with or without the old-format
+    // suffix ("202301234567 (1234567-A)"), so a match is either key
+    // containing the other — the same tolerance lib/businessLookup.js gives
+    // a lookup.
+    const sameNumber = (a, b) => Boolean(a && b) && (a === b || (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))));
+    const registerCheck = (c) => {
+      const mine = normalizeSsm(c.claimSsm);
+      const listed = listedRows.filter((r) => r.businessId === c.businessId);
+      return {
+        listed: listed.map(({ source, ssm }) => ({ source, ssm })),
+        match: !mine || !listed.length ? null : listed.some((r) => sameNumber(r.ssmNormalized, mine)),
+        elsewhere: elsewhereRows
+          .filter((r) => r.businessId !== c.businessId && r.ssmNormalized === mine)
+          .map((r) => ({ businessId: r.businessId, name: r.business.name, source: r.source })),
+      };
+    };
+
+    res.json({
+      claims: claims.map(({ passwordHash, ...c }) => ({
+        ...c,
+        ...(c.claimStatus === "pending" ? { registerCheck: registerCheck(c) } : {}),
+      })),
+    });
   }),
 );
 
-// Approves this account's claim and rejects (deletes) every other pending
-// claim on the same business — see approveClaimAndRejectRivals. Mints a
+// Approves this account's claim and rejects every other pending claim on the
+// same business — see approveClaimAndRejectRivals. ONE REVIEW: when the claim
+// carries an SSM number the admin has checked it too, so the business lands
+// on L2 (SSM-Verified) directly. A wrong number is a reason to reject the
+// claim, not to approve it at L1 — on this path the number is the only proof
+// of ownership there is. Mints a
 // confirmation token, emails the claimant a link to verify their email and
 // log in, and also returns the token directly (handy for local dev when
 // RESEND_API_KEY isn't set — see lib/mailer.js).
@@ -67,7 +122,23 @@ router.post(
       accountId: pending.id,
       businessId: pending.businessId,
       verificationMethod: "manual",
+      verifySsm: true,
     });
+
+    // A claimant who already confirmed their email (every claim since they
+    // could log in while pending) just needs to hear the news; a link would
+    // only make them prove the same inbox twice. An older pending account
+    // that never confirmed still gets the confirm-and-log-in link.
+    if (account.emailVerified) {
+      await sendVerificationEmail({
+        to: account.email,
+        subject: `Your claim on ${business.name} has been approved`,
+        heading: "Your claim was approved",
+        message: `An ABRI admin has approved your claim on ${business.name}. Log in to start using your business page.`,
+        link: `${process.env.FRONTEND_URL}/login`,
+      });
+      return res.json({ account: serializeAccount(account), business });
+    }
 
     const tokenRecord = await prisma.emailVerificationToken.create({
       data: {
@@ -88,14 +159,19 @@ router.post(
     res.json({
       account: serializeAccount(account),
       business,
-      token: tokenRecord.token,
+      token: devOnlyToken(tokenRecord.token),
     });
   }),
 );
 
-// Rejects a single pending claim — deletes that account only. Any other
-// pending claims on the same business (or the business itself) are
-// untouched.
+// Rejects a single pending claim. Any other pending claims on the same
+// business (or the business itself) are untouched.
+//
+// The ACCOUNT stays. It used to be deleted, which was harmless while a
+// pending claimant could not log in — nothing of theirs existed yet. Now
+// they may have been using the app for days, so a rejection detaches the
+// claim (claimStatus "rejected", businessId null) and they can claim again
+// from inside the app (POST /businesses/me/claim).
 router.post(
   "/claims/:accountId/reject",
   asyncHandler(async (req, res) => {
@@ -108,7 +184,12 @@ router.post(
         .json({ error: "No pending claim found for this account." });
     }
 
-    await prisma.account.delete({ where: { id: pending.id } });
+    const business = await prisma.business.findUnique({ where: { id: pending.businessId } });
+    await prisma.account.update({
+      where: { id: pending.id },
+      data: { claimStatus: "rejected", businessId: null, verificationMethod: null },
+    });
+    await emailRejectedClaimant(pending, business?.name);
     res.json({ ok: true });
   }),
 );
@@ -191,36 +272,9 @@ router.post(
           error: "Business must be claimed (T1) before SSM verification.",
         });
     }
-    const updated = await prisma.business.update({
-      where: { id: business.id },
-      data: { verificationLevel: SSM_VERIFIED },
-    });
-    // Announced to the network. No matching write in revoke-ssm below, and
-    // that absence is the design: the feed only shows a level announcement
-    // while the business is still at or above the level it announced, so
-    // dropping back to L1 retracts this row by itself. An ordinary promotion
-    // to L3 does not, which is the case a plain equality check would get
-    // backwards — see verificationLevelsAtOrAbove.
-    //
-    // actorBusinessId null: this is an admin's decision, and staff never
-    // appear in a members' feed.
-    await createNetworkEvent(prisma, {
-      type: "business_verified",
-      subjectBusinessId: business.id,
-    });
-    // And the member is TOLD. Until the submission flow existed this route
-    // moved a badge and said nothing, which was survivable when an admin was
-    // flipping a flag for someone they had just spoken to — and is not, now
-    // that a member submits a number and waits. actorBusinessId null: an
-    // admin did this, and staff are not members.
-    await createActivityEvent(prisma, {
-      businessId: business.id,
-      actorBusinessId: null,
-      type: "ssm_verified",
-    });
-    // Everyone who asked to be told. Fired here rather than lazily on read
-    // because the whole point of a watch is not having to come back and look.
-    await notifyWatchers(business.id, { fromLevel: CLAIMED, toLevel: SSM_VERIFIED });
+    // The announcement, the member's notice and the watchers' alerts all live
+    // in verifyBusinessSsm, shared with the combined claim approval above.
+    const updated = await verifyBusinessSsm(business.id);
     res.json({ business: updated });
   }),
 );
@@ -309,11 +363,10 @@ router.post(
 // yet, so this IS how a sale gets fulfilled — and it replaces having to SSH
 // in and run scripts/set-membership-tier.js to do it.
 //
-// membershipTierExpiresAt is RECORDED, NOT ENFORCED. Nothing reads the column (see
-// schema.prisma), so a date in the past downgrades nobody; expiry belongs
-// to the payment-and-renewal work. It's writable now so an admin selling a
-// year of Plus has somewhere to put the date, and so renewal has real data
-// to act on when it lands.
+// membershipTierExpiresAt is ENFORCED since the Founding programme (Oct
+// 2026): the gates treat an expired tier as Free at once and an hourly sweep
+// rewrites the column (lib/membershipExpiry.js). Leave it empty for a tier
+// that doesn't lapse.
 //
 // isFoundingMember is deliberately NOT writable here. The other two writers
 // (lib/businessClaim.js, scripts/set-membership-tier.js) only ever set it true — that
@@ -323,7 +376,7 @@ router.post(
 router.post(
   "/businesses/:id/membership-tier",
   asyncHandler(async (req, res) => {
-    const { membershipTier, expiresAt } = req.body ?? {};
+    const { membershipTier, expiresAt, paid } = req.body ?? {};
 
     // Checked against the entitlements rank rather than a list kept here:
     // a value this route accepted but can() didn't recognise would be sold,
@@ -348,6 +401,23 @@ router.post(
     const business = await prisma.business.findUnique({ where: { id: req.params.id } });
     if (!business) return res.status(404).json({ error: "Business not found." });
 
+    // A SALE (ABRI-launch-access-plan.md step 6): a paid year, which starts
+    // the day the business is SSM-Verified so it never ticks while the member
+    // waits on our review. Already verified → it starts now. Not yet → it is
+    // parked in pendingMembershipTier and verifyBusinessSsm starts it; the
+    // business keeps whatever tier it has meanwhile (Founding Pro, say).
+    if (paid) {
+      if (membershipTier === "free") {
+        return res.status(400).json({ error: "A paid tier can't be Free." });
+      }
+      const verified = VOUCHABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
+      const updated = await prisma.business.update({
+        where: { id: business.id },
+        data: verified ? startPaidYear(membershipTier) : { pendingMembershipTier: membershipTier },
+      });
+      return res.json({ business: updated, startsAtVerification: !verified });
+    }
+
     const updated = await prisma.business.update({
       where: { id: business.id },
       data: {
@@ -356,10 +426,42 @@ router.post(
         // date shouldn't rewrite when the membership began.
         ...(business.membershipTier === membershipTier ? {} : { membershipTierStartedAt: new Date() }),
         membershipTierExpiresAt,
+        // Hand-set now, so a later change to the Founding end date leaves it
+        // alone (lib/founding.js moves only "founding" grants).
+        membershipTierGrant: membershipTier === "free" ? null : "admin",
       },
     });
 
     res.json({ business: updated });
+  }),
+);
+
+// The Founding programme's two dates (lib/founding.js). PUT takes both every
+// time — ISO dates, or null to clear — so the form always says exactly what
+// is stored. Changing the end date moves every business still on its
+// Founding Pro, and the response says how many.
+router.get(
+  "/settings/founding",
+  asyncHandler(async (req, res) => {
+    const settings = await getFoundingSettings();
+    const [foundingMembers, foundingProMembers] = await Promise.all([
+      prisma.business.count({ where: { isFoundingMember: true } }),
+      prisma.business.count({ where: { membershipTierGrant: "founding", membershipTier: "pro" } }),
+    ]);
+    res.json({ ...settings, foundingMembers, foundingProMembers });
+  }),
+);
+
+router.put(
+  "/settings/founding",
+  asyncHandler(async (req, res) => {
+    const { closesAt, proEndsAt } = req.body ?? {};
+    const closes = parseDate(closesAt);
+    const ends = parseDate(proEndsAt);
+    if ((closesAt && !closes) || (proEndsAt && !ends)) {
+      return res.status(400).json({ error: "That isn't a real date." });
+    }
+    res.json(await setFoundingSettings({ closesAt: closes, proEndsAt: ends }));
   }),
 );
 

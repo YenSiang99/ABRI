@@ -36,6 +36,8 @@ prints the failing output at the end. It exits non-zero if any suite failed.
 | `tiers.mjs` | the Plus and Pro rungs, and that Plus only ever *adds* |
 | `map-pin.mjs` | the profile map pin: public, not member-editable, cleared when the address changes |
 | `portfolio.mjs` | the portfolio record — propose, confirm, and who gets credited for a service |
+| `claims.mjs` | claiming a business: the confirm link, logging in while pending (owning nothing), rivals, rejection, claiming again |
+| `founding.mjs` | the Founding programme (Pro until the end date, moving it, expiry, closing it) and paying before SSM verification |
 
 ## Two things about the order
 

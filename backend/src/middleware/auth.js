@@ -12,10 +12,24 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 // plain columns on Account, which is everything either caller needs today,
 // and keeping this to a single primary-key lookup is what makes optionalAuth
 // cheap enough to mount on a public, high-traffic route.
+//
+// A CLAIM THAT ISN'T APPROVED OWNS NOTHING. A pending claimant can log in
+// (they confirm their own email and wait for the admin with the app open),
+// and their Account row carries the businessId they are claiming. Nearly
+// every route reads req.account.businessId as "the business I act as", and
+// only PATCH /businesses/me and POST /businesses/me/ssm ever checked
+// claimStatus. So the business is hidden HERE, once, rather than in fifty
+// handlers: until claimStatus is "approved", req.account.businessId is null
+// and every route treats them exactly like an account with no business.
+// The claim itself is still readable as claimBusinessId, which only
+// routes about the claim (lib/accountView.js, POST /businesses/me/claim)
+// should touch.
 async function accountFromSession(req) {
   const accountId = verifySessionToken(req.cookies[SESSION_COOKIE]);
   if (!accountId) return null;
-  return prisma.account.findUnique({ where: { id: accountId } });
+  const account = await prisma.account.findUnique({ where: { id: accountId } });
+  if (!account || account.claimStatus === "approved") return account;
+  return { ...account, businessId: null, claimBusinessId: account.businessId };
 }
 
 // Loads the account for the session cookie onto req.account. 401s if there's

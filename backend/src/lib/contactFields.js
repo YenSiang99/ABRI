@@ -70,6 +70,8 @@ const PROTECTED_FIELDS = [
   "membershipTier",
   "membershipTierStartedAt",
   "membershipTierExpiresAt",
+  "membershipTierGrant",
+  "pendingMembershipTier",
   "isFoundingMember",
 ];
 

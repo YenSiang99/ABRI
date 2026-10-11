@@ -14,6 +14,7 @@ import { feedRouter } from "./routes/feed.js";
 import { watchRouter } from "./routes/watches.js";
 import { portfolioRouter } from "./routes/portfolio.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { startMembershipSweep } from "./lib/membershipExpiry.js";
 
 const app = express();
 // Behind nginx on the EC2 host, so the client's real IP and protocol arrive
@@ -56,6 +57,8 @@ app.get("/health/db", async (req, res) => {
 app.use(errorHandler);
 
 const port = process.env.PORT || 4000;
+startMembershipSweep();
+
 app.listen(port, () => {
   console.log(`ABRI backend listening on http://localhost:${port}`);
 });

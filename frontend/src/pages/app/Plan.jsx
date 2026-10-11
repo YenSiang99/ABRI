@@ -38,17 +38,20 @@ import { cn } from "@/lib/utils";
 // invites a support ticket the product can't service — there is no billing
 // flow behind any of this yet. `to` matches the public cards' CTAs, which
 // are also the only destinations that exist.
-function ctaFor(tier, currentTier) {
+//
+// A Founding member gets no buttons at all: they pay nothing during the
+// founding period, so there is nothing to buy.
+function ctaFor(tier, currentTier, founding) {
   const i = MEMBERSHIP_TIER_ORDER.indexOf(tier);
   const current = MEMBERSHIP_TIER_ORDER.indexOf(currentTier);
   if (i === current) return { label: "Current plan", current: true };
-  if (i < current) return null;
+  if (i < current || founding) return null;
   if (tier === "enterprise") return { label: "Talk to us", to: "/register" };
   return { label: `Upgrade to ${membershipTierLabel[tier]}`, to: "/register" };
 }
 
-function TierCard({ tier, currentTier }) {
-  const cta = ctaFor(tier, currentTier);
+function TierCard({ tier, currentTier, founding }) {
+  const cta = ctaFor(tier, currentTier, founding);
   const isCurrent = tier === currentTier;
   const below = MEMBERSHIP_TIER_ORDER[MEMBERSHIP_TIER_ORDER.indexOf(tier) - 1];
   const features = membershipTierUpgrades(tier);
@@ -141,6 +144,36 @@ function TierCard({ tier, currentTier }) {
   );
 }
 
+// One line on how long the current tier lasts. Founding Pro is the case that
+// needs saying most: it is free, and it ends on a date ABRI sets (backend
+// lib/founding.js), which may not be decided yet.
+function PlanTerm({ business }) {
+  const until = business.membershipTierExpiresAt
+    ? new Date(business.membershipTierExpiresAt).toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+  if (business.membershipTierGrant === "founding") {
+    return (
+      <p className="mt-2 text-sm text-muted-foreground">
+        Founding Pro — free {until ? `until ${until}` : "while the founding period lasts"}. After that
+        you move to Free, keep the Founding badge, and get a founding discount on any paid tier.
+      </p>
+    );
+  }
+  if (business.pendingMembershipTier) {
+    return (
+      <p className="mt-2 text-sm text-muted-foreground">
+        {membershipTierLabel[business.pendingMembershipTier] ?? business.pendingMembershipTier} is
+        paid for and starts the day your SSM registration is verified — your year doesn't tick
+        while you wait.
+      </p>
+    );
+  }
+  if (until && business.membershipTier !== "free") {
+    return <p className="mt-2 text-sm text-muted-foreground">Runs until {until}.</p>;
+  }
+  return null;
+}
+
 function Plan() {
   const { business } = useAuth();
   const currentTier = business.membershipTier;
@@ -152,7 +185,7 @@ function Plan() {
           Your membership
         </div>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
-          What you're paying for
+          {business.membershipTierGrant === "founding" ? "Your founding membership" : "What you're paying for"}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">You're on</span>
@@ -168,11 +201,12 @@ function Plan() {
             <span className="text-sm text-muted-foreground">— the top tier.</span>
           )}
         </div>
+        <PlanTerm business={business} />
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {MEMBERSHIP_TIER_ORDER.map((tier) => (
-          <TierCard key={tier} tier={tier} currentTier={currentTier} />
+          <TierCard key={tier} tier={tier} currentTier={currentTier} founding={business.membershipTierGrant === "founding"} />
         ))}
       </div>
 

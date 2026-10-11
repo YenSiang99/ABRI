@@ -164,6 +164,14 @@ function lookupWhere(query, { includeCategory = false } = {}) {
     for (const token of ssmTokens(raw)) {
       if (token !== ssm) clauses.push({ ssmNormalized: token });
     }
+    // The same two shapes against numbers public registers published
+    // (SourceRecord). Not the owner's submitted number, so it never touches
+    // the SSM review queue — but it is how an unclaimed listing is found by
+    // the number its owner knows.
+    clauses.push({ sourceRecords: { some: { ssmNormalized: { contains: ssm } } } });
+    for (const token of ssmTokens(raw)) {
+      if (token !== ssm) clauses.push({ sourceRecords: { some: { ssmNormalized: token } } });
+    }
   }
 
   if (looksLikeDomain(domain)) {
@@ -198,11 +206,15 @@ function matchReasonFor(business, query) {
   // actually matched on. Both directions plus the token set, mirroring the
   // three clauses lookupWhere builds — if these two ever disagree, a row comes
   // back labelled "name" while the reason it was found was its number.
-  const storedSsm = business.ssmNormalized ?? normalizeSsm(business.ssm);
+  // Register-published numbers count too (callers include
+  // sourceRecords.ssmNormalized; see REGISTRY_SSM_INCLUDE).
+  const storedKeys = [
+    business.ssmNormalized ?? normalizeSsm(business.ssm),
+    ...(business.sourceRecords ?? []).map((r) => r.ssmNormalized),
+  ].filter(Boolean);
   if (
     ssm.length >= MIN_QUERY_LENGTH &&
-    storedSsm &&
-    (storedSsm.includes(ssm) || ssm.includes(storedSsm) || ssmTokens(raw).includes(storedSsm))
+    storedKeys.some((stored) => stored.includes(ssm) || ssm.includes(stored) || ssmTokens(raw).includes(stored))
   ) {
     return "ssm";
   }
@@ -245,7 +257,13 @@ function standingFor(business) {
   return business.verificationLevel === UNCLAIMED ? "unclaimed" : "listed";
 }
 
+// What a query must include for matchReasonFor to see register numbers.
+const REGISTRY_SSM_INCLUDE = {
+  sourceRecords: { where: { ssmNormalized: { not: null } }, select: { ssmNormalized: true } },
+};
+
 export {
+  REGISTRY_SSM_INCLUDE,
   LOOKUP_LIMIT,
   MIN_QUERY_LENGTH,
   normalizeSsm,

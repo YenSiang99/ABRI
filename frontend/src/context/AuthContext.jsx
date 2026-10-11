@@ -1,13 +1,18 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 import { login as apiLogin, logout as apiLogout, getMe } from "@/lib/api/auth";
-import { submitBusinessClaim } from "@/lib/api/businesses";
+import { submitBusinessClaim, submitClaimAsMember } from "@/lib/api/businesses";
 
 const AuthContext = createContext(null);
 
 function AuthProvider({ children }) {
   const [account, setAccount] = useState(null);
   const [business, setBusiness] = useState(null);
+  // Where an account with no approved business stands — /auth/me's `claim`:
+  // { status: "pending" | "rejected" | "none", business } or null for an
+  // owner or an admin. A pending claimant logs in to a limited app
+  // (AppLayout) and this is what that app reads.
+  const [claim, setClaim] = useState(null);
   // True until the initial /auth/me check resolves — the real session lives
   // in an httpOnly cookie, so (unlike the old localStorage-backed mock) we
   // can't know synchronously on first render whether one exists.
@@ -32,6 +37,7 @@ function AuthProvider({ children }) {
         if (cancelled) return;
         setAccount(data.account);
         setBusiness(data.business);
+        setClaim(data.claim ?? null);
       } catch (err) {
         if (cancelled) return;
         if (err?.status === 0 && attempt === 1) {
@@ -41,6 +47,7 @@ function AuthProvider({ children }) {
         }
         setAccount(null);
         setBusiness(null);
+        setClaim(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -62,6 +69,7 @@ function AuthProvider({ children }) {
       const data = await getMe();
       setAccount(data.account);
       setBusiness(data.business);
+      setClaim(data.claim ?? null);
     } catch (err) {
       // Same rule as the bootstrap above, and it matters more here: this runs
       // after an action the member just took, so clearing a live session
@@ -71,6 +79,7 @@ function AuthProvider({ children }) {
       if (err?.status === 0) return;
       setAccount(null);
       setBusiness(null);
+      setClaim(null);
     }
   }
 
@@ -79,6 +88,7 @@ function AuthProvider({ children }) {
       const data = await apiLogin(email, password);
       setAccount(data.account);
       setBusiness(data.business);
+      setClaim(data.claim ?? null);
       return { ok: true, isAdmin: Boolean(data.account?.isAdmin) };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -89,6 +99,7 @@ function AuthProvider({ children }) {
     await apiLogout().catch(() => {});
     setAccount(null);
     setBusiness(null);
+    setClaim(null);
   }
 
   // Submits a claim (either against an existing T0 listing or a brand new
@@ -127,9 +138,28 @@ function AuthProvider({ children }) {
         password,
         connectTargetId: connectTarget,
       });
-      return result.requiresEmailVerification
-        ? { ok: true, requiresEmailVerification: true, token: result.token }
-        : { ok: true, requiresAdminApproval: true };
+      // The admin path also asks for email confirmation now (the link logs
+      // them in while the claim waits), so requiresAdminApproval is checked
+      // first: it is the one that says which screen comes next. `token` is
+      // only present in local dev, with no mail provider.
+      if (result.requiresAdminApproval) {
+        return { ok: true, requiresAdminApproval: true, token: result.token ?? null };
+      }
+      return { ok: true, requiresEmailVerification: true, token: result.token ?? null };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
+
+  // Claiming from inside the app, as a logged-in account with no approved
+  // business. Applies the returned account view directly.
+  async function claimAsMember(payload) {
+    try {
+      const data = await submitClaimAsMember(payload);
+      setAccount(data.account);
+      setBusiness(data.business);
+      setClaim(data.claim ?? null);
+      return { ok: true };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -138,12 +168,14 @@ function AuthProvider({ children }) {
   const value = {
     account,
     business,
+    claim,
     isAuthenticated: Boolean(account),
     isAdmin: Boolean(account?.isAdmin),
     loading,
     login,
     logout,
     claimOrRegister,
+    claimAsMember,
     refreshAccount,
   };
 

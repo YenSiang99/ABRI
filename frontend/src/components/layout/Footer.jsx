@@ -15,16 +15,16 @@ const FOOTER_COLUMNS = [
   {
     heading: "Company",
     links: [
-      { href: "#", label: "About" },
-      { href: "#", label: "Contact" },
-      { href: "#", label: "FAQ" },
+      { to: "/about", label: "About" },
+      { to: "/contact", label: "Contact" },
+      { to: "/faq", label: "FAQ" },
     ],
   },
   {
     heading: "Legal",
     links: [
-      { href: "#", label: "Privacy" },
-      { href: "#", label: "Terms" },
+      { to: "/privacy", label: "Privacy" },
+      { to: "/terms", label: "Terms" },
     ],
   },
 ];
@@ -45,9 +45,9 @@ function Footer() {
               ABRI
             </Link>
             <p className="mt-3 max-w-[26rem] text-[13.5px] text-grey-500 dark:text-muted-foreground">
-              The verified business network — where every member is
-              SSM-verified, vouched for by real peers, and trusted from day
-              one.
+              The verified business network — where verified means checked
+              against the SSM register, and trust is vouched for by real
+              peers.
             </p>
           </div>
           {FOOTER_COLUMNS.map((column) => (

@@ -32,7 +32,14 @@ const BUSINESS_CATEGORIES = [
   "Health & Wellness",
   "Marketing & Media",
   "Professional Training",
-  "Automotive",
+    "Automotive",
+  // Added Oct 2026 — see the backend copy for the counts behind each.
+  "Travel & Hospitality",
+  "Events & Entertainment",
+  "Business Services",
+  "Finance & Insurance",
+  "Personal & Home Services",
+  "Wholesale & Distribution",
 ];
 
 const BUSINESS_LOCATIONS = [

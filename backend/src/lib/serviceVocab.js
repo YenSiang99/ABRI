@@ -226,6 +226,55 @@ const SERVICES_BY_CATEGORY = {
     "Motorcycle servicing",
     "Fleet maintenance",
   ],
+  // The six categories added Oct 2026 (see businessVocab.js).
+  "Travel & Hospitality": [
+    "Hotel & accommodation",
+    "Corporate travel",
+    "Tour packages",
+    "Umrah & Hajj packages",
+    "Air ticketing",
+    "Venue & conference rooms",
+  ],
+  "Events & Entertainment": [
+    "Corporate events",
+    "Wedding planning",
+    "Event venue",
+    "Live entertainment",
+    "Team building",
+    "Event equipment rental",
+  ],
+  "Business Services": [
+    "Recruitment & staffing",
+    "Office cleaning",
+    "Security services",
+    "Business consulting",
+    "Outsourced admin",
+    "Translation",
+  ],
+  "Finance & Insurance": [
+    "Business loans",
+    "Insurance",
+    "Takaful",
+    "Financial planning",
+    "Money changing & remittance",
+    "Leasing & hire purchase",
+  ],
+  "Personal & Home Services": [
+    "Laundry & dry cleaning",
+    "Tailoring & alterations",
+    "Pet care & grooming",
+    "Home cleaning",
+    "Pest control",
+    "Funeral services",
+  ],
+  "Wholesale & Distribution": [
+    "Bulk trading",
+    "Distribution",
+    "Import & export",
+    "Government supply",
+    "Office supplies",
+    "Industrial supplies",
+  ],
 };
 
 // Every canonical service across every category, for the membership test. A

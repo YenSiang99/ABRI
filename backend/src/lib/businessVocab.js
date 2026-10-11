@@ -74,7 +74,22 @@ const BUSINESS_CATEGORIES = [
   // dealers, tyre and parts shops were the largest group of real corridor
   // businesses with no category to go in — about 6,000 of them. Another
   // buyer-side SME, and a heavy user of accountants and insurers.
-  "Automotive",
+    "Automotive",
+
+  // Added Oct 2026 from the register crawls and the seeding pull's overflow
+  // (ABRI-ssm-data-sites.md). Each is a general trade that real Klang Valley
+  // businesses were sitting in overflow for want of: about 9,000 hotels,
+  // lodgings and travel/Umrah agencies; 5,000 event planners and venues;
+  // 3,500 business-services firms and recruiters; 1,900 banks, insurers and
+  // licensed lenders; 1,900 laundries, tailors, pet and home services; and the
+  // government's own suppliers (myProcurement "Bekalan" winners). Widening,
+  // so safe — see the note above.
+  "Travel & Hospitality",
+  "Events & Entertainment",
+  "Business Services",
+  "Finance & Insurance",
+  "Personal & Home Services",
+  "Wholesale & Distribution",
 ];
 
 // The localities of the Klang Valley corridor.

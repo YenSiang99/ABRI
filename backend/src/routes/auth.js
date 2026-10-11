@@ -8,7 +8,7 @@ import { loadAccountView } from "../lib/accountView.js";
 import { startSession } from "../lib/session.js";
 import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { sendVerificationEmail } from "../lib/mailer.js";
+import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
 import { findOrCreateClaimTarget, approveClaimAndRejectRivals } from "../lib/businessClaim.js";
 
 const router = Router();
@@ -71,7 +71,7 @@ router.post("/register", asyncHandler(async (req, res) => {
 
   res
     .status(201)
-    .json({ requiresEmailVerification: true, account: serializeAccount(account), token: tokenRecord.token });
+    .json({ requiresEmailVerification: true, account: serializeAccount(account), token: devOnlyToken(tokenRecord.token) });
 }));
 
 router.post("/login", asyncHandler(async (req, res) => {
@@ -146,6 +146,7 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
         passwordHash,
         businessId: targetBusiness.id,
         claimStatus: "pending",
+        claimSsm: ssm ? String(ssm).trim() : null,
         emailVerified: true,
         phoneVerified: false,
       },

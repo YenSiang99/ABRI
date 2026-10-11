@@ -8,6 +8,7 @@ import {
   serializePortfolioEntry,
 } from "./portfolio.js";
 import { verificationTimelineFor } from "./verificationTimeline.js";
+import { claimCodeTarget, maskEmail } from "./claimCode.js";
 
 // Shapes a Business row (with its vouchesReceived relation loaded) into what
 // the frontend expects: vouchCount/vouchLevel derived at read time (never
@@ -43,6 +44,8 @@ function omitBillingFields(business) {
     membershipTier: _membershipTier,
     membershipTierStartedAt: _membershipTierStartedAt,
     membershipTierExpiresAt: _membershipTierExpiresAt,
+    membershipTierGrant: _membershipTierGrant,
+    pendingMembershipTier: _pendingMembershipTier,
     isFoundingMember: _isFoundingMember,
     ...publicFields
   } = business;
@@ -207,6 +210,21 @@ function serializeBusiness(business) {
   };
 }
 
+// Where an account without an approved business stands. null for an approved
+// owner and for an admin. "none" is an account that has never claimed (a
+// bare signup) or whose last claim lost — those two look the same to the
+// member: there is nothing waiting, and the next move is to claim.
+function claimView(account, business) {
+  if (account.isAdmin || account.claimStatus === "approved") return null;
+  return {
+    status: account.claimStatus === "pending" ? "pending" : account.claimStatus === "rejected" ? "rejected" : "none",
+    business: business ? publicBusinessView(business) : null,
+    // Masked, and only while pending: where an instant-claim code would go
+    // (lib/claimCode.js). Null when the listing has no email on file.
+    codeEmail: account.claimStatus === "pending" ? maskEmail(claimCodeTarget(business)) : null,
+  };
+}
+
 // Single source of truth for "what does the frontend get back for a logged
 // in account" — used by /login, /me, and /verify-claim so all three shape
 // the response identically instead of drifting apart.
@@ -236,7 +254,20 @@ async function loadAccountView(accountId) {
 
   const { business, ...accountFields } = account;
   if (!business) {
-    return { account: serializeAccount(accountFields), business: null };
+    return { account: serializeAccount(accountFields), business: null, claim: claimView(accountFields, null) };
+  }
+
+  // A claim that isn't approved gets the PUBLIC view of the listing it is
+  // claiming, under `claim`, and `business: null` — the same answer
+  // middleware/auth.js gives every other route. serializeBusiness below is
+  // the OWNER's view (billing, contact, ssm); handing it to whoever submitted
+  // a claim form would publish a listing's private columns to a stranger.
+  if (accountFields.claimStatus !== "approved") {
+    return {
+      account: serializeAccount({ ...accountFields, businessId: null }),
+      business: null,
+      claim: claimView(accountFields, business),
+    };
   }
 
   // Fetched here rather than as a nested include, because the summary needs a

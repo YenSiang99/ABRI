@@ -30,7 +30,7 @@ const membershipTierPitch = {
   free: "People can find me.",
   plus: "People can trust me.",
   pro: "The network brings me business.",
-  enterprise: "One account for my whole organisation.",
+  enterprise: "Talk to us about my organisation.",
 };
 
 const membershipTierPrice = {
@@ -61,9 +61,13 @@ const MEMBERSHIP_TIER_FEATURES = [
     pro: true,
     enterprise: true,
   },
+  // Every plan. It said Free: dash, Plus: tick until 12 Oct 2026, which
+  // sold the badge — and the line under this table says you cannot pay your
+  // way to it. A Free business whose SSM number checks out is SSM-Verified
+  // like anyone else (lib/businessClaim.js verifyBusinessSsm reads no plan).
   {
-    label: "SSM-verified badge",
-    free: false,
+    label: "SSM-verified badge, once we've checked your registration",
+    free: true,
     plus: true,
     pro: true,
     enterprise: true,
@@ -195,9 +199,9 @@ const MEMBERSHIP_TIER_FEATURES = [
     pro: true,
     enterprise: true,
   },
-  // ENFORCED. GET /businesses/:id withholds phone/whatsapp/email outright —
-  // the server sends nothing, so there is no masked value on the page to
-  // un-mask.
+  // Every plan, since 11 Oct 2026: phone, WhatsApp and email reach any
+  // logged-in member whatever the owner's plan (backend
+  // lib/contactVisibility.js). The row stays so Free visibly includes it.
   //
   // The label says "Your" for a reason. It used to read "Contact details
   // visible" with "Members" in the paid cells, which stated the feature
@@ -210,52 +214,18 @@ const MEMBERSHIP_TIER_FEATURES = [
   // Rule: backend/src/lib/contactVisibility.js.
   {
     label: "Your contact details visible to members",
-    free: false,
+    free: true,
     plus: true,
     pro: true,
     enterprise: true,
   },
-  {
-    label: "Profile view alerts + weekly summary",
-    free: false,
-    plus: true,
-    pro: true,
-    enterprise: true,
-  },
-  {
-    label: "Search ranking",
-    free: "Standard",
-    plus: "Higher",
-    pro: "Top",
-    enterprise: "Top",
-  },
-  // Nothing behind this yet — no route, no screen, no data. It used to read
-  // "Referral tracker + introductions"; the introductions half was removed
-  // in Aug 2026 (the screen was mock data end to end) and the referral
-  // tracker has never been built, so this row is Pro's headline promise and
-  // is entirely a promise. It's the first thing to make real, or the first
-  // thing to replace, before Pro is sold to anyone.
-  {
-    label: "Referral tracker",
-    free: false,
-    plus: false,
-    pro: true,
-    enterprise: true,
-  },
-  {
-    label: "Business card scanner",
-    free: false,
-    plus: false,
-    pro: true,
-    enterprise: true,
-  },
-  {
-    label: "Team accounts",
-    free: false,
-    plus: false,
-    pro: false,
-    enterprise: true,
-  },
+  // Five rows came off here on 12 Oct 2026 because nothing stood behind
+  // them, and every founding member is on Pro and would have gone looking:
+  // "Profile view alerts + weekly summary" (no WhatsApp sending yet), "Search
+  // ranking" Standard/Higher/Top (directory order ignores the plan),
+  // "Referral tracker", "Business card scanner" and "Team accounts". Each one
+  // comes back as a row the day it is built — ABRI-feature-checklist.md has
+  // them. A row here is a promise to a paying member; add it with the feature.
 ];
 
 // The features tier `t` adds over the tier below it, for the in-app upgrade
@@ -319,14 +289,6 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // loses the one number that would make them want it.
   profileViewers: "pro",
   testimonials: "plus",
-  // Like `testimonials` and unlike the two below it: the server strips the
-  // data, so this copy only lets the UI explain a gate that is already
-  // enforced. It is also only HALF the rule — the full one additionally
-  // requires the viewer to be logged in. That half has no mirror here
-  // because the client already knows whether it's logged in, and modelling
-  // it as a plan question is what would recreate the viewer-side paywall
-  // this feature deliberately doesn't have.
-  contactDetails: "plus",
   // Both server-enforced (POST /vouches and POST /vouches/:id/accept
   // respectively, which answer 402 with an `requiredMembershipTier` plan). Unlike
   // every other entry here, these two are read to decide whether a button

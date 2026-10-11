@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { MembershipTierComparison } from "@/components/sections/MembershipTierComparison";
 
 function Pricing() {
@@ -21,22 +23,22 @@ function Pricing() {
         <MembershipTierComparison />
 
         <div className="mx-auto mt-11 max-w-[640px] rounded-md bg-surface-2 px-7 py-5 text-center text-[14.5px] text-grey-600 dark:bg-muted dark:text-muted-foreground">
-          <b className="text-ink dark:text-foreground">Founding 100 — by invitation only.</b> The
-          first hundred members of ABRI are hand-picked businesses invited to
-          anchor the network. Founding members carry the founding badge
-          permanently. If you believe your business belongs in the first
-          hundred,{" "}
-          <a href="#" className="border-b-2 border-yellow font-bold text-ink dark:text-foreground">
-            request an invitation →
-          </a>
+          <b className="text-ink dark:text-foreground">Founding members — join before launch.</b>{" "}
+          Every business that joins before ABRI launches is a Founding member:
+          every Pro feature free until the founding period ends, the founding
+          badge for good, and a founding discount if you stay on a paid tier.{" "}
+          <Link to="/register" className="border-b-2 border-yellow font-bold text-ink dark:text-foreground">
+            Claim your business →
+          </Link>
         </div>
 
         <div className="mx-auto mt-[22px] max-w-[640px] text-center text-sm text-grey-500 dark:text-muted-foreground">
-          Every paid tier still requires SSM verification —{" "}
+          You can choose a paid tier before your SSM check is done — your year
+          starts the day you're verified, not the day you pay. But{" "}
           <b className="text-ink dark:text-foreground">
             you cannot pay your way to a verified badge
           </b>
-          . Paying unlocks what verified trust lets you do, never the trust
+          : paying unlocks what verified trust lets you do, never the trust
           itself.
         </div>
       </div>

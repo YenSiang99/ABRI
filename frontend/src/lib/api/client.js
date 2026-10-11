@@ -38,6 +38,9 @@ async function apiFetch(path, { method = "GET", body } = {}) {
       // can't — a tier that lapsed mid-session, or a gate the client hasn't
       // mirrored — where the alternative is a toast that reads like a fault.
       requiredMembershipTier: data?.requiredMembershipTier,
+      // A claim code that can no longer be used (expired, or out of
+      // attempts) — the claim screen goes back to "send a code".
+      expired: data?.expired,
     });
   }
   return data;

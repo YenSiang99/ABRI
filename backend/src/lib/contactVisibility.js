@@ -1,55 +1,27 @@
-import { can } from "./entitlements.js";
-
-// The one place the contact rule is written down. Two conditions, and they
-// exist for two unrelated reasons — which is exactly why this isn't just a
-// second entry in entitlements.js:
+// The one place the contact rule is written down: phone, WhatsApp and email
+// cross the wire to any LOGGED-IN viewer, on every listing, whatever the
+// owner's plan. Anonymous visitors get none of them.
 //
-//   1. The OWNER is on plus or above. This is the revenue rule: pay so people
-//      can reach you. It's a plan question, so it defers to can().
-//   2. The VIEWER is logged in — ANY plan, free included. This is
-//      anti-scraping, NOT a paywall. A free account clears it, and that is
-//      the point: we never charge the buyer for the privilege of contacting a
-//      paying seller. LinkedIn and Alignable both gate reach and insight
-//      (InMail, who-viewed-you) rather than identity, for the same reason —
-//      a directory whose contacts are unreachable is worth less to the very
-//      members who paid to browse it.
+// Being logged in is anti-scraping, NOT a paywall — a free account clears it.
+// The old rule had a second half, "the owner is on Plus or above", and it was
+// dropped on 11 Oct 2026 (ABRI-launch-access-plan.md step 5) for two reasons:
 //
-// There is NO viewer-plan check here. Adding one would invert the business
-// model rather than tighten it: it would paywall a paying member's own
-// inbound leads away from the free members trying to hire them.
+//   - The directory is mostly unclaimed listings whose phone and email came
+//     from public sources. Behind an owner-plan gate that data reached nobody
+//     but admins; open to members, it is the first thing a new signup can
+//     actually use.
+//   - With the owner half in place, claiming a listing on Free would HIDE the
+//     number it showed while unclaimed — claiming would make a business
+//     harder to reach, which punishes the thing the product most wants.
 //
-// Overrides: the owner always sees their own (they also get them ungated via
-// loadAccountView, so this is the public route's version of that), and admins
-// always see them — the same ruling accountView.js already makes for billing.
+// There is still NO viewer-plan check, for the reason that has always held:
+// charging the buyer to contact a seller paywalls the seller's own leads.
 //
-// Returns a reason rather than a bare boolean because the two locked states
-// are different messages with different calls to action, and only one of them
-// names something the viewer can actually do.
+// Returns a reason rather than a bare boolean so the profile can say what
+// the viewer can do about it ("log in"), and so a future reason has a shape
+// to arrive in.
 function contactVisibility(business, viewer) {
-  if (viewer?.isAdmin) return { visible: true, reason: null };
-  if (viewer?.businessId && viewer.businessId === business.id) {
-    return { visible: true, reason: null };
-  }
-
-  // Owner-plan is reported FIRST when both conditions fail. Telling an
-  // anonymous visitor to log in, when logging in would still show them
-  // nothing, spends the one action we asked of them and teaches them that
-  // the prompt lies. Same principle as the verification-beats-billing precedence in the
-  // UI: name the blocker that would still be standing after the reader does
-  // exactly as they were told.
-  //
-  // Yes, this lets an anonymous caller infer which businesses are on a free
-  // plan. testimonialsLocked in the same payload already leaks precisely
-  // that (both gates are "plus"), so it reveals nothing new — noted here so
-  // nobody "fixes" it by flipping the order and reintroducing the lying
-  // prompt.
-  if (!can(business, "contactDetails")) {
-    return { visible: false, reason: "owner_plan" };
-  }
-  if (!viewer) {
-    return { visible: false, reason: "viewer_anonymous" };
-  }
-
+  if (!viewer) return { visible: false, reason: "viewer_anonymous" };
   return { visible: true, reason: null };
 }
 

@@ -9,11 +9,10 @@ function FinalCta() {
             Claim your business in five minutes.
           </h2>
           <p className="mx-auto mt-3.5 max-w-[46ch] text-[#a5a198]">
-            Free to start. Verified the moment your SSM record checks out.
+            Free to start. Verified once our team has checked your SSM record.
           </p>
           <div className="mt-2 mb-7 font-mono text-[12.5px] text-[#8a857a]">
-            takes ~5 minutes for most directors · no documents required for
-            the automatic match
+            takes ~5 minutes · no documents needed, just your SSM number
           </div>
           <Link
             to="/register"

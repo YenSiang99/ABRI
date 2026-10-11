@@ -54,7 +54,7 @@ function Row({ business, onDecided }) {
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-foreground">{business.name}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {business.category} · {business.location}
+            {[business.category, business.location].filter(Boolean).join(" · ")}
           </p>
 
           {/* The number AS SUBMITTED, in mono, unmodified. The admin is

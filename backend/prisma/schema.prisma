@@ -141,13 +141,29 @@ model Business {
   membershipTier String @default("free")
 
   // Null until the business first lands on a tier (set at claim approval).
-  // membershipTierExpiresAt stays null for tiers that don't lapse; nothing reads it
-  // yet, but renewal is the next thing to touch this row and a nullable
-  // column costs nothing to add now versus a second migration later.
+  // membershipTierExpiresAt stays null for tiers that don't lapse. Enforced:
+  // an expired tier is Free to every gate at once, and an hourly sweep
+  // rewrites the column (lib/membershipExpiry.js).
   membershipTierStartedAt DateTime?
   membershipTierExpiresAt DateTime?
 
-  // The founding-100 programme, split out of membershipTier so it survives
+  // WHY the business is on its current tier, so a change to one programme
+  // moves only the businesses it granted:
+  //   "founding" — the Founding programme (lib/founding.js): Pro until the
+  //                Founding end date, which an admin can move for all of them
+  //   "admin"    — set by hand on the admin claims screen
+  //   "paid"     — a paid year, started at SSM verification (see below)
+  //   null       — free, or set before this column existed
+  membershipTierGrant String?
+
+  // A paid tier waiting for SSM verification (ABRI-launch-access-plan.md
+  // step 6). A member may pay before their SSM number is checked, and the
+  // year must not tick while they wait on us, so the purchase is parked here
+  // and lib/businessClaim.js verifyBusinessSsm starts it — tier, start date,
+  // expiry twelve months on — the day the business reaches L2.
+  pendingMembershipTier String?
+
+  // The Founding programme flag, split out of membershipTier so it survives
   // every later tier change. It used to be encoded AS the plan (founding
   // members were assigned "premium"), which meant the first upgrade,
   // downgrade or expiry silently erased the fact that they were founding
@@ -224,6 +240,11 @@ model Business {
   // true reintroduces exactly what it was added to prevent.
   privateBrowsing Boolean @default(false)
 
+  // What public registers and datasets say about this business — see
+  // SourceRecord. Never the owner's own word: that lives on this row.
+  sourceRecords SourceRecord[]
+  claimCodes    ClaimCode[]
+
   // The first indexes this model has ever carried, added with the
   // check-a-business lookup (GET /businesses/lookup) that queries both.
   //
@@ -271,14 +292,23 @@ model Account {
   business           Business? @relation(fields: [businessId], references: [id])
   // null (not a claim) | "pending" | "approved"
   claimStatus        String?
-  // null | "manual" | "domain-auto"
+  // null | "manual" | "domain-auto" | "email-code" (lib/claimCode.js)
   verificationMethod String?
+  // The SSM registration number the claimant typed with their claim, as typed.
+  // On the ACCOUNT, not the business, because several accounts can be
+  // claiming one listing and none of them owns it yet — a rival must not be
+  // able to overwrite what another claimant submitted, or what the business
+  // already has. The admin reads it on the claim (ABRI-launch-access-plan.md
+  // step 3: one review covers the claim and the SSM number), and approval is
+  // what copies it onto Business.ssm.
+  claimSsm           String?
 
   deferredConnections DeferredConnection[]
   // Admin-only back-relations: the vouch interventions this account made and
   // the reports it ruled on. Empty for every non-admin account.
   vouchActionsAsAdmin VouchAction[]        @relation("VouchActionAdminActor")
   vouchFlagsResolved  VouchFlag[]          @relation("VouchFlagResolver")
+  claimCodes          ClaimCode[]
 }
 
 // The vouch feature is three tables, and which one a piece of text lives in
@@ -1091,3 +1121,105 @@ model EmailVerificationToken {
   expiresAt    DateTime
 }
 
+
+// One record per business per public source that mentions it: a register
+// (MDEC, myProcurement, CIDB, JAKIM, MOTAC), an open dataset (data.gov.my,
+// Overture, OpenStreetMap, DBKL), or a manual entry ("manual").
+//
+// WHY A SEPARATE TABLE RATHER THAN MORE COLUMNS ON Business:
+//
+//   - REGISTRATION NUMBERS. Business.ssm means "the owner submitted this for
+//     verification": on an L1 row it puts the business in the admin SSM queue
+//     (see POST /businesses/me/ssm). A number a register published is a
+//     different claim and must never enter that queue, so it lives here, in
+//     its own ssmNormalized that the lookup also matches on.
+//   - PROVENANCE. The Business table had no source column; imports kept
+//     manifest files instead. Several sources require attribution (CC-BY,
+//     ODbL), ODbL may require OSM-derived data to stay separable, and a
+//     source whose licence ends must be removable. Each is one WHERE here.
+//   - DISAGREEMENT. Two registers can hold different numbers or addresses for
+//     one business; one row each keeps both instead of picking silently.
+//
+// Business stays "what the profile shows"; this table is "who said what".
+// Written by scripts/sync-source-records.mjs (bulk imports) and
+// scripts/add-source-records.mjs (hand entries), never by an owner.
+model SourceRecord {
+  id String @id @default(cuid())
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  // "mdec", "myprocurement", "cidb", "halal", "motac", "datagovmy",
+  // "overture", "osm", "dbkl", "manual" — data/sources/<source>.
+  source   String
+  // The source's own id for the record (an Overture place id, a JAKIM
+  // company code, an SSM number). For "manual", whatever identifies the
+  // entry: a URL or a note.
+  sourceId String
+
+  // As the source published it; ssmNormalized via normalizeSsm in
+  // lib/businessLookup.js, the same key Business.ssmNormalized uses.
+  ssm           String?
+  ssmNormalized String?
+
+  name     String?
+  category String?
+  address  String?
+  phone    String?
+  whatsapp String?
+  email    String?
+  website  String?
+
+  // Anything source-specific: a CIDB grade, a halal certificate expiry, a
+  // count of government contracts won.
+  detail Json?
+
+  // The year the source last vouched for the record, as the source says it.
+  sourceYear String?
+  fetchedAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([source, sourceId])
+  @@index([businessId])
+  @@index([ssmNormalized])
+}
+
+// A one-time code sent to the email a listing ALREADY HAS on file (copied
+// from a public source), so a pending claimant who can read that inbox wins
+// the claim at once instead of waiting on an admin. Proof of the business,
+// not of the claimant: the claimant's own email was confirmed separately.
+// See ABRI-launch-access-plan.md step 2 and POST
+// /businesses/me/claim/email-code.
+//
+// Only a hash is stored. `sentTo` is the address it went to, kept because
+// the listing's email can change (an owner edit, a re-import) and a code must
+// only ever count for the inbox it was sent to.
+model ClaimCode {
+  id String @id @default(cuid())
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  sentTo     String
+  codeHash   String
+  // Wrong guesses against this code. Five, and it is spent.
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([businessId, createdAt])
+}
+
+// Site-wide settings an admin can change without a deploy. Key/value, because
+// there are few and they are read rarely: today only the Founding programme's
+// two dates (lib/founding.js). Values are strings; each reader parses its own.
+model AppSetting {
+  key       String   @id
+  value     String?
+  updatedAt DateTime @updatedAt
+}

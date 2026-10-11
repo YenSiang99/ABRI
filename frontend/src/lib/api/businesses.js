@@ -85,6 +85,27 @@ function submitBusinessClaim(payload) {
   return apiFetch("/businesses/claim", { method: "POST", body: payload });
 }
 
+// The instant claim (ABRI-launch-access-plan.md step 2): a 6-digit code sent
+// to the email the listing already has on file. send → { sentTo, code? }
+// (code only in local dev); verify → the getMe() shape, now owning the business.
+function sendClaimCode() {
+  return apiFetch("/businesses/me/claim/email-code", { method: "POST" });
+}
+
+function verifyClaimCode(code) {
+  return apiFetch("/businesses/me/claim/email-code/verify", { method: "POST", body: { code } });
+}
+
+// A claim from someone already logged in with no approved business — a
+// rejected claimant trying again, or moving a pending claim. Resolves to the
+// same shape as getMe().
+function submitClaimAsMember({ businessId, businessName, category, location, ssm }) {
+  return apiFetch("/businesses/me/claim", {
+    method: "POST",
+    body: { businessId, businessName, category, location, ssm },
+  });
+}
+
 // The owner saving their own business. Send only the fields being changed —
 // the server treats an absent key as "leave it alone" and an empty string as
 // "clear it", so passing the whole business object back would be a different
@@ -108,5 +129,8 @@ export {
   submitSsm,
   fetchBusiness,
   submitBusinessClaim,
+  submitClaimAsMember,
+  sendClaimCode,
+  verifyClaimCode,
   updateMyBusiness,
 };

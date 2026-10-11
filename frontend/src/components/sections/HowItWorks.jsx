@@ -2,14 +2,14 @@ const STEPS = [
   {
     title: "Claim",
     description:
-      "Enter your SSM number. We pull your official company record — you don't type it, we retrieve it.",
+      "Find your business in the directory, or add it, and give us your SSM registration number.",
     tag: "SSM 2018·01·019345",
   },
   {
     title: "Verify",
     description:
-      "We match you to the registered company and confirm you're authorised to represent it. Directors verify automatically.",
-    tag: "✓ director match",
+      "Our team checks your number against the SSM register and confirms the business is yours, usually within a couple of business days.",
+    tag: "✓ register match",
   },
   {
     title: "Connect",
@@ -28,7 +28,7 @@ function HowItWorks() {
             How ABRI works
           </span>
           <h2 className="mt-3 text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
-            Verified in minutes, not days.
+            Claim today. Verified within days.
           </h2>
         </div>
 

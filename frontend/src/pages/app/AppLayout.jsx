@@ -6,10 +6,15 @@ import { AppSidebar } from "@/components/app/AppSidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
+import { ClaimHome } from "@/pages/app/ClaimHome";
+
+// Where an account with no approved business may go. A trailing slash means
+// "and everything under it".
+const CLAIMANT_PATHS = ["/app", "/app/directory", "/app/business/"];
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, business } = useAuth();
   const { pathname } = useLocation();
 
   // Portaled content (dialogs, toasts) mounts to document.body, outside this
@@ -26,6 +31,16 @@ function AppLayout() {
   // so admin can have more than one screen (claims review, vouch review).
   if (isAdmin && !pathname.startsWith("/app/admin")) {
     return <Navigate to="/app/admin" replace />;
+  }
+
+  // No approved business: a pending or rejected claimant, or a signup that
+  // never claimed. Same move as the admin confinement above — rather than
+  // teach every page about a missing business, these accounts get the claim
+  // screen at /app, the directory and profiles, and nothing else. The server
+  // agrees: it treats them as having no business (middleware/auth.js).
+  const claimant = !isAdmin && !business;
+  if (claimant && !CLAIMANT_PATHS.some((p) => (p.endsWith("/") ? pathname.startsWith(p) : pathname === p))) {
+    return <Navigate to="/app" replace />;
   }
 
   return (
@@ -45,7 +60,7 @@ function AppLayout() {
           <ThemeToggle className="ml-auto" />
         </header>
         <main className="flex-1">
-          <Outlet />
+          {claimant && pathname === "/app" ? <ClaimHome /> : <Outlet />}
         </main>
       </div>
       <Toaster />

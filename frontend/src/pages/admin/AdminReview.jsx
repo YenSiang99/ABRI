@@ -18,6 +18,38 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/AuthContext";
 import { MEMBERSHIP_TIER_ORDER, membershipTierLabel } from "@/lib/membershipTiers";
 import { CLAIMED, SSM_VERIFIED } from "@/lib/verificationLevels";
+import { FoundingSettings } from "@/pages/admin/FoundingSettings";
+
+// The claimant's SSM number beside what the public registers say about this
+// listing (GET /admin/claims, registerCheck). Most listings have no register
+// number, so "nothing to compare" is the usual case and says so; a number
+// the registers file under a DIFFERENT business is the one to stop at.
+function RegisterCheck({ account }) {
+  const check = account.registerCheck;
+  return (
+    <div className="text-[13px] text-muted-foreground">
+      <div>
+        Claimant's SSM:{" "}
+        <strong className="font-mono text-foreground">{account.claimSsm || "none given"}</strong>
+        {check?.match === true && <span className="ml-2 text-emerald-600 dark:text-emerald-400">✓ matches the register</span>}
+        {check?.match === false && <span className="ml-2 text-red-600 dark:text-red-400">✗ doesn't match the register</span>}
+      </div>
+      {check?.listed?.length > 0 ? (
+        <div className="mt-0.5">
+          Registers list:{" "}
+          {check.listed.map((r) => `${r.ssm} (${r.source})`).join(", ")}
+        </div>
+      ) : (
+        <div className="mt-0.5">No register number for this listing — check it on SSM e-Info.</div>
+      )}
+      {check?.elsewhere?.length > 0 && (
+        <div className="mt-0.5 text-red-600 dark:text-red-400">
+          ⚠ The registers file this number under {check.elsewhere.map((e) => `${e.name} (${e.source})`).join(", ")}.
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ClaimantLine({ account }) {
   return (
@@ -116,15 +148,20 @@ function dateInputValue(iso) {
 function MembershipTierFields({ business, onSetMembershipTier }) {
   const [membershipTier, setMembershipTier] = useState(business.membershipTier);
   const [expiresAt, setExpiresAt] = useState(dateInputValue(business.membershipTierExpiresAt));
+  // A sale rather than a hand grant: a paid year that starts at SSM
+  // verification (backend POST /admin/businesses/:id/membership-tier).
+  const [paid, setPaid] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const dirty =
+    paid ||
     membershipTier !== business.membershipTier ||
     expiresAt !== dateInputValue(business.membershipTierExpiresAt);
 
   async function handleSave() {
     setSaving(true);
-    await onSetMembershipTier(business.id, { membershipTier, expiresAt });
+    await onSetMembershipTier(business.id, { membershipTier, expiresAt, paid });
+    setPaid(false);
     setSaving(false);
   }
 
@@ -146,22 +183,38 @@ function MembershipTierFields({ business, onSetMembershipTier }) {
             </option>
           ))}
         </select>
-        <input
-          type="date"
-          aria-label="Membership expiry date"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-          className={fieldClass}
-        />
+        {!paid && (
+          <input
+            type="date"
+            aria-label="Membership expiry date"
+            value={expiresAt}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className={fieldClass}
+          />
+        )}
+        <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={paid}
+            disabled={membershipTier === "free"}
+            onChange={(e) => setPaid(e.target.checked)}
+          />
+          Paid — a year from SSM verification
+        </label>
         <Button size="sm" disabled={!dirty || saving} onClick={handleSave}>
-          {saving ? "Saving…" : "Save tier"}
+          {saving ? "Saving…" : paid ? "Record payment" : "Save tier"}
         </Button>
       </div>
-      {/* Said out loud because the field looks like it does something it
-          doesn't: no code reads membershipTierExpiresAt yet, so a date that has
-          passed leaves the business on its tier. */}
+      {business.pendingMembershipTier && (
+        <p className="mt-1.5 text-[11.5px] text-amber-700 dark:text-amber-400">
+          Paid for {membershipTierLabel[business.pendingMembershipTier] ?? business.pendingMembershipTier}
+          {" "}— starts when SSM is verified. Refund it if verification fails.
+        </p>
+      )}
       <p className="mt-1.5 text-[11.5px] text-muted-foreground">
-        The expiry date is recorded only — nothing downgrades automatically yet.
+        {business.membershipTierGrant === "founding"
+          ? "On Founding Pro — its end date is set in the Founding programme panel above."
+          : "An expiry date is enforced: the tier drops to Free when it passes. Leave it empty for no end."}
       </p>
     </div>
   );
@@ -195,15 +248,19 @@ function ReviewTimeline({
       >
         {claimStatus === "current" ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            {/* One review (ABRI-launch-access-plan.md step 3): with an SSM
+                number on the claim, approving it says the number checked out
+                too, and the business lands on SSM-Verified. A number that
+                doesn't check out is a reason to deny the claim. */}
             <Button size="sm" onClick={() => onApprove(account.id)}>
-              Approve claim
+              {account.claimSsm ? "Approve claim + SSM" : "Approve claim"}
             </Button>
             <Button
               size="sm"
               variant="destructive"
               onClick={() =>
                 confirmRemove(
-                  `Deny this claim on "${business.name}"? The claimant's account will be deleted and the listing will go back to unclaimed.`,
+                  `Deny this claim on "${business.name}"? The claimant keeps their account and can claim again; they'll get an email saying it wasn't approved.`,
                 )
               }
             >
@@ -377,7 +434,7 @@ function ClaimTable({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onS
                   <td className="px-3 py-3 align-top">
                     <div className="font-bold text-foreground">{business.name}</div>
                     <div className="text-[12px] text-muted-foreground">
-                      {business.category} · {business.location}
+                      {[business.category, business.location].filter(Boolean).join(" · ")}
                     </div>
                   </td>
                   <td className="hidden px-3 py-3 align-top md:table-cell">
@@ -400,9 +457,13 @@ function ClaimTable({ claims, onApprove, onRemove, onVerifySsm, onRevokeSsm, onS
                   <tr className="border-t border-dashed border-border bg-muted/20">
                     <td />
                     <td colSpan={5} className="px-3 pt-3 pb-5">
-                      <div className="text-[13px] text-muted-foreground">
-                        {business.ssm ? `SSM ${business.ssm}` : "No SSM number submitted"}
-                      </div>
+                      {account.claimStatus === "pending" ? (
+                        <RegisterCheck account={account} />
+                      ) : (
+                        <div className="text-[13px] text-muted-foreground">
+                          {business.ssm ? `SSM ${business.ssm}` : "No SSM number submitted"}
+                        </div>
+                      )}
                       <ClaimantLine account={account} />
                       <div className="mt-4">
                         <ReviewTimeline
@@ -516,10 +577,12 @@ function AdminReview() {
         Claim &amp; verification review
       </h1>
       <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-        A new claim needs to be approved before the claimant can log in; SSM verification is a
-        separate step after that. Removing a claim reverts the listing to unclaimed and revokes
-        the claimant's login.
+        Claimants can log in while they wait, but own nothing until approved. One review covers
+        the claim and its SSM number: approving lands the business on SSM-Verified, and a number
+        that doesn't check out is a reason to deny. Claims approved by an email code arrive in the
+        SSM queue instead. Removing an approved claim reverts the listing to unclaimed.
       </p>
+      <FoundingSettings />
       {allClaims.length === 0 ? (
         <p className="mt-10 text-sm text-muted-foreground">No claims to review yet.</p>
       ) : (

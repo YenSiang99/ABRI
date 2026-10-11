@@ -27,7 +27,7 @@ function NetworkBusinessCard({ business, badges, actions, from }) {
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-semibold text-foreground">{business.name}</div>
           <div className="mt-0.5 truncate text-sm text-muted-foreground">
-            {business.category} · {business.location}
+            {[business.category, business.location].filter(Boolean).join(" · ")}
           </div>
         </div>
       </div>

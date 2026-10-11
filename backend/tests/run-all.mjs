@@ -53,6 +53,11 @@ const SUITES = [
   // businesses and cleans none of them up — they are fixtures' rows to remove,
   // not this file's, and teardown-e2e.mjs knows about the table.
   "portfolio.mjs",
+  // Creates its own e2e-claim-* listings and claimant accounts, and clears
+  // last run's at its start.
+  "claims.mjs",
+  // Moves the Founding settings and puts them back (open, no end date).
+  "founding.mjs",
 ];
 
 function run(file) {
@@ -108,6 +113,11 @@ async function startApi() {
       // The suites drive the API directly, never a browser, so no origin ever
       // needs to be allowed through CORS.
       FRONTEND_URL: TEST_API_URL,
+      // No mail provider: nothing is sent to the e2e- addresses, and link
+      // tokens come back in API responses (lib/mailer.js devOnlyToken), which
+      // is how the claim suites open their own confirmation links. Set, not
+      // deleted, because dotenv never overrides a variable that exists.
+      RESEND_API_KEY: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

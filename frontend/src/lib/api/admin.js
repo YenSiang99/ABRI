@@ -27,13 +27,14 @@ function revokeSsm(businessId) {
 }
 
 // Sets the membership tier by hand — the only way to fulfil a sale until
-// there's a payment page. `expiresAt` is an ISO date string or null; the
-// backend stores it but nothing acts on it yet, so an expired date does
-// not downgrade anyone.
-function setBusinessMembershipTier(businessId, { membershipTier, expiresAt } = {}) {
+// there's a payment page. `expiresAt` is an ISO date string or null, and is
+// enforced: an expired tier drops to Free. `paid: true` records a SALE
+// instead: a year that starts the day the business is SSM-Verified (now, if
+// it already is), and `expiresAt` is ignored.
+function setBusinessMembershipTier(businessId, { membershipTier, expiresAt, paid = false } = {}) {
   return apiFetch(`/admin/businesses/${businessId}/membership-tier`, {
     method: "POST",
-    body: { membershipTier, expiresAt: expiresAt || null },
+    body: { membershipTier, expiresAt: expiresAt || null, paid },
   }).then((data) => data.business);
 }
 
@@ -83,7 +84,20 @@ function resolveVouchFlag(id, { outcome, note } = {}) {
   }).then((data) => data.flag);
 }
 
+// The Founding programme's two dates (backend lib/founding.js). Both ISO
+// strings or null. Saving moves every business still on Founding Pro to the
+// new end date; the response counts them.
+function fetchFoundingSettings() {
+  return apiFetch("/admin/settings/founding");
+}
+
+function saveFoundingSettings({ closesAt, proEndsAt }) {
+  return apiFetch("/admin/settings/founding", { method: "PUT", body: { closesAt, proEndsAt } });
+}
+
 export {
+  fetchFoundingSettings,
+  saveFoundingSettings,
   fetchSsmReviews,
   rejectSsm,
   fetchAdminClaims,

@@ -297,9 +297,11 @@ function BusinessProfile({ inApp = false }) {
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" /> {business.category}
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" /> {business.location}
-                </span>
+                {business.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" /> {business.location}
+                  </span>
+                )}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {/* Tappable, and this is THE surface the explainer exists

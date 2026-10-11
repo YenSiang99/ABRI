@@ -41,4 +41,16 @@ function sendVerificationEmail({ to, subject, heading, message, link }) {
   });
 }
 
-export { sendMail, sendVerificationEmail };
+// A link token for an API response — ONLY when no mail provider is set up.
+//
+// Every route that mints a link used to return its token in the response
+// unconditionally, as a local-dev convenience. With a real provider that
+// turns "we emailed you a link" into "here is the link": whoever submits the
+// form proves nothing about the inbox. So the token rides along only when
+// there is no inbox to prove anything with, i.e. local dev and the test API
+// (tests/run-all.mjs blanks RESEND_API_KEY).
+function devOnlyToken(token) {
+  return resend ? undefined : token;
+}
+
+export { sendMail, sendVerificationEmail, devOnlyToken };

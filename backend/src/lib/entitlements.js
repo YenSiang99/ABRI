@@ -27,6 +27,8 @@
 // Ranks, not the ordered array lib/verificationLevels.js uses, because this
 // map is read with >= (see can() below) while verification levels are only
 // ever read with === and Set.has. The two shapes disagree on purpose.
+import { effectiveMembershipTier } from "./membershipExpiry.js";
+
 const MEMBERSHIP_TIER_RANK = { free: 0, plus: 1, pro: 2, enterprise: 3 };
 
 const FEATURE_MIN_MEMBERSHIP_TIER = {
@@ -41,21 +43,14 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // to Free keeps the count on its page and loses the words. Without this
   // gate, cancelling Plus would cost them nothing they could see.
   //
-  // That path is one admin click away today (POST /admin/businesses/:id/plan)
-  // and becomes automatic the moment membershipTierExpiresAt starts being enforced.
-  // Don't remove this as unreachable — it's the thing that will be reached.
+  // That path is one admin click away (POST /admin/businesses/:id/
+  // membership-tier) and automatic since expiry is enforced
+  // (lib/membershipExpiry.js). Don't remove this as unreachable.
   testimonials: "plus",
 
-  // The OWNER's plan half of the contact gate — the second server-enforced
-  // entry here, after testimonials. Deliberately only half: the full rule
-  // also requires the VIEWER to be logged in, which is not a plan question,
-  // so it lives in lib/contactVisibility.js and that is what routes call.
-  //
-  // Don't add a viewer argument to can() to accommodate it. Every other gate
-  // in this file asks about one business's own plan, and it should stay that
-  // way — a two-subject can() would make every existing call site ambiguous
-  // about which business it was asking about.
-  contactDetails: "plus",
+  // `contactDetails: "plus"` sat here until 11 Oct 2026 — the owner's plan
+  // half of the contact gate. Contact details now reach every logged-in
+  // member whatever the owner's plan; lib/contactVisibility.js says why.
 
   // The two halves of the vouch paywall, and the shape of the Free tier.
   // A Free business may RECEIVE a vouch request in full — the row is
@@ -172,7 +167,9 @@ function can(business, feature) {
     );
   }
 
-  const rank = MEMBERSHIP_TIER_RANK[business?.membershipTier];
+  // The EFFECTIVE tier: an expired one counts as Free from the moment it
+  // expires, before the hourly sweep rewrites the column (lib/membershipExpiry.js).
+  const rank = MEMBERSHIP_TIER_RANK[effectiveMembershipTier(business)];
   if (rank === undefined) {
     // Same call as vouchCap.js's: deny rather than throw, because an
     // off-union plan value is our data bug, not the visitor's, and a

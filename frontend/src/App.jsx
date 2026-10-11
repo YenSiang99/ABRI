@@ -28,6 +28,11 @@ import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
 import { AdminSsmReviews } from "@/pages/admin/AdminSsmReviews";
+import { About } from "@/pages/legal/About";
+import { Contact } from "@/pages/legal/Contact";
+import { Faq } from "@/pages/legal/Faq";
+import { Privacy } from "@/pages/legal/Privacy";
+import { Terms } from "@/pages/legal/Terms";
 
 function PublicLayout() {
   return (
@@ -58,6 +63,11 @@ function App() {
           <Route path="/check" element={<Navigate to="/directory" replace />} />
           <Route path="/register" element={<Register />} />
           <Route path="/verify-claim/:token" element={<VerifyClaimLink />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/faq" element={<Faq />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppLayout />}>

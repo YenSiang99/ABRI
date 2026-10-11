@@ -69,13 +69,37 @@ export function ClaimStrip({ business }) {
   );
 }
 
+// Who published a registration number, for the "per …" note beside it.
+const REGISTRY_LABEL = {
+  mdec: "MDEC",
+  myprocurement: "MOF myProcurement",
+  cidb: "CIDB",
+  manual: "ABRI records",
+};
+
+// An unclaimed listing's number as a public register published it — said to
+// be the register's word, never shown as verified (see registryNumbersFor in
+// routes/businesses.js).
+function RegistryNumber({ entry }) {
+  const by = entry.sources.map((s) => REGISTRY_LABEL[s] ?? s).join(", ");
+  return (
+    <span>
+      <span className="font-mono">Reg. {entry.number}</span>
+      <span className="block text-xs text-grey-500 dark:text-muted-foreground">per {by} · not yet verified</span>
+    </span>
+  );
+}
+
 // The three facts a visitor checks first, the same three for everyone.
 export function KeyFacts({ business }) {
   const stage = profileStage(business);
   const { ssm, vouchCount } = business;
+  const registry = business.registryNumbers?.[0];
   const facts = [
     ["SSM registration",
-      stage === "verified" ? (ssm ? `Reg. ${ssm}` : "Verified") : stage === "claimed" ? "Pending check" : <Missing>Not provided</Missing>,
+      stage === "verified" ? (ssm ? `Reg. ${ssm}` : "Verified")
+        : stage === "claimed" ? "Pending check"
+        : registry ? <RegistryNumber entry={registry} /> : <Missing>Not provided</Missing>,
       stage === "verified" && ssm],
     ["Vouches",
       stage === "verified" ? (vouchCount > 0 ? `${vouchCount} ${vouchCount === 1 ? "peer" : "peers"}` : "No vouches yet") : <Missing>Open once SSM-verified</Missing>],
@@ -130,14 +154,16 @@ export function ContactSection({ layout, business, first }) {
   const stage = profileStage(business);
   const { name, website, address, openingHours, lat, lng } = business;
   const hasPin = lat != null && lng != null;
-  // An unclaimed listing has nobody who could have published a phone number,
-  // so the gate's "hasn't published" wording would be odd — say "Not listed",
-  // the same as every other empty field.
-  const gated =
-    stage === "unclaimed" ? null : (
-      <GatedContact business={business} contactLocked={business.contactLocked} contactLockedReason={business.contactLockedReason} />
-    );
-  const showGatedPlaceholders = stage === "unclaimed" || (!business.contactLocked && !business.phone && !business.whatsapp && !business.email);
+  // Phone, WhatsApp and email reach every logged-in member on every listing,
+  // unclaimed ones included (backend lib/contactVisibility.js). On an
+  // unclaimed listing they came from public sources, and the line under the
+  // section says so. An anonymous visitor gets GatedContact's "log in" row;
+  // a listing with none of the three gets "Not listed", like any empty field.
+  const gated = (
+    <GatedContact business={business} contactLocked={business.contactLocked} contactLockedReason={business.contactLockedReason} />
+  );
+  const hasGated = Boolean(business.phone || business.whatsapp || business.email);
+  const showGatedPlaceholders = !business.contactLocked && !hasGated;
 
   return (
     <Section layout={layout} title="Contact & location" first={first}>
@@ -170,6 +196,7 @@ export function ContactSection({ layout, business, first }) {
       </div>
       {stage === "unclaimed" && (
         <p className="mt-5 text-sm text-grey-600 dark:text-muted-foreground">
+          {hasGated && "These details come from public sources, not the business. "}
           Wrong or missing info?{" "}
           <Link to={`/register?business=${business.id}`} className={`font-medium text-ink dark:text-foreground ${linkClass}`}>
             Claim this business to fix it

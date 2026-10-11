@@ -73,11 +73,6 @@ const UPGRADE_COPY = {
     description:
       "Someone has vouched for you. Plus is what puts it on your public profile, where it counts towards your vouch level and is the first thing a visitor sees. Free accounts can receive vouches but not publish them.",
   },
-  contactDetails: {
-    title: "Being reachable is part of Plus",
-    description:
-      "Your phone, WhatsApp and email stay hidden from other members while you're on Free. Plus publishes them to logged-in members, so someone who finds your profile can act on it.",
-  },
   // No `nfcCard` entry: nothing opens a dialog for it. /app/card sells the
   // card by SHOWING it (see pages/app/Card.jsx), so its pitch lives inline
   // on that page. A second copy here would be the drift this map exists to

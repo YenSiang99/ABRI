@@ -810,12 +810,10 @@ function Profile() {
   const hasAnyContact = Boolean(
     business.phone || business.whatsapp || business.email,
   );
-  const contactHidden =
-    hasAnyContact &&
-    !membershipTierAllows(business.membershipTier, "contactDetails");
-  const contactEmpty =
-    !hasAnyContact &&
-    membershipTierAllows(business.membershipTier, "contactDetails");
+  // Every plan publishes contact details to logged-in members (backend
+  // lib/contactVisibility.js), so the only thing worth saying is when there
+  // are none to publish.
+  const contactEmpty = !hasAnyContact;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
@@ -836,9 +834,11 @@ function Profile() {
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" /> {business.category}
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" /> {business.location}
-                </span>
+                {business.location && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" /> {business.location}
+                  </span>
+                )}
                 {account?.createdAt && (
                   <span>
                     Member since {formatMemberSince(account.createdAt)}
@@ -940,20 +940,13 @@ function Profile() {
           {/* The owner's side of the gate, and the one place selling it is
               right — they're looking at the exact details visitors can't
               see, so the gap is concrete rather than abstract. */}
-          {contactHidden && (
-            <LockedFeature
-              requiredMembershipTier="plus"
-              title="Your contact details aren't shown to anyone"
-              description="You've added them, but nobody visiting your profile or tapping your card can see them."
-            />
-          )}
           {/* The inverse nudge. On a paid plan an empty contact block is the
               feature being wasted, and this is the only screen that can say
               so — a visitor would just see a profile with no phone number. */}
           {contactEmpty && (
             <p className="text-sm text-muted-foreground">
-              Your tier shows your contact details to members — but you haven't
-              added any yet. Use Edit profile to add a phone number, WhatsApp or
+              Members can see your contact details — but you haven't added any
+              yet. Use Edit profile to add a phone number, WhatsApp or
               email.
             </p>
           )}

@@ -3,10 +3,11 @@ import { Router } from "express";
 import { prisma } from "../prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { matchesBusinessDomain } from "../lib/domainVerification.js";
-import { findOrCreateClaimTarget } from "../lib/businessClaim.js";
+import { findOrCreateClaimTarget, approveClaimAndRejectRivals } from "../lib/businessClaim.js";
+import { sendClaimCode, checkClaimCode, ClaimCodeError } from "../lib/claimCode.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { sendVerificationEmail } from "../lib/mailer.js";
+import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { messageFor, pruneActivityEvents } from "../lib/activityEvents.js";
 import { vouchLevelFor } from "../lib/vouchLevel.js";
@@ -30,6 +31,7 @@ import {
   MIN_QUERY_LENGTH,
   lookupWhere,
   matchReasonFor,
+  REGISTRY_SSM_INCLUDE,
   normalizeSsm,
   rankMatches,
   standingFor,
@@ -39,6 +41,21 @@ const router = Router();
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const CLAIM_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+// Every claim carries an SSM number (ABRI-launch-access-plan.md step 3): on
+// the admin path it is the proof of ownership, and one review covers both.
+// Same bounds and the same absence of a format check as POST /me/ssm — the
+// admin reads the number against the register, and that is the validation.
+function claimSsmError(ssm) {
+  const value = String(ssm ?? "").trim();
+  if (!value) return "Enter your SSM registration number.";
+  if (value.length < 4 || value.length > 60) return "Enter the registration number as it appears on your SSM documents.";
+  return null;
+}
+// The admin-path claimant's "confirm your email" link. Same window as a bare
+// signup's (routes/auth.js): it is opened from an inbox some time later, not
+// in one sitting.
+const CONFIRM_EMAIL_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 // Validates the "connect me to this business once I'm in" hint that rides
 // along with a claim submitted off a card tap. Returns the id if it's still
@@ -130,6 +147,24 @@ const DIRECTORY_MAX_PAGE_SIZE = 50;
 // the lookup uses. See lib/businessLookup.js for why that clause is shared
 // now when this file previously argued it must not be: a logged-in member had
 // ended up with two search boxes, and one box has to answer both questions.
+// Registration numbers as public registers published them, one entry per
+// distinct number with every source that gave it: [{ number, sources }].
+//
+// Published even on an unclaimed listing, unlike Business.ssm (see ssmIsPublic
+// in lib/accountView.js), because the register — not the member — is the one
+// asserting it, and the profile says which register. It is never shown as
+// verified: matching a register record to this listing was done by name and
+// locality, which is evidence, not proof.
+function registryNumbersFor(records = []) {
+  const byNumber = new Map();
+  for (const r of records) {
+    const key = r.ssm.trim();
+    if (!byNumber.has(key)) byNumber.set(key, new Set());
+    byNumber.get(key).add(r.source);
+  }
+  return [...byNumber].map(([number, sources]) => ({ number, sources: [...sources] }));
+}
+
 router.get(
   "/",
   optionalAuth,
@@ -190,6 +225,7 @@ router.get(
     };
 
     const BUSINESS_INCLUDE = {
+      ...(search ? REGISTRY_SSM_INCLUDE : {}),
       _count: {
         select: {
           vouchesReceived: { where: { status: "published" } },
@@ -505,6 +541,7 @@ router.get(
     const businesses = await prisma.business.findMany({
       where: lookupWhere(query),
       include: {
+        ...REGISTRY_SSM_INCLUDE,
         _count: {
           select: {
             vouchesReceived: { where: { status: "published" } },
@@ -595,6 +632,9 @@ router.get(
     const business = await prisma.business.findUnique({
       where: { id: req.params.id },
       include: {
+        // Registration numbers public registers published, shown with their
+        // source and never as verified (see registryNumbersFor).
+        sourceRecords: { where: { ssm: { not: null } }, select: { source: true, ssm: true }, orderBy: { source: "asc" } },
         // Public profile — only ever show vouches the receiver has
         // actually accepted (see the Vouch review state machine in
         // schema.prisma). This route returns the raw business object
@@ -699,6 +739,7 @@ router.get(
     res.json({
       business: {
         ...publicBusinessView(business, { showContact: contact.visible }),
+        registryNumbers: registryNumbersFor(business.sourceRecords),
         vouchCount,
         verificationTimeline,
         // viewerBusinessId is null: this is the PUBLIC view, so no
@@ -998,7 +1039,10 @@ router.post(
 // Scope note: this only covers submission. It always ends in one of two
 // states — a token waiting to be opened (domain match), or a pending
 // account waiting on an admin (no domain match) — never an immediate
-// login. Multiple accounts can hold pending claims on the same business
+// login. On the admin path the claimant is emailed a link that confirms
+// their own email and logs them in with the claim still pending: they wait
+// for the admin with the app open, owning nothing (middleware/auth.js)
+// until the claim is approved. Multiple accounts can hold pending claims on the same business
 // at once (see schema.prisma) — this only rejects a claim outright once
 // the business already has an approved owner.
 router.post(
@@ -1042,6 +1086,8 @@ router.post(
     if (!password || password.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters." });
     }
+    const ssmError = claimSsmError(ssm);
+    if (ssmError) return res.status(400).json({ error: ssmError });
 
     const existingAccount = await prisma.account.findUnique({ where: { email: repEmail } });
     if (existingAccount) {
@@ -1119,7 +1165,7 @@ router.post(
         link: `${process.env.FRONTEND_URL}/verify-claim/${record.token}`,
       });
 
-      return res.json({ requiresEmailVerification: true, token: record.token });
+      return res.json({ requiresEmailVerification: true, token: devOnlyToken(record.token) });
     }
 
     const business = await findOrCreateClaimTarget({ businessId, businessName, category, location, ssm });
@@ -1132,6 +1178,7 @@ router.post(
         passwordHash,
         businessId: business.id,
         claimStatus: "pending",
+        claimSsm: ssm.trim(),
         verificationMethod: null,
         emailVerified: false,
         // No SMS/OTP provider wired up yet — this stays false until that's
@@ -1150,6 +1197,25 @@ router.post(
         .catch((err) => console.error("Failed to queue connect intent", err));
     }
 
+    // Confirms the claimant's OWN email, and nothing about the business: the
+    // admin review is still the proof of that. Opening it logs them in to the
+    // limited, business-less app (POST /auth/verify-claim/:token, accountId
+    // branch), so a claim no longer means days locked out.
+    const confirm = await prisma.emailVerificationToken.create({
+      data: {
+        email: account.email,
+        accountId: account.id,
+        expiresAt: new Date(Date.now() + CONFIRM_EMAIL_TOKEN_TTL_MS),
+      },
+    });
+    await sendVerificationEmail({
+      to: account.email,
+      subject: "Confirm your ABRI account",
+      heading: "Confirm your email",
+      message: `Your claim on ${businessName} is with an ABRI admin. Confirm your email to log in while you wait — you can browse the directory now, and we'll email you when the claim is decided.`,
+      link: `${process.env.FRONTEND_URL}/verify-claim/${confirm.token}`,
+    });
+
     // publicBusinessView, not the raw row. This response goes to whoever
     // POSTed the claim, BEFORE any approval — so before this, any stranger
     // could claim an existing listing and read back that business's four
@@ -1162,9 +1228,119 @@ router.post(
     // reads only requiresEmailVerification and token off this payload.
     res.status(201).json({
       requiresAdminApproval: true,
+      requiresEmailVerification: true,
+      token: devOnlyToken(confirm.token),
       account: serializeAccount(account),
       business: publicBusinessView(business),
     });
+  }),
+);
+
+// A claim from someone already logged in: a claimant whose last claim was
+// rejected (or lost to a rival), or a bare signup that never claimed. The
+// account and the confirmed email already exist, so this is POST /claim's
+// admin path with the account half removed — it always lands in the admin
+// queue, never on the domain shortcut (a session proves this email, not the
+// business's).
+//
+// A pending claimant may use it too, to move their claim to another listing:
+// it replaces the claim rather than adding a second, since an account holds
+// one businessId. An approved owner and an admin may not.
+router.post(
+  "/me/claim",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    if (req.account.isAdmin) {
+      return res.status(403).json({ error: "Admin accounts don't claim businesses." });
+    }
+    if (req.account.claimStatus === "approved") {
+      return res.status(409).json({ error: "Your account already owns a business." });
+    }
+
+    const { businessId, businessName, category, location, ssm } = req.body ?? {};
+    if (!businessName?.trim() || !category?.trim() || !location?.trim()) {
+      return res.status(400).json({ error: "Business name, category, and location are required." });
+    }
+    const ssmError = claimSsmError(ssm);
+    if (ssmError) return res.status(400).json({ error: ssmError });
+    if (!isValidCategory(category.trim())) {
+      return res.status(400).json({ error: "Pick a category from the list." });
+    }
+    if (!isValidLocation(location.trim())) {
+      return res.status(400).json({ error: "Pick a location from the list." });
+    }
+
+    // findOrCreateClaimTarget refuses a missing or already-owned listing with
+    // a 400 of its own.
+    let business;
+    try {
+      business = await findOrCreateClaimTarget({ businessId, businessName, category, location, ssm });
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      throw err;
+    }
+
+    await prisma.account.update({
+      where: { id: req.account.id },
+      data: { businessId: business.id, claimStatus: "pending", verificationMethod: null, claimSsm: ssm.trim() },
+    });
+
+    res.status(201).json(await loadAccountView(req.account.id));
+  }),
+);
+
+// The instant claim: a code to the email the listing already has on file
+// (lib/claimCode.js). Both routes act on the caller's PENDING claim only —
+// claimBusinessId, which middleware/auth.js sets for exactly that case.
+async function loadPendingClaim(req) {
+  if (req.account.claimStatus !== "pending" || !req.account.claimBusinessId) {
+    throw new ClaimCodeError(403, "You don't have a claim waiting.");
+  }
+  const business = await prisma.business.findUnique({ where: { id: req.account.claimBusinessId } });
+  if (!business) throw new ClaimCodeError(404, "Business not found.");
+  return business;
+}
+
+function claimCodeFailure(res, err) {
+  if (!(err instanceof ClaimCodeError)) throw err;
+  const { status, message, attemptsLeft, expired } = err;
+  return res.status(status).json({ error: message, attemptsLeft, expired });
+}
+
+router.post(
+  "/me/claim/email-code",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      const business = await loadPendingClaim(req);
+      const { sentTo, code } = await sendClaimCode({ account: req.account, business });
+      res.json({ sentTo, code: devOnlyToken(code) });
+    } catch (err) {
+      return claimCodeFailure(res, err);
+    }
+  }),
+);
+
+// A right code approves the claim outright, the same way the domain match
+// does: rivals are rejected and the business lands on L1. SSM is still its
+// own step (POST /businesses/me/ssm) — the inbox proves the business, not
+// its registration.
+router.post(
+  "/me/claim/email-code/verify",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    try {
+      const business = await loadPendingClaim(req);
+      await checkClaimCode({ account: req.account, business, code: req.body?.code });
+    } catch (err) {
+      return claimCodeFailure(res, err);
+    }
+    await approveClaimAndRejectRivals({
+      accountId: req.account.id,
+      businessId: req.account.claimBusinessId,
+      verificationMethod: "email-code",
+    });
+    res.json(await loadAccountView(req.account.id));
   }),
 );
 

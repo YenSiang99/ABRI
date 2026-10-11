@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 
 import { fetchBusinesses, fetchBusiness } from "@/lib/api/businesses";
@@ -36,7 +36,7 @@ const labelClass = "text-[13px] font-bold text-ink dark:text-foreground";
 const errorClass = "mt-1 text-[12.5px] text-red-600 dark:text-red-400";
 
 function Register() {
-  const { claimOrRegister } = useAuth();
+  const { claimOrRegister, isAuthenticated, business: ownBusiness, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const preselectedId = searchParams.get("business");
   // The business this claimant scanned a card for and wants to connect
@@ -55,7 +55,12 @@ function Register() {
 
   const [step, setStep] = useState("search");
   const [submittedName, setSubmittedName] = useState("");
-  const [linkToken, setLinkToken] = useState(null);
+  // True when the claimant's email matched the business's domain: the
+  // confirm link they're sent approves the claim on its own.
+  const [instantClaim, setInstantClaim] = useState(false);
+  // The admin path's confirm-email link, only in local dev (no mail
+  // provider) — the same simulated-inbox affordance the domain path has.
+  const [confirmToken, setConfirmToken] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(baseForm);
   const [errors, setErrors] = useState({});
@@ -136,6 +141,7 @@ function Register() {
     const nextErrors = {};
     if (!form.businessName.trim()) nextErrors.businessName = "Required";
     if (!form.location.trim()) nextErrors.location = "Required";
+    if (!form.regNumber.trim()) nextErrors.regNumber = "Required";
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       return;
@@ -168,13 +174,14 @@ function Register() {
   // lands on (see routes/businesses.js POST /claim) and this branches on
   // its response: requiresEmailVerification shows the (real) verification
   // link inline; requiresAdminApproval moves straight to "submitted".
-  async function handleVerifySubmit({ phoneCode }) {
-    const nextErrors = {};
-    if (phoneCode.trim().length < 4) nextErrors.phoneCode = "Enter the code we sent";
-    if (Object.keys(nextErrors).length) {
-      setErrors(nextErrors);
-      return;
-    }
+  //
+  // Both paths end on "check your email". This step used to ask for a code
+  // "sent to your phone" that nothing sent (any four digits passed), and on
+  // the domain path it stayed put after submitting — fine locally, where the
+  // link was printed inline, but a dead end once a mail provider is set and
+  // the token no longer comes back in the response (lib/mailer.js
+  // devOnlyToken).
+  async function handleVerifySubmit() {
     setErrors({});
     setSubmitting(true);
     const result = await claimOrRegister(form);
@@ -184,12 +191,19 @@ function Register() {
       setErrors({ submit: result.error });
       return;
     }
-    if (result.requiresEmailVerification) {
-      setLinkToken(result.token);
-      return;
-    }
+    setInstantClaim(Boolean(result.requiresEmailVerification && !result.requiresAdminApproval));
     setSubmittedName(form.businessName);
+    setConfirmToken(result.token ?? null);
     setStep("submitted");
+  }
+
+  // Already logged in: this form would create a second account. An account
+  // with no approved business claims from inside the app instead (the claim
+  // screen at /app reads the same ?business= preselect); an owner or admin has
+  // nothing to claim here.
+  if (isAuthenticated) {
+    if (ownBusiness || isAdmin) return <Navigate to="/app" replace />;
+    return <Navigate to={`/app${preselectedId ? `?business=${encodeURIComponent(preselectedId)}` : ""}`} replace />;
   }
 
   return (
@@ -228,7 +242,6 @@ function Register() {
             form={form}
             errors={errors}
             domainMatch={domainMatch}
-            linkToken={linkToken}
             submitting={submitting}
             connectBusinessName={connectBusinessInfo?.name}
             onBack={() => setStep("personal")}
@@ -240,6 +253,8 @@ function Register() {
             businessName={submittedName}
             email={form.repEmail}
             connectBusinessName={connectBusinessInfo?.name}
+            confirmToken={confirmToken}
+            instant={instantClaim}
           />
         )}
       </div>
@@ -324,7 +339,7 @@ function SearchStep({ onSelect, onManual }) {
                   {business.name}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-grey-500 dark:text-muted-foreground">
-                  {business.category} · {business.location}
+                  {[business.category, business.location].filter(Boolean).join(" · ")}
                 </div>
               </button>
             ))
@@ -413,10 +428,7 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
         </div>
 
         <div>
-          <label className={labelClass}>
-            SSM registration number{" "}
-            <span className="font-normal text-grey-500 dark:text-muted-foreground">(optional)</span>
-          </label>
+          <label className={labelClass}>SSM registration number</label>
           <input
             type="text"
             value={form.regNumber}
@@ -424,9 +436,11 @@ function DetailsStep({ form, errors, onChange, onSubmit }) {
             placeholder="e.g. 201801019345"
             className={cn(fieldClass, "mt-1.5")}
           />
+          {errors.regNumber && <p className={errorClass}>{errors.regNumber}</p>}
           <p className="mt-1 text-[12.5px] text-grey-500 dark:text-muted-foreground">
-            We'll match this against official SSM records during
-            verification.
+            The new 12-digit number or the old one (e.g. 1234567-A). An admin
+            checks it against SSM records — it's how we know the business is
+            yours.
           </p>
         </div>
       </div>
@@ -546,24 +560,54 @@ function PersonalStep({ form, errors, onChange, onBack, onSubmit }) {
   );
 }
 
-function SubmittedStep({ businessName, email, connectBusinessName }) {
+function SubmittedStep({ businessName, email, connectBusinessName, confirmToken, instant }) {
   return (
     <div>
       <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
         Claim your business
       </span>
       <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
-        Your account is being reviewed
+        Check your email
       </h1>
       <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-        Thanks — your claim for {businessName || "this business"} is with an admin now. Once
-        it's reviewed, we'll email {email || "you"} with a confirmation link. This usually
-        takes 1–3 business days.
+        We've sent a link to <strong>{email || "your email"}</strong>. Open it to confirm
+        your email and log in — you can browse the directory and see every listing's
+        details straight away.
       </p>
+      {instant ? (
+        <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
+          Your email matches {businessName || "this business"}&rsquo;s website, so opening the
+          link also approves your claim. We then check your SSM registration number, usually
+          within a couple of business days.
+        </p>
+      ) : (
+        <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
+          Your claim for {businessName || "this business"} is with the ABRI team, who check it
+          against your SSM registration, usually within 1–3 business days. We&rsquo;ll email you
+          when it&rsquo;s decided. If the listing already has an email address, you can skip
+          the wait once you&rsquo;re logged in, with a code sent to that address.
+        </p>
+      )}
+      {confirmToken && (
+        <div className="mt-4 rounded-md border border-grey-200 bg-surface-2 p-4 dark:border-border dark:bg-muted">
+          <p className="text-[12.5px] font-bold text-ink dark:text-foreground">
+            Simulated email — sent to {email}
+          </p>
+          <p className="mt-1 text-[12.5px] text-grey-600 dark:text-muted-foreground">
+            No mail provider is set up here, so open the link directly.
+          </p>
+          <Link
+            to={`/verify-claim/${confirmToken}`}
+            className="mt-3 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2 text-[13px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi"
+          >
+            Open confirmation link
+          </Link>
+        </div>
+      )}
       {connectBusinessName && (
         <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-          You'll be connected with {connectBusinessName} on ABRI once your registration is
-          verified.
+          You'll be connected with {connectBusinessName} on ABRI once your claim is
+          approved.
         </p>
       )}
       <div className="mt-8 flex flex-wrap gap-3">
@@ -578,63 +622,13 @@ function SubmittedStep({ businessName, email, connectBusinessName }) {
   );
 }
 
-// Both branches render the same shape — a label, one line of status copy,
-// then either a clickable verification link or a plain "later" message —
-// so that watching the page tells an observer as little as possible about
-// which path was taken beyond the one difference that's unavoidable: this
-// branch has a link available right now and the other doesn't yet.
-function DomainEmailVerification({ email, linkToken }) {
-  return (
-    <div>
-      <label className={labelClass}>Email verification</label>
-      {linkToken ? (
-        <div className="mt-3 rounded-md border border-grey-200 bg-surface-2 p-4 dark:border-border dark:bg-muted">
-          <p className="text-[12.5px] font-bold text-ink dark:text-foreground">
-            Simulated email — sent to {email}
-          </p>
-          <p className="mt-1 text-[12.5px] text-grey-600 dark:text-muted-foreground">
-            In production this link would arrive in your inbox. For this demo, click it
-            directly below to simulate opening it from {email}.
-          </p>
-          <Link
-            to={`/verify-claim/${linkToken}`}
-            className="mt-3 inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2 text-[13px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi"
-          >
-            Open verification link
-          </Link>
-        </div>
-      ) : (
-        <p className="mt-1.5 text-[12.5px] text-grey-600 dark:text-muted-foreground">
-          We'll send a confirmation link to <strong>{email}</strong>. Enter the code sent
-          to your phone below, then continue.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function PendingEmailVerification({ email, connectBusinessName }) {
-  return (
-    <div>
-      <label className={labelClass}>Email verification</label>
-      <p className="mt-1.5 text-[12.5px] text-grey-600 dark:text-muted-foreground">
-        Once you continue, your account will be reviewed by an admin — this usually takes
-        1–3 business days. We'll send a confirmation link to <strong>{email}</strong> as soon
-        as that's done.
-        {connectBusinessName && (
-          <> You'll be connected with <strong>{connectBusinessName}</strong> once that's done.</>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function VerifyStep({ form, errors, domainMatch, linkToken, submitting, connectBusinessName, onBack, onSubmit }) {
-  const [phoneCode, setPhoneCode] = useState("");
-
+// The last step: what happens next, then submit. Which path the claim takes
+// is the backend's call (routes/businesses.js POST /claim); `domainMatch` is
+// only the client's guess, used to pick the explanation.
+function VerifyStep({ form, errors, domainMatch, submitting, connectBusinessName, onBack, onSubmit }) {
   function handleSubmit(e) {
     e.preventDefault();
-    onSubmit({ phoneCode });
+    onSubmit();
   }
 
   return (
@@ -643,44 +637,49 @@ function VerifyStep({ form, errors, domainMatch, linkToken, submitting, connectB
         Claim your business
       </span>
       <h1 className="mt-2 text-2xl font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
-        Verify it's you
+        What happens next
       </h1>
-      <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-        We need to confirm a few more things before finishing your claim on{" "}
-        {form.businessName || "this business"}. Enter the code sent to your phone, and
-        we'll take care of the rest by email.
-      </p>
-
-      <div className="mt-6 flex flex-col gap-4">
+      <ul className="mt-4 flex list-disc flex-col gap-2 pl-5 text-[14px] text-grey-600 dark:text-muted-foreground">
+        <li>
+          We email a link to <strong>{form.repEmail}</strong>. Open it to confirm your email and
+          log in.
+        </li>
         {domainMatch ? (
-          <DomainEmailVerification email={form.repEmail} linkToken={linkToken} />
+          <li>
+            Your email matches {form.businessName || "the business"}&rsquo;s website, so that
+            link also approves your claim.
+          </li>
         ) : (
-          <PendingEmailVerification email={form.repEmail} connectBusinessName={connectBusinessName} />
+          <li>
+            The ABRI team reviews your claim, usually within 1–3 business days. You can log in
+            and use the directory while you wait.
+          </li>
         )}
+        <li>
+          We check your SSM registration number ({form.regNumber || "the one you gave"}) against the
+          SSM register before your business shows as SSM-Verified.
+        </li>
+        {connectBusinessName && (
+          <li>You&rsquo;ll be connected with {connectBusinessName} once your claim is approved.</li>
+        )}
+      </ul>
 
-        <div>
-          <label className={labelClass}>
-            Code sent to {form.repPhone || "your phone"}{" "}
-            <span className="font-normal text-grey-500 dark:text-muted-foreground">
-              (demo — enter any 4+ digit code)
-            </span>
-          </label>
-          <input
-            type="text"
-            value={phoneCode}
-            onChange={(e) => setPhoneCode(e.target.value)}
-            placeholder="123456"
-            disabled={Boolean(linkToken)}
-            className={cn(fieldClass, "mt-1.5")}
-            autoFocus
-          />
-          {errors.phoneCode && <p className={errorClass}>{errors.phoneCode}</p>}
-        </div>
-      </div>
+      <p className="mt-6 text-[13px] text-grey-500 dark:text-muted-foreground">
+        By submitting, you confirm you&rsquo;re authorised to represent this business and agree to
+        our{" "}
+        <Link to="/terms" className="font-bold text-ink underline underline-offset-2 dark:text-foreground">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link to="/privacy" className="font-bold text-ink underline underline-offset-2 dark:text-foreground">
+          Privacy notice
+        </Link>
+        .
+      </p>
 
       {errors.submit && <p className={cn(errorClass, "mt-4")}>{errors.submit}</p>}
 
-      <div className="mt-8 flex gap-3">
+      <div className="mt-6 flex gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -688,18 +687,16 @@ function VerifyStep({ form, errors, domainMatch, linkToken, submitting, connectB
         >
           Back
         </button>
-        {!linkToken && (
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:opacity-60"
-          >
-            {submitting ? "Submitting…" : "Continue"}
-          </button>
-        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-5 py-2.5 text-[14px] font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md disabled:opacity-60"
+        >
+          {submitting ? "Submitting…" : "Submit claim"}
+        </button>
       </div>
     </form>
   );
 }
 
-export { Register };
+export { Register, SearchStep, DetailsStep, EMPTY_FORM };

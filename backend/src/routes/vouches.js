@@ -1,3 +1,4 @@
+import { effectiveMembershipTier } from "../lib/membershipExpiry.js";
 import { Router } from "express";
 
 import { prisma } from "../prisma.js";
@@ -116,7 +117,7 @@ router.post(
     // through the cap for free and charged a resurrected old row against
     // its original date. One "submit" action exists per attempt, which is
     // exactly "times this business submitted something".
-    const cap = vouchCapFor(fromBusiness.membershipTier);
+    const cap = vouchCapFor(effectiveMembershipTier(fromBusiness));
     const submittedCount = await prisma.vouchAction.count({
       where: {
         action: "submit",

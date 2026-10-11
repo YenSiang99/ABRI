@@ -28,8 +28,9 @@ function Hero() {
             .
           </h1>
           <p className="mt-[22px] max-w-[32rem] text-[19px] text-grey-600 dark:text-muted-foreground">
-            Every company on ABRI is verified against official SSM records — so
-            the first handshake starts with proof, not guesswork.
+            Every SSM-Verified company on ABRI has been checked against the
+            official SSM register — so the first handshake starts with proof,
+            not guesswork.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
@@ -38,12 +39,12 @@ function Hero() {
             >
               Claim your business
             </Link>
-            <a
-              href="#"
+            <Link
+              to="/directory"
               className="inline-flex items-center gap-2 rounded-sm border border-grey-300 px-[22px] py-[13px] text-[15px] leading-none font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
             >
-              Browse verified companies
-            </a>
+              Browse the directory
+            </Link>
           </div>
           <div className="mt-[26px] flex items-center gap-2.5 text-[13px] text-grey-500 dark:text-muted-foreground">
             <VerificationIcon mark="verified" size="small" />

@@ -62,7 +62,7 @@ function PinMap({ lat, lng, name, className = "" }) {
 // Contact section can use it too. Returns null when there is nothing to say.
 function GatedContact({ business, contactLocked, contactLockedReason, ownerView = false }) {
   const location = useLocation();
-  const { name, phone, whatsapp, email } = business;
+  const { phone, whatsapp, email } = business;
   const hasGated = Boolean(phone || whatsapp || email);
 
   // Three states, not two. "Withheld" and "the owner hasn't added any" must
@@ -96,17 +96,7 @@ function GatedContact({ business, contactLocked, contactLockedReason, ownerView 
             create a free account
           </Link>
         </ContactRow>
-      ) : (
-        // reason === "owner_plan". No link and no mention of a plan: the
-        // visitor can do nothing about this, and naming the plan would
-        // surface someone's billing status as a profile signal, which
-        // schema.prisma's membershipTier comment rules out.
-        <ContactRow icon={Lock} label="Contact details">
-          <span className="text-grey-600 dark:text-muted-foreground">
-            {name} hasn&apos;t published a phone number, WhatsApp or email.
-          </span>
-        </ContactRow>
-      );
+      ) : null; // the only reason left: "owner_plan" went on 11 Oct 2026
   } else if (hasGated) {
     gated = (
       <div className="grid gap-4 sm:grid-cols-2">

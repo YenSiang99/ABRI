@@ -71,13 +71,13 @@ function AppDirectory() {
       // follow or vouch for yourself, so every action on the card would be
       // dead. Filtered here rather than server-side because the same route
       // serves logged-out callers, who have no "own business".
-      const rows = data.businesses.filter((b) => b.id !== business.id);
+      const rows = data.businesses.filter((b) => b.id !== business?.id);
       setBusinesses((prev) => (page > 1 ? [...prev, ...rows] : rows));
       setHasMore(data.hasMore);
       setPage(data.page);
       setTotal(data.total ?? rows.length);
     },
-    [query, place.category, place.location, business.id],
+    [query, place.category, place.location, business?.id],
   );
 
   useEffect(() => {
@@ -185,11 +185,13 @@ function AppDirectory() {
                   business={b}
                   basePath="/app/business"
                   showActions
-                  connectable={b.verificationLevel !== UNCLAIMED}
+                  // No business of your own (a pending claimant) means
+                  // nothing to connect FROM; the server would refuse it.
+                  connectable={Boolean(business) && b.verificationLevel !== UNCLAIMED}
                   connectionState={connectionStateWith(b.id).state}
                   connecting={connectingId === b.id}
                   onConnect={handleConnect}
-                  reserveTopRight
+                  reserveTopRight={Boolean(business)}
                 />
                 {/* Plus, and silent when there is no overlap. */}
                 <NetworkOverlap
@@ -207,14 +209,16 @@ function AppDirectory() {
 
                     The card reserves the space with `reserveTopRight`, so a
                     long business name truncates before it reaches this. */}
-                <div className="absolute right-3 top-3 z-10">
-                  <WatchButton
-                    business={b}
-                    watching={watchedIds.has(b.id)}
-                    onChanged={refreshWatches}
-                    iconOnly
-                  />
-                </div>
+                {business && (
+                  <div className="absolute right-3 top-3 z-10">
+                    <WatchButton
+                      business={b}
+                      watching={watchedIds.has(b.id)}
+                      onChanged={refreshWatches}
+                      iconOnly
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>

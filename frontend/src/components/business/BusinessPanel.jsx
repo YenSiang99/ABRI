@@ -51,9 +51,11 @@ function BusinessPanel({ business, eyebrow, basePath = "/business", children }) 
               <span className="inline-flex items-center gap-1.5">
                 <Building2 className="h-4 w-4" /> {business.category}
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4" /> {business.location}
-              </span>
+              {business.location && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4" /> {business.location}
+                </span>
+              )}
             </div>
             <div className="mt-3">
               <VerificationBadge verificationLevel={business.verificationLevel} size="inline" chip />

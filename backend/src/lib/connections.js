@@ -158,7 +158,11 @@ async function acceptConnection(client, connection, accepterBusinessId) {
 // surface to someone who is just logging in.
 async function consumeDeferredConnections(accountId) {
   const account = await prisma.account.findUnique({ where: { id: accountId } });
-  if (!account?.businessId) return;
+  // Approved only. A pending claimant now logs in while they wait, and their
+  // row already carries the businessId they are claiming — consuming here
+  // would connect a business they have not proven is theirs. The queue
+  // stays put and drains at the first session after approval.
+  if (!account?.businessId || account.claimStatus !== "approved") return;
 
   const queued = await prisma.deferredConnection.findMany({
     where: { accountId },

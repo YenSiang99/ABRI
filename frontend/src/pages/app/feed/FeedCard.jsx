@@ -237,7 +237,7 @@ function FeedRow({ event, onVouch }) {
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <AppVerificationBadge verificationLevel={event.subject.verificationLevel} />
           <span className="text-xs text-muted-foreground">
-            {event.subject.category} · {event.subject.location}
+            {[event.subject.category, event.subject.location].filter(Boolean).join(" · ")}
           </span>
           <FeedActions event={event} onVouch={onVouch} />
         </div>

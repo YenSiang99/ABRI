@@ -120,6 +120,13 @@ const BUSINESS_ITEMS = [
 // be visible. Vouch review used to be reachable only through a link on the
 // claims page, which read as though flagged vouches were part of claim
 // review — a different job on different records.
+// An account with no approved business (see AppLayout's CLAIMANT_PATHS):
+// its claim, and the directory. Nothing else would load for it.
+const CLAIMANT_ITEMS = [
+  { title: "Your claim", url: "/app", icon: LayoutDashboard },
+  { title: "Directory", url: "/app/directory", icon: Search },
+];
+
 const ADMIN_ITEMS = [
   { title: "Claims review", url: "/app/admin", icon: ClipboardCheck },
   { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
@@ -178,6 +185,7 @@ function SidebarNav({
   pathname,
   onNavigate,
   business,
+  claim,
   isAdmin,
   locked,
   unreadCount,
@@ -229,6 +237,17 @@ function SidebarNav({
               ))}
             </div>
           </>
+        ) : !business ? (
+          <div className="flex flex-col gap-1">
+            {CLAIMANT_ITEMS.map((item) => (
+              <NavRow
+                key={item.title}
+                item={item}
+                active={isActive(item.url)}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
         ) : (
           <>
             {/* No group label. These two are the front door — a header above
@@ -313,7 +332,24 @@ function SidebarNav({
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
-        {!isAdmin && (
+        {!isAdmin && !business && (
+          <div className="flex min-w-0 flex-col rounded-lg px-2 py-2 text-left">
+            <span className="truncate text-sm font-medium text-sidebar-foreground">
+              {claim?.business?.name ?? "No business yet"}
+            </span>
+            <Link
+              to="/app"
+              className="truncate text-xs text-muted-foreground hover:text-sidebar-foreground"
+            >
+              {claim?.status === "pending"
+                ? "Claim pending review"
+                : claim?.status === "rejected"
+                  ? "Claim not approved"
+                  : "Claim your business"}
+            </Link>
+          </div>
+        )}
+        {!isAdmin && business && (
           <>
             <div className="flex items-center gap-2 rounded-lg px-2 py-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-semibold text-accent-foreground">
@@ -367,7 +403,9 @@ function SidebarNav({
                     Founding
                   </span>
                 )}
-                {canUpgradeFromMembershipTier(business.membershipTier) && (
+                {/* Not for Founding members: they pay nothing while the
+                    founding period lasts, so there is nothing to upgrade to. */}
+                {canUpgradeFromMembershipTier(business.membershipTier) && business.membershipTierGrant !== "founding" && (
                   <Link
                     to="/app/plan"
                     className="ml-auto text-xs font-medium text-muted-foreground hover:text-sidebar-foreground"
@@ -395,15 +433,13 @@ function SidebarNav({
 function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { business, isAdmin, logout } = useAuth();
+  const { business, claim, isAdmin, logout } = useAuth();
   const { unreadCount, vouchActionCount, portfolioCount } =
     useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
   // contexts, matching how the other two counts arrive.
   const { incoming } = useConnections();
-
-  if (!business && !isAdmin) return null;
 
   const locked = business?.verificationLevel === CLAIMED;
 
@@ -430,6 +466,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
         <SidebarNav
           pathname={pathname}
           business={business}
+          claim={claim}
           isAdmin={isAdmin}
           locked={locked}
           unreadCount={unreadCount}
@@ -459,6 +496,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               pathname={pathname}
               onNavigate={onCloseMobile}
               business={business}
+          claim={claim}
               isAdmin={isAdmin}
               locked={locked}
               unreadCount={unreadCount}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { History, AlertTriangle, Bell, Eye, EyeOff, Lock } from "lucide-react";
 
 import { LockedFeature } from "@/components/app/LockedFeature";
@@ -52,7 +52,7 @@ function Row({ entry, watching, onWatchChanged }) {
           {entry.business.name}
         </Link>
         <p className="mt-1 text-sm text-muted-foreground">
-          {entry.business.category} · {entry.business.location}
+          {[entry.business.category, entry.business.location].filter(Boolean).join(" · ")}
         </p>
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -107,7 +107,7 @@ function ViewerRow({ entry }) {
           {entry.business.name}
         </Link>
         <p className="mt-1 text-sm text-muted-foreground">
-          {entry.business.category} · {entry.business.location}
+          {[entry.business.category, entry.business.location].filter(Boolean).join(" · ")}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <AppVerificationBadge
@@ -362,7 +362,10 @@ function TabButton({ active, onClick, children }) {
 
 function CheckHistory() {
   const { business } = useAuth();
-  const [tab, setTab] = useState("checked");
+  // ?tab=viewers opens straight onto the viewers — the dashboard's profile
+  // views card links here.
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") === "viewers" ? "viewers" : "checked");
   const [checks, setChecks] = useState([]);
   const [watchedIds, setWatchedIds] = useState(new Set());
   const [status, setStatus] = useState("loading");

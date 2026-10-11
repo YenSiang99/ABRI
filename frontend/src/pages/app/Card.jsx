@@ -1,12 +1,8 @@
 import { Link } from "react-router-dom";
-import { Radio, Package, MapPin, Eye, Zap, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { StatCard } from "@/components/app/StatCard";
+import { Radio, ArrowUpRight } from "lucide-react";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
 import { membershipTierAllows } from "@/lib/membershipTiers";
-import { nfcTaps } from "@/data/appMockData";
-import { toast } from "@/lib/toast";
 import { CLAIMED } from "@/lib/verificationLevels";
 import { verificationLevelLabel } from "@/lib/trustLabels";
 
@@ -109,7 +105,7 @@ function Card() {
         <div className="mt-8">
           <LockedFeature
             title="NFC card unlocks after SSM verification"
-            description="Once our team confirms your SSM registration, your founding-member card ships and taps start showing up here."
+            description="Once our team confirms your SSM registration, your card shows here, with your verified details on it."
           />
         </div>
       </div>
@@ -121,27 +117,9 @@ function Card() {
   // description of it ever was. Same principle as the vouch buttons in
   // components/app/UpgradePrompt.jsx: don't hide the thing you're selling.
   //
-  // What they DON'T get is everything below this branch, and the reason is
-  // honesty rather than billing:
-  //
-  //   Status panel  — reads "Active · Founding batch · shipped Jan 2026" and
-  //                   a Card ID that is hardcoded for every member. Showing
-  //                   that to someone with no card states a fact that is
-  //                   simply untrue.
-  //   Tap stats     — read frontend/src/data/appMockData.js. Invented. Six
-  //                   taps and an 83% conversion rate on a card that was
-  //                   never printed is a fabricated record, not a teaser.
-  //   Tap history   — same mock.
-  //
-  // Omitted outright rather than blurred or locked. A blurred number invites
-  // the member to believe there IS a number behind it; there isn't one for
-  // anybody yet. Don't tease these into view when a real taps table lands —
-  // by then a Free member's figures would be a genuine, and genuinely empty,
-  // zero, which sells nothing.
-  //
   // Note the ordering: the T1 check above wins, so this preview is only ever
-  // reached by a verified business. A T1 member has no `ssm`, and the card
-  // face would render "SSM null".
+  // reached by a verified business. A T1 member has no public `ssm`, and the
+  // card face would render "SSM null".
   if (!membershipTierAllows(business.membershipTier, "nfcCard")) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-10">
@@ -176,87 +154,50 @@ function Card() {
     );
   }
 
-  const totalTaps = nfcTaps.length;
-  const converted = nfcTaps.filter((t) => t.ledToProfileView).length;
-  const rate = Math.round((converted / totalTaps) * 100);
-
+  // A member whose plan includes the card. Until 12 Oct 2026 this branch
+  // showed a status panel ("Active · Founding batch · shipped Jan 2026", Card
+  // ID ABRI-0187, the same for everyone), six invented taps with an 83%
+  // conversion rate, and two buttons that only fired a toast. Every founding
+  // member is on Pro, so every one of them would have read that as their
+  // card's record. Nothing is printed or posted yet and nothing records a
+  // tap, so this says exactly that. When ordering and a taps table exist,
+  // their real figures go here.
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <PageHeader />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <CardFace business={business} />
+          <CardFace business={business} preview />
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2">
           <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</div>
           <div className="mt-2 flex items-center gap-2">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span className="text-lg font-semibold text-foreground">Active</span>
+            <span className="flex h-2.5 w-2.5 rounded-full bg-muted-foreground/50" />
+            <span className="text-lg font-semibold text-foreground">Not printed yet</span>
           </div>
-          <div className="mt-1 text-sm text-muted-foreground">Founding batch · shipped Jan 2026</div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your plan includes the card. We'll get in touch to confirm the details before it's
+            printed and posted.
+          </p>
 
           <div className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
-            <Row label="Card ID" value="ABRI-0187" mono />
-            <Row label="Chip" value="NTAG 424 DNA" />
-            <Row label="Landing URL" value={`${landingHost()}/m/${business.id}`} mono />
+            <Row label="Opens" value={`${landingHost()}/m/${business.id}`} mono />
           </div>
 
-          <div className="mt-6 flex flex-col gap-2">
-            <Button variant="secondary" onClick={() => toast.success("QR fallback downloaded")}>
-              <Download className="mr-1.5 h-4 w-4" /> Download QR fallback
-            </Button>
-            <Button variant="outline" onClick={() => toast("Replacement request sent · RM50")}>
-              <Package className="mr-1.5 h-4 w-4" /> Request replacement (RM50)
-            </Button>
-          </div>
+          <Link
+            to={`/m/${business.id}`}
+            className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground underline underline-offset-4"
+          >
+            See what a tap shows <ArrowUpRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Total taps" value={totalTaps} hint="Last 7 days" icon={Zap} />
-        <StatCard label="Led to profile view" value={converted} hint={`${rate}% conversion`} icon={Eye} />
-        <StatCard
-          label="Unique locations"
-          value={new Set(nfcTaps.map((t) => t.location)).size}
-          hint="Klang Valley corridor"
-          icon={MapPin}
-        />
-      </div>
-
-      <div className="mt-10">
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Tap history</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">Recent activity</h2>
-          </div>
-        </div>
-        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
-          <ul className="divide-y divide-border">
-            {nfcTaps.map((tap) => (
-              <li key={tap.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                  <Radio className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-foreground">{tap.location}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {tap.device} · {tap.date}
-                  </div>
-                </div>
-                {tap.ledToProfileView ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                    <Eye className="h-3 w-3" /> Viewed profile
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">No follow-through</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <p className="mt-8 text-sm text-muted-foreground">
+        Taps are counted from the day your card is in use, and show up here.
+      </p>
     </div>
   );
 }

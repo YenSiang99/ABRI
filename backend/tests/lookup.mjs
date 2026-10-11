@@ -188,21 +188,14 @@ ok("withheld at L1, published at L2, matchable at both");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n8. Contact details follow contactVisibility, not this route");
-// Free owner: withheld from a logged-in member, and the reason names the
-// blocker that would still be standing if they did as they were told.
-await db.business.update({ where: { id: `${P}target` }, data: { membershipTier: "free" } });
+// A Free owner's details reach a logged-in member: the owner's plan is no
+// longer part of the rule (lib/contactVisibility.js, 11 Oct 2026).
+await db.business.update({ where: { id: `${P}target` }, data: { membershipTier: "free", phone: "03-1234 5678" } });
 d = await look(member, "E2E Recommended");
 let hit = d.matches.find((m) => m.id === `${P}target`);
-assert.equal(hit.contactLocked, true);
-assert.equal(hit.contactLockedReason, "owner_plan", "a free owner blocks before an anonymous viewer does");
-
-// Plus owner + logged-in viewer: both conditions met, so it crosses.
-await db.business.update({ where: { id: `${P}target` }, data: {
-  membershipTier: "plus", phone: "03-1234 5678" } });
-d = await look(member, "E2E Recommended");
-hit = d.matches.find((m) => m.id === `${P}target`);
-assert.equal(hit.contactLocked, false, "a Plus owner's details reach a logged-in member");
+assert.equal(hit.contactLocked, false, "a Free owner's details reach a logged-in member");
 assert.equal(hit.phone, "03-1234 5678");
+await db.business.update({ where: { id: `${P}target` }, data: { membershipTier: "plus" } });
 
 // Same business, anonymous: the viewer half of the gate now fails.
 d = await look(anon, "E2E Recommended");
@@ -210,7 +203,7 @@ hit = d.matches.find((m) => m.id === `${P}target`);
 assert.equal(hit.contactLocked, true);
 assert.equal(hit.contactLockedReason, "viewer_anonymous");
 assert.ok(!("phone" in hit), "the key is absent, not nulled");
-ok("owner_plan, then visible, then viewer_anonymous — the existing rule, unchanged");
+ok("visible to any logged-in member, whatever the owner's plan; hidden from anonymous visitors");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n9. An unclaimed listing reads as unclaimed, not as a member");

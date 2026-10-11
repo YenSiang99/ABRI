@@ -30,7 +30,9 @@ function buildVerificationLevelData(account, business) {
       verificationLevel: VERIFICATION_LEVELS[2],
       blurb: ssmDone
         ? "SSM records cross-checked against your registration."
-        : "Pending manual review by the ABRI team — usually within a couple of business days.",
+        : business.ssm
+          ? "Pending manual review by the ABRI team — usually within a couple of business days."
+          : "Submit your SSM registration number and the ABRI team checks it against the register.",
       steps: [
         { id: "ssm", label: "SSM entity match", done: ssmDone },
         { id: "director", label: "Director-name match", done: ssmDone },

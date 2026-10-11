@@ -79,7 +79,7 @@ function BusinessCard({
             {business.name}
           </div>
           <div className="mt-[3px] text-[13.5px] text-grey-600 dark:text-muted-foreground">
-            {business.category} · {business.location}
+            {[business.category, business.location].filter(Boolean).join(" · ")}
           </div>
           <div className="mt-2.5">
             <VerificationBadge
