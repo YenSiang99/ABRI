@@ -79,6 +79,20 @@ function Footer() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-grey-200 pt-6 text-[13px] text-grey-500 dark:border-border dark:text-muted-foreground">
           <span>© 2026 ABRI. All rights reserved.</span>
+          {/* Required by the data licences: OpenStreetMap's ODbL and Overture
+              Maps' terms both ask for a visible credit wherever their data
+              is shown. */}
+          <span>
+            Listing data includes{" "}
+            <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              © OpenStreetMap contributors
+            </a>{" "}
+            and{" "}
+            <a href="https://overturemaps.org" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+              Overture Maps Foundation
+            </a>
+            .
+          </span>
           <span className="flex items-center gap-2">
             <VerificationIcon mark="verified" size="small" />
             Verified against SSM records
