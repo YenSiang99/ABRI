@@ -27,3 +27,6 @@ dist-ssr
 
 # Generated seed extracts (backend/scripts/osm-extract.mjs)
 data/
+
+# SSH keys — never commit
+*.pem
