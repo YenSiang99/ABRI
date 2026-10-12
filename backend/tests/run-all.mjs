@@ -117,7 +117,7 @@ async function startApi() {
       // tokens come back in API responses (lib/mailer.js devOnlyToken), which
       // is how the claim suites open their own confirmation links. Set, not
       // deleted, because dotenv never overrides a variable that exists.
-      RESEND_API_KEY: "",
+      SMTP_HOST: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

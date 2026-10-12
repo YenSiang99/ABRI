@@ -71,7 +71,7 @@ A wrong SSM number: on the email-code path they stay L1 and can resubmit (revoke
 
 ## Next, after these six
 - **Deploy.** Nothing here is committed. Dev and prod need four migrations (20261011090000_add_claim_codes, 20261011100000_account_claim_ssm, 20261011110000_founding_and_plan_grants, and the earlier 20261003090000_add_source_records), which the deploy applies.
-- **A real mail provider on dev/prod.** Without `RESEND_API_KEY` and a verified sending domain, confirm links and claim codes can't reach anyone outside Resend's sandbox.
+- **A real mail provider on prod.** 12 Oct: Resend removed at the user's request; mail now goes over plain SMTP (`SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`). Prod needs an SMTP account (Google Workspace / Zoho for hello@abri.asia, or Amazon SES) plus SPF/DKIM on abri.asia. A production build never shows links on screen; dev needs `MAIL_SHOW_LINKS=1` while it has no SMTP.
 - Set the Founding dates once launch is decided.
 - Update ABRI-feature-checklist.md: it still describes the founding-100 cap and Plus selling contact details.
 - ~~Small leftovers: the owner Dashboard's hardcoded "SSM verification pending" banner; the fake "47 profile views".~~ Done 12 Oct: the dashboard reads the real 30-day viewer count (GET /watches/viewers) and its banner says "add your SSM number" or "waiting on review" from Business.ssm. The NFC card page no longer shows invented taps, card ID or status ("Not printed yet"; appMockData.js deleted).

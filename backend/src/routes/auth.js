@@ -52,7 +52,7 @@ router.post("/register", asyncHandler(async (req, res) => {
   // Not logged in yet — login is gated on emailVerified (see /login below),
   // so this mints the same kind of confirmation token as the claim paths,
   // and is also returned directly below (handy for local dev when
-  // RESEND_API_KEY isn't set — see lib/mailer.js).
+  // no mail is set up — see lib/mailer.js devOnlyToken).
   const tokenRecord = await prisma.emailVerificationToken.create({
     data: {
       email: account.email,

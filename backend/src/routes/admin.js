@@ -105,7 +105,7 @@ router.get(
 // of ownership there is. Mints a
 // confirmation token, emails the claimant a link to verify their email and
 // log in, and also returns the token directly (handy for local dev when
-// RESEND_API_KEY isn't set — see lib/mailer.js).
+// no mail is set up — see lib/mailer.js devOnlyToken).
 router.post(
   "/claims/:accountId/approve",
   asyncHandler(async (req, res) => {

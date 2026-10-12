@@ -21,8 +21,7 @@ import { toast } from "@/lib/toast";
 //                     the name so the recipient doesn't retype it.
 //
 // PLAIN TEXT, COPIED BY HAND, and that is deliberate rather than lazy.
-// lib/mailer.js exists but Resend is still on the sandbox sender (it delivers
-// only to the API key owner), and sendVerificationEmail interpolates straight
+// lib/mailer.js exists, but sendVerificationEmail interpolates straight
 // into HTML with no escaping — so a member-supplied company name in an email
 // template is an injection surface. Until there is a real pipe, the member's
 // own WhatsApp is both safer and what they would have used anyway.

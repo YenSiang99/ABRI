@@ -1147,7 +1147,7 @@ router.post(
       // Nothing is created yet — consuming the link (POST
       // /auth/verify-claim/:token) is what creates the account/business
       // and auto-approves + logs in. Also returned directly below (handy
-      // for local dev when RESEND_API_KEY isn't set — see lib/mailer.js).
+      // for local dev when no mail is set up — see lib/mailer.js devOnlyToken).
       const record = await prisma.emailVerificationToken.create({
         data: {
           email: repEmail,

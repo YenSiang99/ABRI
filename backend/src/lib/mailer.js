@@ -1,25 +1,52 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-// No API key configured (e.g. local dev without Resend set up) — every
-// caller in this codebase already falls back to returning the token
-// directly in its API response, so a missing provider is a silent no-op
-// here rather than a hard failure.
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// Outgoing email goes through plain SMTP, so no mail company is built into
+// the code: Google Workspace, Zoho, Amazon SES or anything else that offers
+// SMTP is a matter of server settings.
+//
+//   SMTP_HOST   e.g. smtp.gmail.com, smtp.zoho.com, email-smtp.<region>.amazonaws.com
+//   SMTP_PORT   465 (implicit TLS) or 587 (STARTTLS); default 587
+//   SMTP_USER   the login the provider gives you
+//   SMTP_PASS   its password (for Google: an app password, not the account's)
+//   MAIL_FROM   who the email says it is from, e.g. "ABRI <hello@abri.asia>"
+//
+// No SMTP_HOST means no mail is sent. That is normal on a developer's own
+// machine and in the test API; on a server it is logged loudly at boot.
+const transport = process.env.SMTP_HOST
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: Number(process.env.SMTP_PORT || 587) === 465,
+      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+    })
+  : null;
 
-// Resend's shared sandbox address — works with no domain setup, but Resend
-// will only actually deliver mail sent from it to the email on the
-// account that owns the API key. Swap in a verified domain's address via
-// RESEND_FROM_EMAIL once one exists.
-const FROM = process.env.RESEND_FROM_EMAIL || "ABRI <onboarding@resend.dev>";
+const FROM = process.env.MAIL_FROM || process.env.SMTP_USER || "ABRI <hello@abri.asia>";
+
+const isProduction = process.env.NODE_ENV === "production";
+// Links and codes are shown on screen instead of emailed only where nobody
+// real can be fooled by it: a machine with no mail set up that is not a
+// production build (a developer's laptop, the test API), or a server that
+// opts in with MAIL_SHOW_LINKS=1 (dev.abri.asia). Never prod.
+const showLinks = !transport && (!isProduction || process.env.MAIL_SHOW_LINKS === "1");
+
+if (!transport && isProduction) {
+  console.warn(
+    showLinks
+      ? "[mailer] No SMTP_HOST: emails are not sent; links and codes are shown on screen (MAIL_SHOW_LINKS=1)."
+      : "[mailer] No SMTP_HOST: emails are NOT being sent. Sign-up confirmations and claim codes will not arrive.",
+  );
+}
 
 async function sendMail({ to, subject, html }) {
-  if (!resend) {
-    console.warn(`[mailer] RESEND_API_KEY not set — skipping email to ${to} ("${subject}")`);
+  if (!transport) {
+    console.warn(`[mailer] SMTP_HOST not set — skipping email to ${to} ("${subject}")`);
     return;
   }
-  const { error } = await resend.emails.send({ from: FROM, to, subject, html });
-  if (error) {
-    console.error(`[mailer] Resend failed to send to ${to}:`, error);
+  try {
+    await transport.sendMail({ from: FROM, to, subject, html });
+  } catch (err) {
+    console.error(`[mailer] failed to send to ${to}:`, err.message);
   }
 }
 
@@ -41,16 +68,16 @@ function sendVerificationEmail({ to, subject, heading, message, link }) {
   });
 }
 
-// A link token for an API response — ONLY when no mail provider is set up.
+// A link token or code for an API response, so the screen can show it in
+// place of an email — ONLY where showLinks allows (see above).
 //
 // Every route that mints a link used to return its token in the response
-// unconditionally, as a local-dev convenience. With a real provider that
-// turns "we emailed you a link" into "here is the link": whoever submits the
-// form proves nothing about the inbox. So the token rides along only when
-// there is no inbox to prove anything with, i.e. local dev and the test API
-// (tests/run-all.mjs blanks RESEND_API_KEY).
+// unconditionally. With real email that turns "we emailed you a link" into
+// "here is the link": whoever submits the form proves nothing about the
+// inbox. And on a live server with mail not yet set up it would be the same
+// hole, so production never shows them.
 function devOnlyToken(token) {
-  return resend ? undefined : token;
+  return showLinks ? token : undefined;
 }
 
 export { sendMail, sendVerificationEmail, devOnlyToken };

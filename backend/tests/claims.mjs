@@ -9,7 +9,7 @@
 // would act as the business if that one line went missing.
 //
 // Needs the test API with no mail provider (tests/run-all.mjs blanks
-// RESEND_API_KEY), so link tokens come back in the responses.
+// SMTP_HOST), so link tokens come back in the responses.
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
 import assert from "node:assert";
