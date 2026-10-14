@@ -28,6 +28,7 @@ import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
 import { AdminSsmReviews } from "@/pages/admin/AdminSsmReviews";
+import { AdminBusinesses } from "@/pages/admin/AdminBusinesses";
 import { About } from "@/pages/legal/About";
 import { Contact } from "@/pages/legal/Contact";
 import { Faq } from "@/pages/legal/Faq";
@@ -120,6 +121,7 @@ function App() {
             <Route path="admin" element={<AdminReview />} />
             <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />
             <Route path="admin/ssm-reviews" element={<AdminSsmReviews />} />
+            <Route path="admin/businesses" element={<AdminBusinesses />} />
           </Route>
         </Route>
         <Route path="/admin" element={<Navigate to="/app/admin" replace />} />

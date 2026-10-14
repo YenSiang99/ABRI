@@ -9,7 +9,11 @@ import {
   emailRejectedClaimant,
   verifyBusinessSsm,
 } from "../lib/businessClaim.js";
-import { normalizeSsm } from "../lib/businessLookup.js";
+import { normalizeSsm, normalizeDomain, looksLikeDomain } from "../lib/businessLookup.js";
+import { normalizeBusinessEdit } from "../lib/contactFields.js";
+import { isPublicEmailDomain } from "../lib/domainVerification.js";
+import { uniqueBusinessId } from "../lib/slug.js";
+import { CATEGORY_SERVICES } from "../lib/categoryServices.js";
 import { getFoundingSettings, setFoundingSettings, parseDate } from "../lib/founding.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
@@ -736,6 +740,238 @@ router.post(
       },
     });
     res.json({ flag: updated });
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Businesses: list, add, edit, delete.
+//
+// Exists so an admin can set up and reset a listing by hand, mainly to test
+// the claim flow: a business whose domain matches the claimant's email
+// (auto-approved) and one that does not (goes to review). Level, plan and
+// claims are NOT editable here; they have their own screens.
+// ---------------------------------------------------------------------------
+
+// Fields an admin sets that a member can't (see PROTECTED_FIELDS in
+// lib/contactFields.js). The rest go through normalizeBusinessEdit, so a
+// phone number is stored exactly as the member's own edit would store it.
+const ADMIN_ONLY_FIELDS = ["name", "category", "location", "domain", "ssm"];
+
+function adminBusinessData(body, { creating }) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "Expected a JSON object." };
+  }
+  const data = {};
+
+  for (const field of ["name", "category", "location"]) {
+    if (!Object.hasOwn(body, field) && !creating) continue;
+    const value = typeof body[field] === "string" ? body[field].trim() : "";
+    if (!value) return { error: `${field[0].toUpperCase()}${field.slice(1)} is required.` };
+    if (value.length > 200) return { error: `${field} is too long.` };
+    data[field] = value;
+  }
+
+  if (Object.hasOwn(body, "domain")) {
+    const raw = body.domain;
+    if (raw === null || raw === "") {
+      data.domain = null;
+    } else if (typeof raw !== "string") {
+      return { error: "Domain must be text." };
+    } else {
+      const domain = normalizeDomain(raw);
+      if (!looksLikeDomain(domain)) {
+        return { error: "That doesn't look like a domain. Use something like acme.com.my." };
+      }
+      if (isPublicEmailDomain(domain)) {
+        return { error: `${domain} is a public email domain; it can't be used to approve claims.` };
+      }
+      data.domain = domain;
+    }
+  }
+
+  // ssm and ssmNormalized are written together or not at all (schema.prisma).
+  if (Object.hasOwn(body, "ssm")) {
+    const raw = typeof body.ssm === "string" ? body.ssm.trim() : "";
+    data.ssm = raw || null;
+    data.ssmNormalized = raw ? normalizeSsm(raw) : null;
+  }
+
+  const rest = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (!ADMIN_ONLY_FIELDS.includes(k)) rest[k] = v;
+  }
+  if (Object.keys(rest).length > 0) {
+    const { data: edit, error } = normalizeBusinessEdit(rest);
+    if (error) return { error };
+    Object.assign(data, edit);
+  }
+  return { data };
+}
+
+const BUSINESS_LIST_SELECT = {
+  id: true,
+  name: true,
+  category: true,
+  location: true,
+  domain: true,
+  email: true,
+  phone: true,
+  website: true,
+  // The rest of what the edit form shows; leaving any out would blank it on save.
+  ssm: true,
+  whatsapp: true,
+  address: true,
+  openingHours: true,
+  description: true,
+  verificationLevel: true,
+  membershipTier: true,
+  updatedAt: true,
+  accounts: {
+    where: { claimStatus: { in: ["pending", "approved"] } },
+    select: { id: true, email: true, claimStatus: true },
+  },
+};
+
+function serializeAdminBusiness({ accounts, ...business }) {
+  return { ...business, claimants: accounts };
+}
+
+router.get(
+  "/businesses",
+  asyncHandler(async (req, res) => {
+    const q = req.query;
+    const pageSize = Math.min(Math.max(parseInt(q.pageSize, 10) || 25, 1), 100);
+    const page = Math.max(parseInt(q.page, 10) || 1, 1);
+
+    const contains = (v) => ({ contains: String(v).trim(), mode: "insensitive" });
+    const where = {};
+    for (const field of ["name", "id", "domain", "email", "location", "category"]) {
+      if (typeof q[field] === "string" && q[field].trim()) where[field] = contains(q[field]);
+    }
+    if (typeof q.verificationLevel === "string" && q.verificationLevel) {
+      where.verificationLevel = q.verificationLevel;
+    }
+    if (q.claimed === "yes") {
+      where.accounts = { some: { claimStatus: { in: ["pending", "approved"] } } };
+    } else if (q.claimed === "no") {
+      where.accounts = { none: { claimStatus: { in: ["pending", "approved"] } } };
+    }
+
+    const [rows, total] = await prisma.$transaction([
+      prisma.business.findMany({
+        where,
+        select: BUSINESS_LIST_SELECT,
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.business.count({ where }),
+    ]);
+    res.json({ businesses: rows.map(serializeAdminBusiness), total, page, pageSize });
+  }),
+);
+
+router.post(
+  "/businesses",
+  asyncHandler(async (req, res) => {
+    const { data, error } = adminBusinessData(req.body, { creating: true });
+    if (error) return res.status(400).json({ error });
+    const id = await uniqueBusinessId(data.name);
+    const business = await prisma.business.create({
+      data: {
+        services: CATEGORY_SERVICES[data.category] ?? [],
+        ...data,
+        id,
+      },
+      select: BUSINESS_LIST_SELECT,
+    });
+    res.status(201).json({ business: serializeAdminBusiness(business) });
+  }),
+);
+
+router.patch(
+  "/businesses/:id",
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.business.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Business not found." });
+    const { data, error } = adminBusinessData(req.body, { creating: false });
+    if (error) return res.status(400).json({ error });
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: "Nothing to update." });
+    // A source's old pin next to a new address is worse than no pin (same
+    // rule as the member PATCH).
+    if (Object.hasOwn(data, "address") && data.address !== existing.address) {
+      data.lat = null;
+      data.lng = null;
+    }
+    const business = await prisma.business.update({
+      where: { id: existing.id },
+      data,
+      select: BUSINESS_LIST_SELECT,
+    });
+    res.json({ business: serializeAdminBusiness(business) });
+  }),
+);
+
+// For resetting a test listing. Refuses anything with network history, so a
+// real member can't be wiped by a stray click; the rows a claim itself
+// writes (system events with no acting business) go with it.
+router.delete(
+  "/businesses/:id",
+  asyncHandler(async (req, res) => {
+    const id = req.params.id;
+    const business = await prisma.business.findUnique({ where: { id } });
+    if (!business) return res.status(404).json({ error: "Business not found." });
+
+    const either = (a, b) => ({ OR: [{ [a]: id }, { [b]: id }] });
+    const counts = await Promise.all([
+      prisma.vouch.count({ where: either("fromBusinessId", "toBusinessId") }),
+      prisma.vouchRevision.count({ where: { createdById: id } }),
+      prisma.vouchFlag.count({ where: either("raisedByBusinessId", "againstBusinessId") }),
+      prisma.vouchAction.count({ where: { actorId: id } }),
+      prisma.connection.count({ where: { OR: [{ businessAId: id }, { businessBId: id }, { requestedById: id }] } }),
+      prisma.follow.count({ where: either("followerId", "followedId") }),
+      prisma.portfolioEntry.count({
+        where: { OR: [{ businessAId: id }, { businessBId: id }, { proposedById: id }, { serviceProvidedById: id }] },
+      }),
+      prisma.businessWatch.count({ where: either("watcherId", "watchedId") }),
+      prisma.businessCheck.count({ where: either("checkedById", "checkedId") }),
+      // Events with an acting business are network history; the ones a claim
+      // approval writes have none.
+      prisma.networkEvent.count({
+        where: { OR: [{ actorBusinessId: id }, { subjectBusinessId: id, actorBusinessId: { not: null } }] },
+      }),
+      prisma.activityEvent.count({
+        where: { OR: [{ actorBusinessId: id }, { businessId: id, actorBusinessId: { not: null } }] },
+      }),
+    ]);
+    if (counts.some((n) => n > 0)) {
+      return res.status(409).json({
+        error: "This business has activity on the network (vouches, connections or similar), so it can't be deleted.",
+      });
+    }
+
+    const accounts = await prisma.account.findMany({
+      where: { businessId: id, isAdmin: false },
+      select: { id: true },
+    });
+    const accountIds = accounts.map((a) => a.id);
+    await prisma.$transaction([
+      prisma.emailVerificationToken.deleteMany({
+        where: { OR: [{ businessId: id }, { accountId: { in: accountIds } }] },
+      }),
+      prisma.deferredConnection.deleteMany({
+        where: { OR: [{ businessId: id }, { accountId: { in: accountIds } }] },
+      }),
+      // Views are analytics, not a relationship, so they never block a delete.
+      prisma.profileView.deleteMany({ where: either("viewerId", "viewedId") }),
+      prisma.networkEvent.deleteMany({ where: { subjectBusinessId: id } }),
+      prisma.activityEvent.deleteMany({ where: { businessId: id } }),
+      prisma.account.deleteMany({ where: { id: { in: accountIds } } }),
+      // An admin who somehow holds this business keeps their account.
+      prisma.account.updateMany({ where: { businessId: id }, data: { businessId: null, claimStatus: null } }),
+      prisma.business.delete({ where: { id } }),
+    ]);
+    res.json({ deleted: id, accountsDeleted: accountIds.length });
   }),
 );
 

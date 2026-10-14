@@ -37,6 +37,7 @@ prints the failing output at the end. It exits non-zero if any suite failed.
 | `map-pin.mjs` | the profile map pin: public, not member-editable, cleared when the address changes |
 | `portfolio.mjs` | the portfolio record — propose, confirm, and who gets credited for a service |
 | `claims.mjs` | claiming a business: the confirm link, logging in while pending (owning nothing), rivals, rejection, claiming again |
+| `admin-businesses.mjs` | the admin Businesses page: filters, paging, add / edit / delete, and a matching vs non-matching claim on a listing it made |
 | `founding.mjs` | the Founding programme (Pro until the end date, moving it, expiry, closing it) and paying before SSM verification |
 
 ## Two things about the order

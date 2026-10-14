@@ -95,7 +95,33 @@ function saveFoundingSettings({ closesAt, proEndsAt }) {
   return apiFetch("/admin/settings/founding", { method: "PUT", body: { closesAt, proEndsAt } });
 }
 
+// The Businesses page. `params` is { page, pageSize, name, id, domain, email,
+// location, category, verificationLevel, claimed }; blank values are dropped.
+function fetchAdminBusinesses(params = {}) {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== "" && v != null) query.set(k, v);
+  }
+  return apiFetch(`/admin/businesses?${query}`);
+}
+
+function createAdminBusiness(body) {
+  return apiFetch("/admin/businesses", { method: "POST", body }).then((d) => d.business);
+}
+
+function updateAdminBusiness(id, body) {
+  return apiFetch(`/admin/businesses/${id}`, { method: "PATCH", body }).then((d) => d.business);
+}
+
+function deleteAdminBusiness(id) {
+  return apiFetch(`/admin/businesses/${id}`, { method: "DELETE" });
+}
+
 export {
+  fetchAdminBusinesses,
+  createAdminBusiness,
+  updateAdminBusiness,
+  deleteAdminBusiness,
   fetchFoundingSettings,
   saveFoundingSettings,
   fetchSsmReviews,

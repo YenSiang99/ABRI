@@ -56,6 +56,9 @@ const SUITES = [
   // Creates its own e2e-claim-* listings and claimant accounts, and clears
   // last run's at its start.
   "claims.mjs",
+  // Creates and deletes its own e2e-admin-biz-* listings through the admin
+  // routes; clears last run's at its start.
+  "admin-businesses.mjs",
   // Moves the Founding settings and puts them back (open, no end date).
   "founding.mjs",
 ];

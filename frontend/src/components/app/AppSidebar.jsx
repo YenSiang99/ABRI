@@ -17,6 +17,7 @@ import {
   Inbox,
   Users,
   Eye,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -134,6 +135,8 @@ const ADMIN_ITEMS = [
   // admin granted SSM-Verified from the claims screen with no number in front
   // of them. See pages/admin/AdminSsmReviews.jsx.
   { title: "SSM review", url: "/app/admin/ssm-reviews", icon: ShieldCheck },
+  // Add, edit and delete listings by hand, for setting up claim tests.
+  { title: "Businesses", url: "/app/admin/businesses", icon: Building2 },
 ];
 
 // Counts capped at 9+ so a member who's been away for a month doesn't get a
