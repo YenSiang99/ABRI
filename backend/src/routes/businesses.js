@@ -4,7 +4,9 @@ import { prisma } from "../prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { matchesBusinessDomain } from "../lib/domainVerification.js";
 import { findOrCreateClaimTarget, approveClaimAndRejectRivals } from "../lib/businessClaim.js";
-import { sendClaimCode, checkClaimCode, ClaimCodeError } from "../lib/claimCode.js";
+import { sendClaimCode, checkClaimCode, matchesListingEmail, claimCodeTarget, maskEmail, ClaimCodeError } from "../lib/claimCode.js";
+import { signClaimHandle, verifyClaimHandle } from "../lib/jwt.js";
+import { startSession } from "../lib/session.js";
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
@@ -1100,8 +1102,9 @@ router.post(
     // already fully claimed — a listing with other pending claims on it
     // is still fair game (see findOrCreateClaimTarget for why).
     let knownDomain = null;
+    let existingBusiness = null;
     if (businessId) {
-      const existingBusiness = await prisma.business.findUnique({ where: { id: businessId } });
+      existingBusiness = await prisma.business.findUnique({ where: { id: businessId } });
       if (!existingBusiness) {
         return res.status(400).json({ error: "This listing isn't available to claim." });
       }
@@ -1143,7 +1146,16 @@ router.post(
       connectTargetId: connectTarget,
     };
 
-    if (matchesBusinessDomain(repEmail, knownDomain)) {
+    // Either proves the claimant reads an inbox the business already had: a
+    // company domain, or the listing's own email (lib/claimCode.js). Each is
+    // the whole proof, so the confirm click approves the claim.
+    const verificationMethod = matchesBusinessDomain(repEmail, knownDomain)
+      ? "domain-auto"
+      : (await matchesListingEmail(repEmail, existingBusiness))
+        ? "email-match"
+        : null;
+
+    if (verificationMethod) {
       // Nothing is created yet — consuming the link (POST
       // /auth/verify-claim/:token) is what creates the account/business
       // and auto-approves + logs in. Also returned directly below (handy
@@ -1152,7 +1164,7 @@ router.post(
         data: {
           email: repEmail,
           businessId: businessId ?? null,
-          claimPayload,
+          claimPayload: { ...claimPayload, verificationMethod },
           expiresAt: new Date(Date.now() + CLAIM_TOKEN_TTL_MS),
         },
       });
@@ -1161,11 +1173,14 @@ router.post(
         to: repEmail,
         subject: `Confirm your claim on ${businessName}`,
         heading: "Confirm your claim",
-        message: `Your email matches ${businessName}'s domain, so your claim is auto-approved. Click below to verify your email and log in.`,
+        message:
+          verificationMethod === "email-match"
+            ? `Your email is the one listed for ${businessName}, so your claim is approved as soon as you confirm it. Click below to verify your email and log in.`
+            : `Your email matches ${businessName}'s domain, so your claim is auto-approved. Click below to verify your email and log in.`,
         link: `${process.env.FRONTEND_URL}/verify-claim/${record.token}`,
       });
 
-      return res.json({ requiresEmailVerification: true, token: devOnlyToken(record.token) });
+      return res.json({ requiresEmailVerification: true, verificationMethod, token: devOnlyToken(record.token) });
     }
 
     const business = await findOrCreateClaimTarget({ businessId, businessName, category, location, ssm });
@@ -1226,10 +1241,18 @@ router.post(
     // was only ever real on the claim-an-existing-listing path, and fixing it
     // at the response covers both. Safe to narrow: AuthContext.claimOrRegister
     // reads only requiresEmailVerification and token off this payload.
+    // The listing-email code, offered on the next screen rather than only
+    // after they log in: codeEmail says whether there's an inbox to send it
+    // to (masked, as ClaimHome shows it), claimHandle lets this browser ask
+    // for it before any session exists (POST /claim/email-code below).
+    const codeEmail = maskEmail(await claimCodeTarget(business));
+
     res.status(201).json({
       requiresAdminApproval: true,
       requiresEmailVerification: true,
       token: devOnlyToken(confirm.token),
+      codeEmail,
+      claimHandle: codeEmail ? signClaimHandle(account.id) : null,
       account: serializeAccount(account),
       business: publicBusinessView(business),
     });
@@ -1290,15 +1313,52 @@ router.post(
 );
 
 // The instant claim: a code to the email the listing already has on file
-// (lib/claimCode.js). Both routes act on the caller's PENDING claim only —
-// claimBusinessId, which middleware/auth.js sets for exactly that case.
-async function loadPendingClaim(req) {
-  if (req.account.claimStatus !== "pending" || !req.account.claimBusinessId) {
+// (lib/claimCode.js). Two doors to the same two steps: /me/claim/email-code
+// for a logged-in claimant (ClaimHome), and /claim/email-code with the
+// claimHandle POST /claim returned, for the claimant still on the signup's
+// "check your email" screen. Both act on a PENDING claim only.
+//
+// `account` is a raw Account row here — its businessId is the claimed one.
+async function loadPendingClaim(account) {
+  if (account.claimStatus !== "pending" || !account.businessId) {
     throw new ClaimCodeError(403, "You don't have a claim waiting.");
   }
-  const business = await prisma.business.findUnique({ where: { id: req.account.claimBusinessId } });
+  const business = await prisma.business.findUnique({ where: { id: account.businessId } });
   if (!business) throw new ClaimCodeError(404, "Business not found.");
   return business;
+}
+
+// requireAuth hides a pending claim's businessId (middleware/auth.js), so the
+// session door puts it back for loadPendingClaim.
+function sessionClaimant(req) {
+  return { ...req.account, businessId: req.account.claimBusinessId ?? null };
+}
+
+async function handleClaimant(req) {
+  const accountId = verifyClaimHandle(req.body?.claimHandle);
+  const account = accountId ? await prisma.account.findUnique({ where: { id: accountId } }) : null;
+  if (!account) throw new ClaimCodeError(401, "This page has expired. Log in to send a code from your account.");
+  return account;
+}
+
+async function sendCodeFor(account) {
+  const business = await loadPendingClaim(account);
+  const { sentTo, code } = await sendClaimCode({ account, business });
+  return { sentTo, code: devOnlyToken(code) };
+}
+
+// A right code approves the claim outright, the same way the domain match
+// does: rivals are rejected and the business lands on L1. SSM is still its
+// own step (POST /businesses/me/ssm) — the inbox proves the business, not
+// its registration.
+async function verifyCodeFor(account, code) {
+  const business = await loadPendingClaim(account);
+  await checkClaimCode({ account, business, code });
+  await approveClaimAndRejectRivals({
+    accountId: account.id,
+    businessId: business.id,
+    verificationMethod: "email-code",
+  });
 }
 
 function claimCodeFailure(res, err) {
@@ -1312,35 +1372,54 @@ router.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     try {
-      const business = await loadPendingClaim(req);
-      const { sentTo, code } = await sendClaimCode({ account: req.account, business });
-      res.json({ sentTo, code: devOnlyToken(code) });
+      res.json(await sendCodeFor(sessionClaimant(req)));
     } catch (err) {
       return claimCodeFailure(res, err);
     }
   }),
 );
 
-// A right code approves the claim outright, the same way the domain match
-// does: rivals are rejected and the business lands on L1. SSM is still its
-// own step (POST /businesses/me/ssm) — the inbox proves the business, not
-// its registration.
 router.post(
   "/me/claim/email-code/verify",
   requireAuth,
   asyncHandler(async (req, res) => {
     try {
-      const business = await loadPendingClaim(req);
-      await checkClaimCode({ account: req.account, business, code: req.body?.code });
+      await verifyCodeFor(sessionClaimant(req), req.body?.code);
     } catch (err) {
       return claimCodeFailure(res, err);
     }
-    await approveClaimAndRejectRivals({
-      accountId: req.account.id,
-      businessId: req.account.claimBusinessId,
-      verificationMethod: "email-code",
-    });
     res.json(await loadAccountView(req.account.id));
+  }),
+);
+
+// The signup door: no session yet, so the claimHandle stands in for one.
+// A right code logs them in as the owner straight away, though their OWN
+// email is still unconfirmed: they just proved the business's inbox, the
+// strongest proof we take, and a second inbox trip before they can use it is
+// the "joined and can't do anything" wall. emailVerified stays false, so
+// POST /auth/login still refuses them until they open the confirm link —
+// this session is the only one they get without it.
+router.post(
+  "/claim/email-code",
+  asyncHandler(async (req, res) => {
+    try {
+      res.json(await sendCodeFor(await handleClaimant(req)));
+    } catch (err) {
+      return claimCodeFailure(res, err);
+    }
+  }),
+);
+
+router.post(
+  "/claim/email-code/verify",
+  asyncHandler(async (req, res) => {
+    try {
+      const account = await handleClaimant(req);
+      await verifyCodeFor(account, req.body?.code);
+      res.json(await startSession(res, account.id));
+    } catch (err) {
+      return claimCodeFailure(res, err);
+    }
   }),
 );
 

@@ -95,6 +95,15 @@ function AuthProvider({ children }) {
     }
   }
 
+  // A session some other call started — the signup screen's listing-email
+  // code (Register's SubmittedStep) answers with the getMe() shape and the
+  // cookie set, so there's nothing to fetch.
+  function applySession(data) {
+    setAccount(data.account);
+    setBusiness(data.business);
+    setClaim(data.claim ?? null);
+  }
+
   async function logout() {
     await apiLogout().catch(() => {});
     setAccount(null);
@@ -141,11 +150,24 @@ function AuthProvider({ children }) {
       // The admin path also asks for email confirmation now (the link logs
       // them in while the claim waits), so requiresAdminApproval is checked
       // first: it is the one that says which screen comes next. `token` is
-      // only present in local dev, with no mail provider.
+      // only present in local dev, with no mail provider. codeEmail and
+      // claimHandle are set when the listing has an inbox of its own to send
+      // a code to, which the next screen offers.
       if (result.requiresAdminApproval) {
-        return { ok: true, requiresAdminApproval: true, token: result.token ?? null };
+        return {
+          ok: true,
+          requiresAdminApproval: true,
+          token: result.token ?? null,
+          codeEmail: result.codeEmail ?? null,
+          claimHandle: result.claimHandle ?? null,
+        };
       }
-      return { ok: true, requiresEmailVerification: true, token: result.token ?? null };
+      return {
+        ok: true,
+        requiresEmailVerification: true,
+        verificationMethod: result.verificationMethod ?? "domain-auto",
+        token: result.token ?? null,
+      };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -176,6 +198,7 @@ function AuthProvider({ children }) {
     logout,
     claimOrRegister,
     claimAsMember,
+    applySession,
     refreshAccount,
   };
 

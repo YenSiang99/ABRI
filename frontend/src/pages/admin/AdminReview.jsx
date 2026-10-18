@@ -51,13 +51,21 @@ function RegisterCheck({ account }) {
   );
 }
 
+// How an instant claim proved itself. A manual approval needs no badge: the
+// admin reading this screen is the one who made it.
+const METHOD_LABELS = {
+  "domain-auto": "Domain-verified",
+  "email-match": "Listing email",
+  "email-code": "Email code",
+};
+
 function ClaimantLine({ account }) {
   return (
     <div className="mt-2 text-[13px] text-muted-foreground">
       Claimed by <strong>{account.name}</strong> ({account.role}) · {account.email}
-      {account.verificationMethod === "domain-auto" && (
+      {METHOD_LABELS[account.verificationMethod] && (
         <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
-          Domain-verified
+          {METHOD_LABELS[account.verificationMethod]}
         </span>
       )}
     </div>

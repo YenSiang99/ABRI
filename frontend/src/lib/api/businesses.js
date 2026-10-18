@@ -96,6 +96,16 @@ function verifyClaimCode(code) {
   return apiFetch("/businesses/me/claim/email-code/verify", { method: "POST", body: { code } });
 }
 
+// The same two calls from the signup's "check your email" screen, before
+// there is a session: claimHandle comes back from submitBusinessClaim.
+function sendSignupClaimCode(claimHandle) {
+  return apiFetch("/businesses/claim/email-code", { method: "POST", body: { claimHandle } });
+}
+
+function verifySignupClaimCode(claimHandle, code) {
+  return apiFetch("/businesses/claim/email-code/verify", { method: "POST", body: { claimHandle, code } });
+}
+
 // A claim from someone already logged in with no approved business — a
 // rejected claimant trying again, or moving a pending claim. Resolves to the
 // same shape as getMe().
@@ -132,5 +142,7 @@ export {
   submitClaimAsMember,
   sendClaimCode,
   verifyClaimCode,
+  sendSignupClaimCode,
+  verifySignupClaimCode,
   updateMyBusiness,
 };

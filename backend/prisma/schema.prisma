@@ -292,7 +292,7 @@ model Account {
   business           Business? @relation(fields: [businessId], references: [id])
   // null (not a claim) | "pending" | "approved"
   claimStatus        String?
-  // null | "manual" | "domain-auto" | "email-code" (lib/claimCode.js)
+  // null | "manual" | "domain-auto" | "email-match" | "email-code" (lib/claimCode.js)
   verificationMethod String?
   // The SSM registration number the claimant typed with their claim, as typed.
   // On the ACCOUNT, not the business, because several accounts can be

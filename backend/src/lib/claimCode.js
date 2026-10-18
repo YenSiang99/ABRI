@@ -32,14 +32,33 @@ function maskEmail(email) {
   return `${local.charAt(0)}***@${domain}`;
 }
 
-// Where a code for this listing would go, or null when there is no code path:
-// no email on file, or the listing is not an unclaimed one from a source (a
-// brand-new business typed in by its claimant has no independent email to
-// prove anything with).
-function claimCodeTarget(business) {
+function normalizeEmail(email) {
+  return String(email ?? "").trim().toLowerCase();
+}
+
+// The listing's inbox, when reading it proves the listing — or null when it
+// can't: no email on file; the listing is not an unclaimed one from a source
+// (a brand-new business typed in by its claimant has no independent email to
+// prove anything with); or the same email is on another listing too. That
+// last one is a sales agent's or a head office's inbox (one agent's gmail sits
+// on 48 listings in the seed data), and reading it says nothing about owning
+// THIS listing — so those go to the admin.
+async function claimCodeTarget(business) {
   if (!business || business.verificationLevel !== UNCLAIMED) return null;
-  const email = String(business.email ?? "").trim().toLowerCase();
-  return /^\S+@\S+\.\S+$/.test(email) ? email : null;
+  const email = normalizeEmail(business.email);
+  if (!/^\S+@\S+\.\S+$/.test(email)) return null;
+  const [{ n }] = await prisma.$queryRaw`
+    SELECT count(*)::int AS n FROM "Business" WHERE lower(trim(email)) = ${email}`;
+  return n === 1 ? email : null;
+}
+
+// The claimant signed up WITH the listing's own inbox. Confirming that email
+// is then the same proof a code to it would be, so the claim is approved on
+// the confirm click (routes/businesses.js POST /claim, auth.js verify-claim)
+// rather than making them prove the one inbox twice.
+async function matchesListingEmail(email, business) {
+  const target = await claimCodeTarget(business);
+  return Boolean(target) && target === normalizeEmail(email);
 }
 
 // Keyed per account, so a code is useless to any other claimant even if it
@@ -64,8 +83,8 @@ class ClaimCodeError extends Error {
 }
 
 async function sendClaimCode({ account, business }) {
-  const sentTo = claimCodeTarget(business);
-  if (!sentTo) throw new ClaimCodeError(400, "This listing has no email on file to send a code to.");
+  const sentTo = await claimCodeTarget(business);
+  if (!sentTo) throw new ClaimCodeError(400, "This listing has no email on file of its own to send a code to. An ABRI admin will review your claim.");
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -120,7 +139,7 @@ async function checkClaimCode({ account, business, code }) {
     throw new ClaimCodeError(400, "That code has expired. Send a new one.", { expired: true });
   }
   // The inbox it went to must still be the listing's inbox.
-  if (latest.sentTo !== claimCodeTarget(business)) {
+  if (latest.sentTo !== (await claimCodeTarget(business))) {
     throw new ClaimCodeError(400, "The listing's email has changed since the code was sent. Send a new one.", { expired: true });
   }
 
@@ -142,4 +161,4 @@ async function checkClaimCode({ account, business, code }) {
   await prisma.claimCode.update({ where: { id: latest.id }, data: { consumedAt: new Date() } });
 }
 
-export { claimCodeTarget, maskEmail, sendClaimCode, checkClaimCode, ClaimCodeError };
+export { claimCodeTarget, matchesListingEmail, maskEmail, sendClaimCode, checkClaimCode, ClaimCodeError };

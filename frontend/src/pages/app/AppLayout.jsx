@@ -14,7 +14,7 @@ const CLAIMANT_PATHS = ["/app", "/app/directory", "/app/business/"];
 
 function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isAdmin, business } = useAuth();
+  const { isAdmin, business, account } = useAuth();
   const { pathname } = useLocation();
 
   // Portaled content (dialogs, toasts) mounts to document.body, outside this
@@ -59,6 +59,15 @@ function AppLayout() {
           <div className="text-sm text-muted-foreground">The verified business network</div>
           <ThemeToggle className="ml-auto" />
         </header>
+        {/* Only reachable unconfirmed through the signup screen's listing-email
+            code (routes/businesses.js), which logs them in before they've
+            opened their own confirm link. Login refuses them until they do. */}
+        {account && !account.emailVerified && (
+          <div className="border-b border-border bg-muted px-4 py-2 text-sm text-foreground">
+            Confirm your email — we sent a link to <strong>{account.email}</strong>. You&rsquo;ll
+            need it to log in next time.
+          </div>
+        )}
         <main className="flex-1">
           {claimant && pathname === "/app" ? <ClaimHome /> : <Outlet />}
         </main>

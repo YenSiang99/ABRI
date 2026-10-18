@@ -214,14 +214,14 @@ function serializeBusiness(business) {
 // owner and for an admin. "none" is an account that has never claimed (a
 // bare signup) or whose last claim lost — those two look the same to the
 // member: there is nothing waiting, and the next move is to claim.
-function claimView(account, business) {
+async function claimView(account, business) {
   if (account.isAdmin || account.claimStatus === "approved") return null;
   return {
     status: account.claimStatus === "pending" ? "pending" : account.claimStatus === "rejected" ? "rejected" : "none",
     business: business ? publicBusinessView(business) : null,
     // Masked, and only while pending: where an instant-claim code would go
-    // (lib/claimCode.js). Null when the listing has no email on file.
-    codeEmail: account.claimStatus === "pending" ? maskEmail(claimCodeTarget(business)) : null,
+    // (lib/claimCode.js). Null when the listing has no email on file, or shares it with another listing.
+    codeEmail: account.claimStatus === "pending" ? maskEmail(await claimCodeTarget(business)) : null,
   };
 }
 
@@ -254,7 +254,7 @@ async function loadAccountView(accountId) {
 
   const { business, ...accountFields } = account;
   if (!business) {
-    return { account: serializeAccount(accountFields), business: null, claim: claimView(accountFields, null) };
+    return { account: serializeAccount(accountFields), business: null, claim: await claimView(accountFields, null) };
   }
 
   // A claim that isn't approved gets the PUBLIC view of the listing it is
@@ -266,7 +266,7 @@ async function loadAccountView(accountId) {
     return {
       account: serializeAccount({ ...accountFields, businessId: null }),
       business: null,
-      claim: claimView(accountFields, business),
+      claim: await claimView(accountFields, business),
     };
   }
 

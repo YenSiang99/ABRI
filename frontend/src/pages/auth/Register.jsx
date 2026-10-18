@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 
-import { fetchBusinesses, fetchBusiness } from "@/lib/api/businesses";
+import { fetchBusinesses, fetchBusiness, sendSignupClaimCode, verifySignupClaimCode } from "@/lib/api/businesses";
+import { CodeClaim } from "@/components/app/CodeClaim";
 import { matchesBusinessDomain } from "@/lib/domainVerification";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -55,12 +56,17 @@ function Register() {
 
   const [step, setStep] = useState("search");
   const [submittedName, setSubmittedName] = useState("");
-  // True when the claimant's email matched the business's domain: the
-  // confirm link they're sent approves the claim on its own.
-  const [instantClaim, setInstantClaim] = useState(false);
+  // Set when the claimant's email matched the business's domain
+  // ("domain-auto") or is the listing's own email ("email-match"): the
+  // confirm link they're sent approves the claim on its own. null otherwise.
+  const [instantClaim, setInstantClaim] = useState(null);
   // The admin path's confirm-email link, only in local dev (no mail
   // provider) — the same simulated-inbox affordance the domain path has.
   const [confirmToken, setConfirmToken] = useState(null);
+  // Admin path only, when the listing has an inbox of its own: the masked
+  // address and the handle that lets the submitted screen send it a code
+  // before they've logged in. null otherwise.
+  const [codeClaim, setCodeClaim] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(baseForm);
   const [errors, setErrors] = useState({});
@@ -191,9 +197,10 @@ function Register() {
       setErrors({ submit: result.error });
       return;
     }
-    setInstantClaim(Boolean(result.requiresEmailVerification && !result.requiresAdminApproval));
+    setInstantClaim(result.requiresAdminApproval ? null : result.verificationMethod);
     setSubmittedName(form.businessName);
     setConfirmToken(result.token ?? null);
+    setCodeClaim(result.codeEmail && result.claimHandle ? { codeEmail: result.codeEmail, claimHandle: result.claimHandle } : null);
     setStep("submitted");
   }
 
@@ -255,6 +262,7 @@ function Register() {
             connectBusinessName={connectBusinessInfo?.name}
             confirmToken={confirmToken}
             instant={instantClaim}
+            codeClaim={codeClaim}
           />
         )}
       </div>
@@ -560,7 +568,11 @@ function PersonalStep({ form, errors, onChange, onBack, onSubmit }) {
   );
 }
 
-function SubmittedStep({ businessName, email, connectBusinessName, confirmToken, instant }) {
+function SubmittedStep({ businessName, email, connectBusinessName, confirmToken, instant, codeClaim }) {
+  // A right listing-email code logs them in as the owner; Register's
+  // logged-in redirect then takes them to /app.
+  const { applySession } = useAuth();
+
   return (
     <div>
       <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
@@ -576,17 +588,29 @@ function SubmittedStep({ businessName, email, connectBusinessName, confirmToken,
       </p>
       {instant ? (
         <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-          Your email matches {businessName || "this business"}&rsquo;s website, so opening the
-          link also approves your claim. We then check your SSM registration number, usually
+          {instant === "email-match"
+            ? <>Your email is the one listed for {businessName || "this business"}, so opening the
+              link also approves your claim.</>
+            : <>Your email matches {businessName || "this business"}&rsquo;s website, so opening the
+              link also approves your claim.</>} We then check your SSM registration number, usually
           within a couple of business days.
         </p>
       ) : (
-        <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-          Your claim for {businessName || "this business"} is with the ABRI team, who check it
-          against your SSM registration, usually within 1–3 business days. We&rsquo;ll email you
-          when it&rsquo;s decided. If the listing already has an email address, you can skip
-          the wait once you&rsquo;re logged in, with a code sent to that address.
-        </p>
+        <>
+          <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
+            Your claim for {businessName || "this business"} is with the ABRI team, who check it
+            against your SSM registration, usually within 1–3 business days. We&rsquo;ll email you
+            when it&rsquo;s decided.
+          </p>
+          {codeClaim && (
+            <CodeClaim
+              codeEmail={codeClaim.codeEmail}
+              send={() => sendSignupClaimCode(codeClaim.claimHandle)}
+              verify={(code) => verifySignupClaimCode(codeClaim.claimHandle, code).then(applySession)}
+              footnote="Can't reach that inbox? No problem — the admin review carries on either way, and you can still send a code once you've logged in."
+            />
+          )}
+        </>
       )}
       {confirmToken && (
         <div className="mt-4 rounded-md border border-grey-200 bg-surface-2 p-4 dark:border-border dark:bg-muted">

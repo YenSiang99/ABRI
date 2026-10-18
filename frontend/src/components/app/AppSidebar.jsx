@@ -123,6 +123,12 @@ const BUSINESS_ITEMS = [
 // review — a different job on different records.
 // An account with no approved business (see AppLayout's CLAIMANT_PATHS):
 // its claim, and the directory. Nothing else would load for it.
+//
+// The rest of the member nav is still shown beneath these, dimmed, so a
+// claimant can see what they're claiming into. Every dimmed row leads back to
+// the claim screen. One caption over the lot rather than a padlock per row:
+// the padlock already means "verify" or "upgrade", and a third meaning on ten
+// rows would blur all three and bury the one thing they can actually do.
 const CLAIMANT_ITEMS = [
   { title: "Your claim", url: "/app", icon: LayoutDashboard },
   { title: "Directory", url: "/app/directory", icon: Search },
@@ -161,19 +167,23 @@ function NavRow({
   active,
   onNavigate,
   locked = false,
+  dimmed = false,
   depth = 0,
   children,
 }) {
   return (
     <Link
-      to={item.url}
+      to={dimmed ? "/app" : item.url}
       onClick={onNavigate}
+      title={dimmed ? "Claim your business to unlock" : undefined}
       className={cn(
         "flex items-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors",
         depth === 0 ? "px-2.5" : "py-1.5 pr-2.5 pl-8 text-[13px]",
-        active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        dimmed
+          ? "text-sidebar-foreground/70 opacity-50 hover:opacity-70"
+          : active
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
       )}
     >
       <item.icon className={depth === 0 ? "h-4 w-4" : "h-3.5 w-3.5"} />
@@ -241,16 +251,48 @@ function SidebarNav({
             </div>
           </>
         ) : !business ? (
-          <div className="flex flex-col gap-1">
-            {CLAIMANT_ITEMS.map((item) => (
-              <NavRow
-                key={item.title}
-                item={item}
-                active={isActive(item.url)}
-                onNavigate={onNavigate}
-              />
+          <>
+            <div className="flex flex-col gap-1">
+              {CLAIMANT_ITEMS.map((item) => (
+                <NavRow
+                  key={item.title}
+                  item={item}
+                  active={isActive(item.url)}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+
+            <div className="mt-5 px-2 text-xs text-muted-foreground">
+              {claim?.status === "pending"
+                ? "Unlocks when your claim is approved"
+                : "Unlocks once you claim your business"}
+            </div>
+            {/* Home and Directory are left out: both are already live above. */}
+            {[
+              { label: null, items: TOP_ITEMS.filter((i) => i.url !== "/app") },
+              { label: "Find", items: FIND_ITEMS.filter((i) => i.url !== "/app/directory") },
+              { label: "My business", items: BUSINESS_ITEMS },
+            ].map((group) => (
+              <div key={group.label ?? "top"}>
+                {group.label && (
+                  <div className="mt-5 px-2 text-xs font-medium uppercase tracking-wider text-muted-foreground opacity-50">
+                    {group.label}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-col gap-1">
+                  {group.items.map((item) => (
+                    <NavRow
+                      key={item.title}
+                      item={item}
+                      onNavigate={onNavigate}
+                      dimmed
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
-          </div>
+          </>
         ) : (
           <>
             {/* No group label. These two are the front door — a header above

@@ -10,6 +10,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
 import { findOrCreateClaimTarget, approveClaimAndRejectRivals } from "../lib/businessClaim.js";
+import { matchesListingEmail } from "../lib/claimCode.js";
 
 const router = Router();
 
@@ -105,9 +106,9 @@ router.get("/me", requireAuth, asyncHandler(async (req, res) => {
 
 // Consumes a link minted by either claim path (see EmailVerificationToken
 // in schema.prisma for the two shapes):
-//  - claimPayload set: domain-match path — nothing exists yet; this is what
-//    actually creates the account/business, auto-approves the claim, and
-//    logs in.
+//  - claimPayload set: domain-match or listing-email-match path — nothing
+//    exists yet; this is what actually creates the account/business,
+//    auto-approves the claim, and logs in.
 //  - accountId set: manual-review path (token minted by an admin approving
 //    a pending claim, once that endpoint exists) — account/business
 //    already exist and are already approved; this just confirms email
@@ -132,8 +133,21 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
   });
 
   if (record.claimPayload) {
-    const { businessId, businessName, category, location, ssm, repName, repEmail, repPhone, repRole, passwordHash, connectTargetId } =
-      record.claimPayload;
+    const {
+      businessId,
+      businessName,
+      category,
+      location,
+      ssm,
+      repName,
+      repEmail,
+      repPhone,
+      repRole,
+      passwordHash,
+      connectTargetId,
+      // Tokens minted before email-match existed carry none: domain-match.
+      verificationMethod = "domain-auto",
+    } = record.claimPayload;
 
     const targetBusiness = await findOrCreateClaimTarget({ businessId, businessName, category, location, ssm });
 
@@ -152,14 +166,26 @@ router.post("/verify-claim/:token", asyncHandler(async (req, res) => {
       },
     });
 
-    // Domain-match is strong enough proof to win outright — this resolves
-    // the claim immediately and rejects (deletes) any other pending,
-    // unverified claims sitting on the same business.
-    const { account, business } = await approveClaimAndRejectRivals({
-      accountId: pendingAccount.id,
-      businessId: targetBusiness.id,
-      verificationMethod: "domain-auto",
-    });
+    // The listing's email can change in the minutes the link is open (an
+    // admin edit, a re-import), and approval rests on it being THEIR inbox,
+    // so it is checked again now. If it no longer holds, the claim stays
+    // pending for the admin, the same as any non-matching claim — the email
+    // is still confirmed, so they are logged in to the limited app.
+    const stillMatches =
+      verificationMethod !== "email-match" || (await matchesListingEmail(repEmail, targetBusiness));
+
+    // Domain or listing-email match is strong enough proof to win outright —
+    // this resolves the claim immediately and rejects any other pending
+    // claims sitting on the same business.
+    const account = stillMatches
+      ? (
+          await approveClaimAndRejectRivals({
+            accountId: pendingAccount.id,
+            businessId: targetBusiness.id,
+            verificationMethod,
+          })
+        ).account
+      : pendingAccount;
 
     // Queued rather than connected directly, even though the session starts
     // three lines below and could just as well do it here: this way the

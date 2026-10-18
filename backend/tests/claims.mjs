@@ -75,6 +75,8 @@ assert.equal(r.status, 201, JSON.stringify(r.data));
 assert.equal(r.data.requiresAdminApproval, true);
 assert.ok(r.data.token, "no mail provider in tests, so the confirm token comes back");
 const tokenA = r.data.token;
+assert.equal(r.data.codeEmail, null, "a business the claimant typed in has no inbox to send a code to");
+assert.equal(r.data.claimHandle, null, "so no handle to ask for one with");
 const bizId = r.data.business.id;
 assert.ok(bizId.startsWith(`${P}claim-`), `the new listing's id is a slug of its name: ${bizId}`);
 ok("claim submitted: pending, with a confirm-email token");
@@ -258,6 +260,133 @@ assert.equal(r.data.claim.codeEmail, null, "a business the claimant typed in has
 r = await b("/businesses/me/claim/email-code", { method: "POST" });
 assert.equal(r.status, 400);
 ok("no email on file, no code");
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log("\n7. Claiming WITH the listing's own email: the confirm click approves it");
+// Listing emails start e2e-claim so the clean slate above removes the
+// accounts made with them. "shared" is one inbox on two listings, as a sales
+// agent's is in the seed data.
+const listingEmails = { match: `${P}claim-match@e2e.test`, moved: `${P}claim-moved@e2e.test`,
+  shared1: `${P}claim-shared@e2e.test`, shared2: `${P}claim-shared@e2e.test` };
+for (const [id, email] of Object.entries(listingEmails)) {
+  await db.business.create({ data: { id: `${P}claim-${id}`, name: `E2E Claim ${id}`, category: "Law",
+    location: "Petaling Jaya", email } });
+}
+
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(`${P}claim-rival@e2e.test`, { businessId: `${P}claim-match`, businessName: "E2E Claim match" }) });
+assert.equal(r.data.requiresAdminApproval, true, "a rival with another email waits for the admin");
+assert.equal((await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" })).status, 200);
+
+// Different case in the domain: the same inbox.
+const matchEmail = `${P}claim-match@E2E.test`;
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(matchEmail, { businessId: `${P}claim-match`, businessName: "E2E Claim match" }) });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.requiresAdminApproval, undefined);
+assert.equal(r.data.verificationMethod, "email-match");
+assert.equal(await db.account.count({ where: { email: matchEmail } }), 0, "nothing is created before the click");
+ok("a claim with the listing's email gets one link, and no account yet");
+
+r = await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.business?.id, `${P}claim-match`, "the click logs them in as the owner");
+assert.equal(r.data.business.verificationLevel, "L1", "an inbox proves the business, not its registration");
+assert.equal((await db.account.findUnique({ where: { email: matchEmail } })).verificationMethod, "email-match");
+const rival = await db.account.findUnique({ where: { email: `${P}claim-rival@e2e.test` } });
+assert.equal(rival.claimStatus, "rejected", "the rival's pending claim lost");
+ok("the click approves the claim (L1, email-match) and rejects the rival");
+
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(listingEmails.moved, { businessId: `${P}claim-moved`, businessName: "E2E Claim moved" }) });
+assert.equal(r.data.verificationMethod, "email-match");
+await db.business.update({ where: { id: `${P}claim-moved` }, data: { email: "someone-else@e2e.test" } });
+r = await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.business, null, "the listing's email changed before the click, so it owns nothing");
+assert.equal(r.data.claim?.status, "pending", "and the claim waits for the admin instead");
+ok("a listing whose email changed before the click falls back to pending");
+
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(listingEmails.shared1, { businessId: `${P}claim-shared1`, businessName: "E2E Claim shared1" }) });
+assert.equal(r.status, 201, JSON.stringify(r.data));
+assert.equal(r.data.requiresAdminApproval, true, "an inbox on two listings proves neither");
+assert.equal(r.data.codeEmail, null, "and the signup screen offers no code for it");
+assert.equal((await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" })).status, 200);
+const s = (await login(listingEmails.shared1)).as;
+r = await s("/auth/me");
+assert.equal(r.data.claim.status, "pending");
+assert.equal(r.data.claim.codeEmail, null, "and no code is offered to it either");
+r = await s("/businesses/me/claim/email-code", { method: "POST" });
+assert.equal(r.status, 400);
+ok("an email shared across listings goes to the admin: no auto-approval, no code");
+
+// ─────────────────────────────────────────────────────────────────────────
+console.log("\n8. The code from the signup screen, before logging in");
+for (const id of ["signup", "signup-limit"]) {
+  await db.business.create({ data: { id: `${P}claim-${id}`, name: `E2E Claim ${id}`, category: "Law",
+    location: "Petaling Jaya", email: `owner@${id}.e2e.test` } });
+}
+// A rival already waiting on the same listing.
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(`${P}claim-rival2@e2e.test`, { businessId: `${P}claim-signup`, businessName: "E2E Claim signup" }) });
+assert.equal((await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" })).status, 200);
+
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(`${P}claim-e@e2e.test`, { businessId: `${P}claim-signup`, businessName: "E2E Claim signup" }) });
+assert.equal(r.status, 201, JSON.stringify(r.data));
+assert.equal(r.data.codeEmail, "o***@signup.e2e.test", "the submitted screen learns where a code would go, masked");
+assert.ok(r.data.claimHandle, "and gets a handle to ask for it with");
+const handleE = r.data.claimHandle;
+const confirmE = r.data.token;
+ok("a claim on a listing with an email returns the masked inbox and a handle");
+
+r = await anon("/businesses/claim/email-code", { method: "POST", body: { claimHandle: "not-a-handle" } });
+assert.equal(r.status, 401);
+const sessionToken = (await login(`${P}claim-rival2@e2e.test`)).cookie.match(/abri_session=([^;]+)/)[1];
+r = await anon("/businesses/claim/email-code", { method: "POST", body: { claimHandle: sessionToken } });
+assert.equal(r.status, 401, "a session token is not a handle");
+const asSession = await fetch(`${API}/auth/me`, { headers: { cookie: `abri_session=${handleE}` } });
+assert.equal(asSession.status, 401, "and a handle is not a session");
+ok("a forged handle, a session token and a handle-as-cookie are all refused");
+
+r = await anon("/businesses/claim/email-code", { method: "POST", body: { claimHandle: handleE } });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.sentTo, "o***@signup.e2e.test");
+const codeE = r.data.code;
+const wrongE = codeE === "000000" ? "111111" : "000000";
+r = await anon("/businesses/claim/email-code/verify", { method: "POST", body: { claimHandle: handleE, code: wrongE } });
+assert.equal(r.status, 400);
+assert.equal(r.data.attemptsLeft, 4);
+r = await anon("/businesses/claim/email-code/verify", { method: "POST", body: { claimHandle: handleE, code: codeE } });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.business?.id, `${P}claim-signup`, "the right code logs them in as the owner");
+const e = client(r.cookie);
+r = await e("/auth/me");
+assert.equal(r.status, 200, "with a real session");
+assert.equal(r.data.business?.id, `${P}claim-signup`);
+assert.equal(r.data.account.emailVerified, false, "though their own email is still unconfirmed");
+const accountE = await db.account.findUnique({ where: { email: `${P}claim-e@e2e.test` } });
+assert.equal(accountE.claimStatus, "approved");
+assert.equal(accountE.verificationMethod, "email-code");
+assert.equal(accountE.emailVerified, false);
+assert.equal((await db.business.findUnique({ where: { id: `${P}claim-signup` } })).verificationLevel, "L1");
+assert.equal((await db.account.findUnique({ where: { email: `${P}claim-rival2@e2e.test` } })).claimStatus, "rejected", "the rival lost");
+r = await anon("/businesses/claim/email-code/verify", { method: "POST", body: { claimHandle: handleE, code: codeE } });
+assert.equal(r.status, 403, "the handle is spent once there's no claim waiting");
+ok("the right code approves the claim from the signup screen (L1, email-code), rejects the rival, and logs them in");
+
+r = await anon("/auth/login", { method: "POST", body: { email: `${P}claim-e@e2e.test`, password: PASSWORD } });
+assert.equal(r.status, 403, "once that session ends, login still waits for their own email");
+r = await anon(`/auth/verify-claim/${confirmE}`, { method: "POST" });
+assert.equal(r.status, 200, JSON.stringify(r.data));
+assert.equal(r.data.business?.id, `${P}claim-signup`, "the confirm link logs them in as the owner");
+assert.equal((await login(`${P}claim-e@e2e.test`)).status, 200, "and the password works from then on");
+ok("login waits for their own confirm link, and works after it");
+
+r = await anon("/businesses/claim", { method: "POST", body: claimBody(`${P}claim-f@e2e.test`, { businessId: `${P}claim-signup-limit`, businessName: "E2E Claim signup-limit" }) });
+const handleF = r.data.claimHandle;
+for (let i = 0; i < 2; i++) assert.equal((await anon("/businesses/claim/email-code", { method: "POST", body: { claimHandle: handleF } })).status, 200);
+assert.equal((await anon(`/auth/verify-claim/${r.data.token}`, { method: "POST" })).status, 200);
+const f = (await login(`${P}claim-f@e2e.test`)).as;
+assert.equal((await f("/businesses/me/claim/email-code", { method: "POST" })).status, 200);
+r = await anon("/businesses/claim/email-code", { method: "POST", body: { claimHandle: handleF } });
+assert.equal(r.status, 429, "the fourth code in the hour is refused, whichever door the first three came through");
+ok("both doors share one rate limit");
 
 console.log(`\n${pass} checks passed.`);
 await db.$disconnect();
