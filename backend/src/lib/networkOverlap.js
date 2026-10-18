@@ -1,6 +1,6 @@
 import { prisma } from "../prisma.js";
 
-// "2 of the businesses vouching for them are in your network."
+// "2 of the businesses endorsing them are in your network."
 //
 // The single most useful sentence the check-a-business screen can say, and
 // the reason it is worth opening a second time. A verification badge says a
@@ -13,7 +13,7 @@ import { prisma } from "../prisma.js";
 // the viewer for facts about the seller: the seller paid to be reachable, so
 // paywalling their details punishes them rather than the browser. This
 // withholds nothing of theirs. It is a comparison between the VIEWER's
-// connection list and the business's voucher list — it does not exist for a
+// connection list and the business's endorser list — it does not exist for a
 // stranger, because a stranger has no connections to compare. Nothing is
 // taken away; something is added.
 //
@@ -25,7 +25,7 @@ import { prisma } from "../prisma.js";
 // ACCEPTED ONLY. A pending request is one business claiming a relationship
 // the other has not confirmed, and the whole reason connections grew an
 // approval step in Aug 2026 is that a unilateral edge is a forgeable signal.
-// Counting one here would let a member manufacture "2 people you know vouch
+// Counting one here would let a member manufacture "2 people you know endorse
 // for them" by sending two requests nobody answered — which is exactly the
 // trust claim this feature exists to make honestly.
 async function connectedIdsFor(businessId) {
@@ -46,27 +46,27 @@ async function connectedIdsFor(businessId) {
   return ids;
 }
 
-// Which of a business's vouchers the viewer already knows.
+// Which of a business's endorsers the viewer already knows.
 //
 // Returns the businesses themselves rather than a count, because the count
 // alone is the weaker half: "2 of them are in your network" is interesting,
-// and "Tan & Co and Meridian Accounting vouch for them" is what makes
+// and "Tan & Co and Meridian Accounting endorse them" is what makes
 // somebody pick up the phone. The client renders names.
 //
-// PUBLISHED VOUCHES ONLY, matching every other read of this graph. An
-// in-flight vouch is not yet a statement anyone has made publicly.
-async function vouchersInNetwork(targetBusinessId, viewerBusinessId) {
+// PUBLISHED ENDORSEMENTS ONLY, matching every other read of this graph. An
+// in-flight endorsement is not yet a statement anyone has made publicly.
+async function endorsersInNetwork(targetBusinessId, viewerBusinessId) {
   const connected = await connectedIdsFor(viewerBusinessId);
   if (connected.size === 0) return [];
 
-  const vouches = await prisma.vouch.findMany({
+  const endorsements = await prisma.endorsement.findMany({
     where: {
       toBusinessId: targetBusinessId,
       status: "published",
       // Intersected in the query rather than in JS: the connection set is
-      // usually far smaller than the voucher list, and this way the database
+      // usually far smaller than the endorser list, and this way the database
       // does the filtering it is already indexed for
-      // (@@index([toBusinessId, status]) on Vouch).
+      // (@@index([toBusinessId, status]) on Endorsement).
       fromBusinessId: { in: [...connected] },
     },
     select: {
@@ -77,27 +77,27 @@ async function vouchersInNetwork(targetBusinessId, viewerBusinessId) {
     orderBy: { closedAt: "desc" },
   });
 
-  return vouches.map((v) => v.fromBusiness);
+  return endorsements.map((v) => v.fromBusiness);
 }
 
 // The same question for a page of businesses, in one round trip.
 //
 // The directory renders up to fifty cards, and asking per-card would be fifty
 // sequential queries on a screen that has to feel instant. Two queries total:
-// the viewer's connections once, then every relevant vouch at once, grouped
+// the viewer's connections once, then every relevant endorsement at once, grouped
 // in memory.
 //
-// Returns a Map of businessId -> voucher[]. Businesses with no overlap are
+// Returns a Map of businessId -> endorser[]. Businesses with no overlap are
 // absent rather than mapped to an empty array, so a caller can spread the
 // result without producing a key on every row.
-async function vouchersInNetworkFor(targetIds, viewerBusinessId) {
+async function endorsersInNetworkFor(targetIds, viewerBusinessId) {
   const overlap = new Map();
   if (targetIds.length === 0) return overlap;
 
   const connected = await connectedIdsFor(viewerBusinessId);
   if (connected.size === 0) return overlap;
 
-  const vouches = await prisma.vouch.findMany({
+  const endorsements = await prisma.endorsement.findMany({
     where: {
       toBusinessId: { in: targetIds },
       status: "published",
@@ -112,12 +112,12 @@ async function vouchersInNetworkFor(targetIds, viewerBusinessId) {
     orderBy: { closedAt: "desc" },
   });
 
-  for (const vouch of vouches) {
-    const list = overlap.get(vouch.toBusinessId) ?? [];
-    list.push(vouch.fromBusiness);
-    overlap.set(vouch.toBusinessId, list);
+  for (const endorsement of endorsements) {
+    const list = overlap.get(endorsement.toBusinessId) ?? [];
+    list.push(endorsement.fromBusiness);
+    overlap.set(endorsement.toBusinessId, list);
   }
   return overlap;
 }
 
-export { connectedIdsFor, vouchersInNetwork, vouchersInNetworkFor };
+export { connectedIdsFor, endorsersInNetwork, endorsersInNetworkFor };

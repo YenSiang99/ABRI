@@ -93,7 +93,7 @@ function RegistryNumber({ entry }) {
 // The three facts a visitor checks first, the same three for everyone.
 export function KeyFacts({ business }) {
   const stage = profileStage(business);
-  const { ssm, vouchCount } = business;
+  const { ssm, endorsementCount } = business;
   const registry = business.registryNumbers?.[0];
   const facts = [
     ["SSM registration",
@@ -101,8 +101,8 @@ export function KeyFacts({ business }) {
         : stage === "claimed" ? "Pending check"
         : registry ? <RegistryNumber entry={registry} /> : <Missing>Not provided</Missing>,
       stage === "verified" && ssm],
-    ["Vouches",
-      stage === "verified" ? (vouchCount > 0 ? `${vouchCount} ${vouchCount === 1 ? "peer" : "peers"}` : "No vouches yet") : <Missing>Open once SSM-verified</Missing>],
+    ["Endorsements",
+      stage === "verified" ? (endorsementCount > 0 ? `${endorsementCount} ${endorsementCount === 1 ? "peer" : "peers"}` : "No endorsements yet") : <Missing>Open once SSM-verified</Missing>],
     ["On ABRI since", formatDate(business.createdAt)],
   ];
   return (
@@ -271,32 +271,32 @@ function TimelineRow({ date, text, note, struck = false, muted = false }) {
   );
 }
 
-export function VouchesSection({ layout, business, VouchCard }) {
+export function EndorsementsSection({ layout, business, EndorsementCard }) {
   const stage = profileStage(business);
-  const { vouchCount = 0, vouchesReceived = [], testimonialsLocked } = business;
+  const { endorsementCount = 0, endorsementsReceived = [], testimonialsLocked } = business;
   let body;
   if (stage !== "verified") {
     body = (
       <p className="text-sm text-grey-500 dark:text-muted-foreground">
         {stage === "unclaimed"
-          ? "Vouches open once this business is claimed and SSM-verified."
-          : "Vouches open once this business is SSM-verified."}
+          ? "Endorsements open once this business is claimed and SSM-verified."
+          : "Endorsements open once this business is SSM-verified."}
       </p>
     );
-  } else if (testimonialsLocked && vouchCount > 0) {
+  } else if (testimonialsLocked && endorsementCount > 0) {
     body = (
       <LockedFeature
-        title="Written vouches not shown"
-        description={`${vouchCount} ${vouchCount === 1 ? "business has" : "businesses have"} vouched for this company. Their written vouches aren't displayed on this profile.`}
+        title="Written endorsements not shown"
+        description={`${endorsementCount} ${endorsementCount === 1 ? "business has" : "businesses have"} endorsed this company. Their written endorsements aren't displayed on this profile.`}
       />
     );
-  } else if (vouchesReceived.length > 0) {
-    body = <div className="grid gap-4 md:grid-cols-2">{vouchesReceived.map((v) => <VouchCard key={v.id} vouch={v} />)}</div>;
+  } else if (endorsementsReceived.length > 0) {
+    body = <div className="grid gap-4 md:grid-cols-2">{endorsementsReceived.map((v) => <EndorsementCard key={v.id} endorsement={v} />)}</div>;
   } else {
-    body = <p className="text-sm text-grey-500 dark:text-muted-foreground">No vouches yet.</p>;
+    body = <p className="text-sm text-grey-500 dark:text-muted-foreground">No endorsements yet.</p>;
   }
   return (
-    <Section layout={layout} title={`Vouches${stage === "verified" ? ` (${vouchCount})` : ""}`} subtitle="Other verified businesses who have worked with them.">
+    <Section layout={layout} title={`Endorsements${stage === "verified" ? ` (${endorsementCount})` : ""}`} subtitle="Other verified businesses who have worked with them.">
       {body}
     </Section>
   );

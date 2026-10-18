@@ -23,7 +23,7 @@ const router = Router();
 //   1. A can() call. The feed is never plan-gated. entitlements.js puts it
 //      plainly for the asks board and it is the same argument here: the
 //      moment a Free member cannot SEE the network, it stops being one. What
-//      Free cannot do is GIVE a vouch — watching them go past is the pitch,
+//      Free cannot do is GIVE an endorsement — watching them go past is the pitch,
 //      and it only works if they can watch.
 //
 //   2. Connections or follows as content. Both are private to each side by
@@ -35,7 +35,7 @@ const router = Router();
 //
 //   3. A public counterpart. Members only, same as the asks board. The
 //      testimonials on it are already public on profiles one at a time; a
-//      logged-out firehose of who-vouched-for-whom is a scrape of the trust
+//      logged-out firehose of who-endorsed-for-whom is a scrape of the trust
 //      graph, which is the one asset the product actually sells.
 //
 // No lazy-expiry sweep either, unlike routes/asks.js. Nothing here goes stale

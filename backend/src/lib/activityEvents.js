@@ -12,33 +12,33 @@ const ACTIVITY_MESSAGES = {
   // actively said this did not happen, which the proposer is entitled to know.
   portfolio_declined: (actorName) => `${actorName} says you didn't work together.`,
   // Proposer only, and worded so it names no culprit. Nobody declined this; it
-  // sat for 14 days and lapsed. Same distinction vouch_expired exists for:
+  // sat for 14 days and lapsed. Same distinction endorsement_expired exists for:
   // without a separate type the proposer is told they were refused by a
   // business that never did anything. "14 days" mirrors EXPIRY_DAYS in
   // lib/portfolio.js and cannot be imported (that module imports this one).
   portfolio_expired: (actorName) =>
     `Your work record with ${actorName} lapsed after 14 days without a reply.`,
-  vouch_submitted: (actorName) => `${actorName} sent you a vouch to review.`,
-  vouch_published: (actorName) => `${actorName} accepted your vouch.`,
-  vouch_cancelled: (actorName) => `${actorName} cancelled your vouch.`,
-  // Distinct from vouch_cancelled because the two are different facts about
+  endorsement_submitted: (actorName) => `${actorName} sent you an endorsement to review.`,
+  endorsement_published: (actorName) => `${actorName} accepted your endorsement.`,
+  endorsement_cancelled: (actorName) => `${actorName} cancelled your endorsement.`,
+  // Distinct from endorsement_cancelled because the two are different facts about
   // a relationship: one is a decision the counterparty made, the other is
-  // nobody getting round to it. Both land the vouch on "cancelled", so
+  // nobody getting round to it. Both land the endorsement on "cancelled", so
   // without a separate type the giver is told they were declined by a
   // business that never actually did anything.
   //
   // Worded so it names no culprit — the counterparty appears as the subject
-  // of the vouch, not as someone who acted. "14 days" mirrors EXPIRY_DAYS in
-  // lib/vouchExpiry.js; it can't be imported (that module imports this one),
+  // of the endorsement, not as someone who acted. "14 days" mirrors EXPIRY_DAYS in
+  // lib/endorsementExpiry.js; it can't be imported (that module imports this one),
   // so change both together.
-  vouch_expired: (actorName) =>
-    `Your vouch for ${actorName} expired after 14 days without a response.`,
-  vouch_reverted: (actorName) => `${actorName} sent your vouch back for edits.`,
+  endorsement_expired: (actorName) =>
+    `Your endorsement of ${actorName} expired after 14 days without a response.`,
+  endorsement_reverted: (actorName) => `${actorName} sent your endorsement back for edits.`,
   // The one event that names no next step for the recipient — a flagged
-  // vouch is an admin's to move, so telling the giver to do anything would
-  // be wrong. See the flag route in routes/vouches.js.
-  vouch_flagged: (actorName) => `${actorName} flagged your vouch for admin review.`,
-  vouch_revised: (actorName) => `${actorName} updated their vouch for you — ready for review.`,
+  // endorsement is an admin's to move, so telling the giver to do anything would
+  // be wrong. See the flag route in routes/endorsements.js.
+  endorsement_flagged: (actorName) => `${actorName} flagged your endorsement for admin review.`,
+  endorsement_revised: (actorName) => `${actorName} updated their endorsement of you — ready for review.`,
 
   // The three connection events, and the distinction that matters most:
   // connection_added is a fact, connection_requested is a to-do. Only a card
@@ -54,20 +54,20 @@ const ACTIVITY_MESSAGES = {
   connection_requested: (actorName) => `${actorName} wants to connect with you.`,
   connection_accepted: (actorName) => `${actorName} accepted your connection request.`,
 
-  // Admin decisions on a flagged vouch. These take no actorName — an admin
+  // Admin decisions on a flagged endorsement. These take no actorName — an admin
   // isn't a business, so the event carries actorBusinessId null and there is
   // no name to interpolate. Both parties get one each time, worded from
-  // their own side, because a vouch coming out of review changes what each
+  // their own side, because an endorsement coming out of review changes what each
   // of them can do next.
-  vouch_review_returned_receiver: () =>
-    "An admin reviewed the flagged vouch — it's back with you to accept, send back or cancel.",
-  vouch_review_returned_giver: () =>
-    "An admin reviewed the flagged vouch — it's back with the business you vouched for.",
-  vouch_review_sent_back_giver: () =>
-    "An admin reviewed the flagged vouch and sent it back for you to edit.",
-  vouch_review_sent_back_receiver: () =>
-    "An admin reviewed the flagged vouch and sent it back to be edited.",
-  vouch_review_cancelled: () => "An admin cancelled the flagged vouch after reviewing it.",
+  endorsement_review_returned_receiver: () =>
+    "An admin reviewed the flagged endorsement — it's back with you to accept, send back or cancel.",
+  endorsement_review_returned_giver: () =>
+    "An admin reviewed the flagged endorsement — it's back with the business you endorsed.",
+  endorsement_review_sent_back_giver: () =>
+    "An admin reviewed the flagged endorsement and sent it back for you to edit.",
+  endorsement_review_sent_back_receiver: () =>
+    "An admin reviewed the flagged endorsement and sent it back to be edited.",
+  endorsement_review_cancelled: () => "An admin cancelled the flagged endorsement after reviewing it.",
 
   // ─── SSM verification ────────────────────────────────────────────────────
   // Both carry no actor: an admin ruled on these, and staff never appear as
@@ -116,7 +116,7 @@ function messageFor(type, actorName) {
 
 // Returns an unawaited Prisma promise — pass `prisma` directly, or a `tx`
 // client inside an interactive transaction, so callers can bundle this
-// into the same prisma.$transaction([...]) as the Vouch update it
+// into the same prisma.$transaction([...]) as the Endorsement update it
 // accompanies and the two can never drift apart.
 function createActivityEvent(client, { businessId, actorBusinessId, type }) {
   return client.activityEvent.create({ data: { businessId, actorBusinessId, type } });
@@ -126,8 +126,8 @@ function createActivityEvent(client, { businessId, actorBusinessId, type }) {
 // the feed renders, so pruning can never eat a row that's still on screen.
 //
 // A per-business cap rather than a time-based TTL: this table is the notify
-// step of the give-first loop, and a vouch stays actionable for 14 days
-// (EXPIRY_DAYS in lib/vouchExpiry.js), so any TTL shorter than that would
+// step of the give-first loop, and an endorsement stays actionable for 14 days
+// (EXPIRY_DAYS in lib/endorsementExpiry.js), so any TTL shorter than that would
 // delete the notification while the thing it's about is still waiting on
 // the reader. A cap has no such window — a dormant business keeps its last
 // 50 events however old they are — while still bounding the worst case that

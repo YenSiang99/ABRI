@@ -75,7 +75,7 @@ function FollowerCard({ entry }) {
 function NetworkFollowing() {
   const { following, followers, status } = useFollows();
 
-  // Tab in the URL, same as the Vouches screen — a link can point at the
+  // Tab in the URL, same as the Endorsements screen — a link can point at the
   // Followers list directly instead of dropping the reader on the other one.
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("tab");

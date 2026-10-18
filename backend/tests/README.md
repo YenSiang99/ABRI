@@ -56,7 +56,7 @@ Ten businesses prefixed `e2e-`, all with the password `e2e-password-123`:
 - `e2e-primary` (Law, PJ, L2) — the main actor in most suites
 - `e2e-t1` (L1) — the only claimed-but-unverified business; used for gate tests
 - `e2e-a2` … `e2e-a7` (Accounting & Tax, various locations, L2) — counterparties
-- `e2e-target` (L2) — the business that gets vouched for
+- `e2e-target` (L2) — the business that gets endorsed
 - `e2e-t0` (L0) — the unclaimed listing
 
 Suites that need an admin create `e2e-admin@e2e.test` themselves. Nothing here

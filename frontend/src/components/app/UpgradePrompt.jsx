@@ -31,14 +31,14 @@ import { FEATURE_MIN_MEMBERSHIP_TIER, membershipTierAllows, membershipTierLabel 
 // front of an ungated route is just a lie with a price on it.
 //
 // The client-side check is the UX, never the enforcement. The server answers
-// 402 with `requiredMembershipTier` on all of these (backend/src/routes/vouches.js);
+// 402 with `requiredMembershipTier` on all of these (backend/src/routes/endorsements.js);
 // this only saves the member a round trip and a toast.
 
 // Per-feature copy, in one place so the same gate reads identically wherever
-// it's hit — a member who meets `giveVouch` on a profile page and again in
-// the vouch dialog should be told the same thing, not two paraphrases.
+// it's hit — a member who meets `giveEndorsement` on a profile page and again in
+// the endorsement dialog should be told the same thing, not two paraphrases.
 //
-// Each entry sells the OUTCOME rather than restating the lock. "Vouching is
+// Each entry sells the OUTCOME rather than restating the lock. "Endorsing is
 // part of Plus" is the title's job; the description's job is why anyone
 // wants it.
 const UPGRADE_COPY = {
@@ -50,7 +50,7 @@ const UPGRADE_COPY = {
   networkOverlap: {
     title: "Seeing who you both know is part of Plus",
     description:
-      "When you look at a business, Plus shows which of the members vouching for them are already in your network. A badge says a document was checked; this says somebody you trust has worked with them.",
+      "When you look at a business, Plus shows which of the members endorsing them are already in your network. A badge says a document was checked; this says somebody you trust has worked with them.",
   },
   watchBusinesses: {
     title: "Watching a business is part of Pro",
@@ -63,15 +63,15 @@ const UPGRADE_COPY = {
       "Keep a record of every business you've checked and what their standing was at the time, so you can show what you knew when you decided.",
   },
 
-  giveVouch: {
-    title: "Vouching is part of Plus",
+  giveEndorsement: {
+    title: "Endorsing is part of Plus",
     description:
-      "Vouching is how the network works — you stake your reputation on businesses you've actually worked with, and they do the same for you. Plus members can give up to 20 vouches a month.",
+      "Endorsing is how the network works — you stake your reputation on businesses you've actually worked with, and they do the same for you. Plus members can give up to 20 endorsements a month.",
   },
-  acceptVouch: {
-    title: "Publishing vouches is part of Plus",
+  acceptEndorsement: {
+    title: "Publishing endorsements is part of Plus",
     description:
-      "Someone has vouched for you. Plus is what puts it on your public profile, where it counts towards your vouch level and is the first thing a visitor sees. Free accounts can receive vouches but not publish them.",
+      "Someone has endorsed you. Plus is what puts it on your public profile, where it counts towards your endorsement level and is the first thing a visitor sees. Free accounts can receive endorsements but not publish them.",
   },
   // No `nfcCard` entry: nothing opens a dialog for it. /app/card sells the
   // card by SHOWING it (see pages/app/Card.jsx), so its pitch lives inline
@@ -87,13 +87,13 @@ const UPGRADE_COPY = {
 //              disabled-looking variant).
 //   guard    — wraps a click handler. Runs it when allowed; opens the
 //              prompt when not. This is the usual call site:
-//                  onClick={gate.guard(() => setVouchOpen(true))}
+//                  onClick={gate.guard(() => setEndorsementOpen(true))}
 //   open/setOpen — the dialog's state, passed straight back via <UpgradePrompt
 //              gate={gate} /> somewhere in the same subtree.
 //
 // Read through useAuth rather than taking a business prop, because every
 // call site is asking about the LOGGED-IN member's own plan. A gate keyed on
-// someone else's plan is a different question (see BusinessProfile's vouches
+// someone else's plan is a different question (see BusinessProfile's endorsements
 // tab) and shouldn't be able to reuse this by accident.
 function useUpgradeGate(feature) {
   const { business } = useAuth();
@@ -135,7 +135,7 @@ function UpgradePrompt({ gate }) {
           {/* Same squared mono chip as the sidebar's plan label and
               LockedFeature's, for the same reason: it has to read as
               billing, not as a third trust signal beside the verification
-              level and the vouch level. See schema.prisma's membershipTier
+              level and the endorsement level. See schema.prisma's membershipTier
               comment. */}
           <span className="w-fit rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
             {plan}

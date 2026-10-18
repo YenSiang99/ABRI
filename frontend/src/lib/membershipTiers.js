@@ -2,7 +2,7 @@
 // The one axis of this product that is for sale — which is what the word
 // "tier" now means, and the only thing it means.
 //
-// The two EARNED axes (verification level, vouch level) are quarantined in
+// The two EARNED axes (verification level, endorsement level) are quarantined in
 // lib/trustLabels.js and must never be labelled from here; see that file's
 // header. The exported label map is `membershipTierLabel`, not `tierLabel`,
 // and that is the one naming decision in this rename a build cannot check
@@ -84,7 +84,7 @@ const MEMBERSHIP_TIER_FEATURES = [
   // saying on a pricing page. ("Check a business" sat above it until 27 Sep
   // 2026, when the public check screen came off the site.)
   {
-    label: "Trust feed — vouches and verifications as they happen",
+    label: "Trust feed — endorsements and verifications as they happen",
     free: true,
     plus: true,
     pro: true,
@@ -93,11 +93,11 @@ const MEMBERSHIP_TIER_FEATURES = [
   // ENFORCED, by `networkOverlap` — and the only row here that gates on the
   // VIEWER's plan rather than the subject's. It is allowed to because it
   // withholds nothing the seller published: it compares the reader's own
-  // connections against the business's vouchers, and a stranger has no
+  // connections against the business's endorsers, and a stranger has no
   // connections to compare. See the viewer-side gates block in
   // backend/src/lib/entitlements.js before adding a second one.
   {
-    label: "See which of their vouchers you already know",
+    label: "See which of their endorsers you already know",
     free: false,
     plus: true,
     pro: true,
@@ -157,28 +157,28 @@ const MEMBERSHIP_TIER_FEATURES = [
     pro: "1 card",
     enterprise: "Per person",
   },
-  // ENFORCED. These four values must match VOUCH_CAP_BY_PLAN in
-  // backend/src/lib/vouchCap.js exactly — it's a rolling 30-day window,
+  // ENFORCED. These four values must match ENDORSEMENT_CAP_BY_PLAN in
+  // backend/src/lib/endorsementCap.js exactly — it's a rolling 30-day window,
   // not a calendar month.
   //
   // Free is a dash, not "0 / mo". Zero-of-a-quantity invites the reader to
   // treat it as a small allowance that might be topped up; a dash says the
-  // feature starts at Plus, which is what the server enforces (`giveVouch`).
+  // feature starts at Plus, which is what the server enforces (`giveEndorsement`).
   {
-    label: "Vouches you can give",
+    label: "Endorsements you can give",
     free: false,
     plus: "20 / mo",
     pro: "40 / mo",
     enterprise: "100 / mo",
   },
-  // ENFORCED, by `acceptVouch` — and the row that describes the Free tier
+  // ENFORCED, by `acceptEndorsement` — and the row that describes the Free tier
   // most honestly, so it sits next to the giving row rather than further
-  // down. A Free business still RECEIVES vouch requests in full: the
+  // down. A Free business still RECEIVES endorsement requests in full: the
   // request lands, the notification fires, the card sits in their queue.
   // What it can't do is publish one. Net effect, and the thing to say out
-  // loud rather than let a reader discover: a Free business has no vouches.
+  // loud rather than let a reader discover: a Free business has no endorsements.
   {
-    label: "Accept vouches onto your profile",
+    label: "Accept endorsements onto your profile",
     free: false,
     plus: true,
     pro: true,
@@ -187,7 +187,7 @@ const MEMBERSHIP_TIER_FEATURES = [
   // ENFORCED, by FEATURE_MIN_MEMBERSHIP_TIER in backend/src/lib/entitlements.js —
   // GET /businesses/:id withholds the text itself, not just the UI.
   //
-  // Vouch caps, this row and the contact-details row below are the only
+  // Endorsement caps, this row and the contact-details row below are the only
   // ones the SERVER enforces. The NFC card row is shut in the UI but not on
   // the wire (it has no endpoint yet). Every other row is still a promise,
   // and the comment saying so is what keeps this table from quietly becoming
@@ -289,18 +289,18 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // loses the one number that would make them want it.
   profileViewers: "pro",
   testimonials: "plus",
-  // Both server-enforced (POST /vouches and POST /vouches/:id/accept
+  // Both server-enforced (POST /endorsements and POST /endorsements/:id/accept
   // respectively, which answer 402 with an `requiredMembershipTier` plan). Unlike
   // every other entry here, these two are read to decide whether a button
   // OPENS ITS ACTION OR AN UPGRADE PROMPT — never whether it renders. The
   // affordance staying visible is the whole mechanism: a Free member is
   // meant to reach for the thing and be told what it costs, not to find an
   // app with fewer buttons in it. See components/app/UpgradePrompt.jsx.
-  giveVouch: "plus",
+  giveEndorsement: "plus",
   // Covers reverting too — see the note on the same feature in
   // backend/src/lib/entitlements.js. Cancel and flag are deliberately
   // ungated on both sides.
-  acceptVouch: "plus",
+  acceptEndorsement: "plus",
   nfcCard: "plus",
 };
 

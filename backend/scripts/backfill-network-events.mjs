@@ -1,7 +1,7 @@
 // Fills the network feed with what already happened, so it isn't empty the
 // first time anyone opens it.
 //
-// Idempotent: every row is keyed to the vouch or answer it points at, and
+// Idempotent: every row is keyed to the endorsement or answer it points at, and
 // this skips anything that already has one. Safe to re-run.
 //
 // TWO OF THE FOUR TYPES CANNOT BE BACKFILLED, and that is not a gap to fix
@@ -17,28 +17,28 @@
 import { prisma } from "../src/prisma.js";
 
 async function main() {
-  // ── vouch_published ────────────────────────────────────────────────────
-  // closedAt is when the vouch reached a terminal status, which for a
+  // ── endorsement_published ────────────────────────────────────────────────────
+  // closedAt is when the endorsement reached a terminal status, which for a
   // published one is when it went live. Rows missing it (there should be
   // none) fall back to createdAt rather than being skipped.
-  const vouches = await prisma.vouch.findMany({
+  const endorsements = await prisma.endorsement.findMany({
     where: { status: "published", networkEvents: { none: {} } },
     select: { id: true, fromBusinessId: true, toBusinessId: true, closedAt: true, createdAt: true },
   });
 
-  for (const vouch of vouches) {
+  for (const endorsement of endorsements) {
     await prisma.networkEvent.create({
       data: {
-        type: "vouch_published",
-        subjectBusinessId: vouch.toBusinessId,
-        actorBusinessId: vouch.fromBusinessId,
-        vouchId: vouch.id,
-        createdAt: vouch.closedAt ?? vouch.createdAt,
+        type: "endorsement_published",
+        subjectBusinessId: endorsement.toBusinessId,
+        actorBusinessId: endorsement.fromBusinessId,
+        endorsementId: endorsement.id,
+        createdAt: endorsement.closedAt ?? endorsement.createdAt,
       },
     });
   }
 
-  console.log(`Backfilled ${vouches.length} vouch_published events.`);
+  console.log(`Backfilled ${endorsements.length} endorsement_published events.`);
   console.log(
     "Level events cannot be backfilled — see the note at the top of this file.",
   );

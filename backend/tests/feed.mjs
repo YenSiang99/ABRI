@@ -54,62 +54,62 @@ const a3 = await login(`${P}a3@e2e.test`);
 const admin = await login(`${P}admin@e2e.test`);
 
 const feed = async (client, scope = "network") => (await client(`/feed?scope=${scope}`)).data.events;
-const findByVouch = (events, id) => events.find((e) => e.type === "vouch_published" && e.id === id);
+const findByEndorsement = (events, id) => events.find((e) => e.type === "endorsement_published" && e.id === id);
 
 // ─────────────────────────────────────────────────────────────────────────
-console.log("\n1. Publishing a vouch puts it in the feed, with its testimonial");
-// Plus, because acceptVouch is a Plus feature and this is about the feed.
+console.log("\n1. Publishing an endorsement puts it in the feed, with its testimonial");
+// Plus, because acceptEndorsement is a Plus feature and this is about the feed.
 await db.business.updateMany({ where: { id: { in: [`${P}a2`, `${P}primary`] } }, data: { membershipTier: "plus" } });
-// A Vouch has four children plus a self-reference (currentRevisionId), so a
-// bare deleteMany trips VouchRevision_vouchId_fkey. Unwind in dependency
+// An Endorsement has four children plus a self-reference (currentRevisionId), so a
+// bare deleteMany trips EndorsementRevision_endorsementId_fkey. Unwind in dependency
 // order, newest pointer first.
-const stale = await db.vouch.findMany({
+const stale = await db.endorsement.findMany({
   where: { fromBusinessId: `${P}a2`, toBusinessId: `${P}primary` }, select: { id: true },
 });
 for (const { id } of stale) {
-  await db.vouch.update({ where: { id }, data: { currentRevisionId: null } });
-  await db.networkEvent.deleteMany({ where: { vouchId: id } });
-  await db.vouchAction.deleteMany({ where: { vouchId: id } });
-  await db.vouchFlag.deleteMany({ where: { vouchId: id } });
-  await db.vouchRevision.deleteMany({ where: { vouchId: id } });
-  await db.vouch.delete({ where: { id } });
+  await db.endorsement.update({ where: { id }, data: { currentRevisionId: null } });
+  await db.networkEvent.deleteMany({ where: { endorsementId: id } });
+  await db.endorsementAction.deleteMany({ where: { endorsementId: id } });
+  await db.endorsementFlag.deleteMany({ where: { endorsementId: id } });
+  await db.endorsementRevision.deleteMany({ where: { endorsementId: id } });
+  await db.endorsement.delete({ where: { id } });
 }
 
-let r = await a2("/vouches", { method: "POST", body: {
+let r = await a2("/endorsements", { method: "POST", body: {
   toBusinessId: `${P}primary`, testimonial: "Sharpest corporate lawyers we have worked with." } });
 assert.equal(r.status, 201, JSON.stringify(r.data));
-const vouchId = r.data.vouch.id;
-r = await primary(`/vouches/${vouchId}/accept`, { method: "POST" });
+const endorsementId = r.data.endorsement.id;
+r = await primary(`/endorsements/${endorsementId}/accept`, { method: "POST" });
 assert.equal(r.status, 200, JSON.stringify(r.data));
 
 let events = await feed(primary);
-let vouchEvent = events.find((e) => e.type === "vouch_published" && e.subject.id === `${P}primary`);
-assert.ok(vouchEvent, "published vouch is in the feed");
-assert.equal(vouchEvent.actor.id, `${P}a2`, "actor is the giver");
-assert.equal(vouchEvent.quote, "Sharpest corporate lawyers we have worked with.");
-ok(`vouch_published in feed, quoting VouchRevision (not a copy)`);
+let endorsementEvent = events.find((e) => e.type === "endorsement_published" && e.subject.id === `${P}primary`);
+assert.ok(endorsementEvent, "published endorsement is in the feed");
+assert.equal(endorsementEvent.actor.id, `${P}a2`, "actor is the giver");
+assert.equal(endorsementEvent.quote, "Sharpest corporate lawyers we have worked with.");
+ok(`endorsement_published in feed, quoting EndorsementRevision (not a copy)`);
 
 // ─────────────────────────────────────────────────────────────────────────
-console.log("\n2. A vouch that stops being published drops out — no compensating write");
+console.log("\n2. An endorsement that stops being published drops out — no compensating write");
 // Driven against the column rather than through a route, deliberately:
-// "published" is TERMINAL today, so no endpoint can un-publish a vouch and
+// "published" is TERMINAL today, so no endpoint can un-publish an endorsement and
 // there is no flow to exercise. What is being guarded here is the READ RULE
 // in visibleNetworkEventsWhere, so that the day an admin decision or a
-// retraction feature does move a published vouch, the feed already follows it
+// retraction feature does move a published endorsement, the feed already follows it
 // without anybody remembering to write an un-announce. Step 4 exercises the
 // same property through a real API path, where one exists.
-const eventsBefore = await db.networkEvent.count({ where: { vouchId } });
-await db.vouch.update({ where: { id: vouchId }, data: { status: "under_review" } });
+const eventsBefore = await db.networkEvent.count({ where: { endorsementId } });
+await db.endorsement.update({ where: { id: endorsementId }, data: { status: "under_review" } });
 
 events = await feed(primary);
-assert.ok(!events.some((e) => e.id === vouchEvent.id), "an unpublished vouch is gone from the feed");
-assert.equal(await db.networkEvent.count({ where: { vouchId } }), eventsBefore,
+assert.ok(!events.some((e) => e.id === endorsementEvent.id), "an unpublished endorsement is gone from the feed");
+assert.equal(await db.networkEvent.count({ where: { endorsementId } }), eventsBefore,
   "the NetworkEvent row is untouched — visibility is a read-time join, not a delete");
 
-await db.vouch.update({ where: { id: vouchId }, data: { status: "published" } });
+await db.endorsement.update({ where: { id: endorsementId }, data: { status: "published" } });
 events = await feed(primary);
-assert.ok(events.some((e) => e.id === vouchEvent.id), "and it comes back when the source does");
-ok("feed follows the vouch's status both ways; its row never moves");
+assert.ok(events.some((e) => e.id === endorsementEvent.id), "and it comes back when the source does");
+ok("feed follows the endorsement's status both ways; its row never moves");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n6. Verification is announced, and revoking it retracts the announcement");
@@ -251,9 +251,9 @@ const tied = all.events.filter((e) => new Date(e.createdAt).getTime() === tie.ge
 assert.equal(tied.length, 2, "both same-millisecond events survived paging");
 ok(`paged ${seen.length} events two at a time — no duplicates, same order, ties held`);
 
-console.log("\n10. Every row carries what a vouch button needs, and nothing more");
-// The feed's action buttons make NO extra request: isVouchable reads
-// target.id + target.verificationLevel, and VouchDialog renders name and
+console.log("\n10. Every row carries what an endorsement button needs, and nothing more");
+// The feed's action buttons make NO extra request: isEndorsable reads
+// target.id + target.verificationLevel, and EndorseDialog renders name and
 // category. The whole "no backend change" claim rests on those four fields
 // being present on every row, so assert it rather than assume it.
 for (const e of all.events) {

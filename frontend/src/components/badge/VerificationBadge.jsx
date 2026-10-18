@@ -57,7 +57,7 @@ const SIZE_ICON_CLASS = {
 
 function VerificationBadge({ verificationLevel, size = "profile", subtitle, chip = false, className }) {
   // Falls back rather than indexing blind — see the same guard in
-  // VouchBadge.jsx. `VERIFICATION_LEVEL_ICON[unknown]` is undefined and rendering that as
+  // EndorsementBadge.jsx. `VERIFICATION_LEVEL_ICON[unknown]` is undefined and rendering that as
   // a component throws, taking the route with it; an unrecognised value has
   // to degrade to a neutral mark, never to a white screen.
   //

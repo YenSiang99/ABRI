@@ -6,7 +6,7 @@ import { orderedPair } from "./connections.js";
 // this file implements the rules that comment states.
 
 // Untouched this long and a pending portfolio entry lapses. Same number and same
-// lazy mechanism as lib/vouchExpiry.js: there is no background-job infra in
+// lazy mechanism as lib/endorsementExpiry.js: there is no background-job infra in
 // this codebase, so every route that reads one sweeps it first.
 const EXPIRY_DAYS = 14;
 
@@ -33,10 +33,10 @@ function isExpired(entry) {
 
 // Lapses a pending portfolio entry nobody answered. Returns the row either way, so
 // callers can use it inline — the shape applyExpiryIfNeeded has in
-// lib/vouchExpiry.js.
+// lib/endorsementExpiry.js.
 //
 // Told to the PROPOSER only, and worded to name no culprit: nobody declined
-// this, it just sat there. That distinction is the same one vouch_expired
+// this, it just sat there. That distinction is the same one endorsement_expired
 // exists for — without it the proposer is told they were refused by a business
 // that never actually did anything.
 async function applyExpiryIfNeeded(entry) {

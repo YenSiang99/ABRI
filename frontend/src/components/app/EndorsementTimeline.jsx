@@ -1,7 +1,7 @@
 import { Check, Clock, CornerUpLeft, Flag, Gavel, PenLine, Send, X } from "lucide-react";
 
-// Renders the server's per-vouch audit log (the VouchAction table, via
-// serializeAction in backend/src/lib/vouchTurn.js).
+// Renders the server's per-endorsement audit log (the EndorsementAction table, via
+// serializeAction in backend/src/lib/endorsementTurn.js).
 //
 // Three properties matter.
 //
@@ -17,7 +17,7 @@ import { Check, Clock, CornerUpLeft, Flag, Gavel, PenLine, Send, X } from "lucid
 // been overwritten. Every submit/revise now prints its own revision.
 //
 // HISTORICAL — the text under an entry is the text as it stood at that
-// moment, read from that action's revision, never from the live vouch.
+// moment, read from that action's revision, never from the live endorsement.
 //
 // Each entry is its own bordered panel on the rail rather than a run of
 // text under a dot. With several rounds of revisions the flat version ran
@@ -27,17 +27,17 @@ import { Check, Clock, CornerUpLeft, Flag, Gavel, PenLine, Send, X } from "lucid
 // used to take (a quoted box and a grey bubble) collapse into plain text
 // inside it: one level of nesting instead of two.
 const ACTIONS = {
-  submit: { icon: Send, message: (who) => `${who} sent the vouch for review` },
+  submit: { icon: Send, message: (who) => `${who} sent the endorsement for review` },
   revise: { icon: PenLine, message: (who) => `${who} revised the testimonial` },
   revert: { icon: CornerUpLeft, message: (who) => `${who} sent it back for edits` },
   // The one outcome worth colouring: it's the point of the whole exchange,
   // and on a long trail it's what the eye should find first.
-  accept: { icon: Check, message: (who) => `${who} accepted the vouch`, tone: "accent" },
-  cancel: { icon: X, message: (who) => `${who} cancelled the vouch`, tone: "danger" },
+  accept: { icon: Check, message: (who) => `${who} accepted the endorsement`, tone: "accent" },
+  cancel: { icon: X, message: (who) => `${who} cancelled the endorsement`, tone: "danger" },
   // Says only that it happened. The reason and note the receiver filed go
   // to admins, not onto the shared trail — the giver shouldn't read the
   // report against them here, and the flag entry carries no `comment` for
-  // that reason (see the flag route in backend/src/routes/vouches.js).
+  // that reason (see the flag route in backend/src/routes/endorsements.js).
   flag: { icon: Flag, message: (who) => `${who} put this on hold for admin review`, tone: "danger" },
   // No actor — this one lapsed rather than being anybody's decision.
   expire: { icon: Clock, message: () => "No response for 14 days — closed automatically" },
@@ -57,7 +57,7 @@ const ACTIONS = {
   },
   admin_cancel: {
     icon: Gavel,
-    message: () => "An admin reviewed this and cancelled the vouch",
+    message: () => "An admin reviewed this and cancelled the endorsement",
     tone: "danger",
   },
 };
@@ -83,7 +83,7 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
-function VouchTimeline({ timeline }) {
+function EndorsementTimeline({ timeline }) {
   if (!timeline?.length) return null;
 
   return (
@@ -114,7 +114,7 @@ function VouchTimeline({ timeline }) {
             </div>
 
             {/* The giver's text. No version label: the entry's own headline
-                ("sent the vouch for review" vs "revised the testimonial") and
+                ("sent the endorsement for review" vs "revised the testimonial") and
                 date already place the quote in the sequence, so numbering it
                 was noise stacked on top of the words themselves. */}
             {WRITES_REVISION.has(entry.action) && entry.revisionComment && (
@@ -137,4 +137,4 @@ function VouchTimeline({ timeline }) {
   );
 }
 
-export { VouchTimeline };
+export { EndorsementTimeline };

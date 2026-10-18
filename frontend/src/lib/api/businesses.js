@@ -16,9 +16,9 @@ function fetchBusinesses(options = {}) {
 
 // The paged form: `{ businesses, page, hasMore }`.
 //
-// `vouchCount` and `vouchLevel` are ABSENT for a logged-out caller — the keys
+// `endorsementCount` and `endorsementLevel` are ABSENT for a logged-out caller — the keys
 // are missing, not zeroed. BusinessCard reads that absence as "log in to see
-// vouches", which is a different sentence from "no vouches yet"; zeroing them
+// endorsements", which is a different sentence from "no endorsements yet"; zeroing them
 // here would silently turn every business into the latter.
 function fetchBusinessPage({
   search,

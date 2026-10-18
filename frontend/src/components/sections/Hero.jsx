@@ -104,7 +104,7 @@ function Hero() {
 
             <div className="my-4 overflow-hidden rounded-md border border-grey-200 dark:border-border">
               <div className="border-b border-grey-200 bg-surface px-3.5 py-2 text-[11px] font-semibold tracking-[0.08em] text-grey-500 uppercase dark:border-border dark:bg-muted dark:text-muted-foreground">
-                Peer vouch
+                Peer endorsement
               </div>
               <div className="px-3.5 py-3">
                 <p className="text-sm text-[#4a473f] italic dark:text-grey-300">

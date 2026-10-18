@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useFollows } from "@/context/FollowsContext";
-import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
+import { isEndorsable, ENDORSABLE_VERIFICATION_LEVELS } from "@/lib/endorsementRules";
 import { CLAIMED } from "@/lib/verificationLevels";
 import { verificationLevelLabel } from "@/lib/trustLabels";
 import { toast } from "@/lib/toast";
@@ -59,7 +59,7 @@ function BusinessLink({ business }) {
 // One row per type. The icon is the type's only colour, and it is the thing
 // that makes four kinds of news skimmable in one column.
 const PRESENTATION = {
-  vouch_published: { icon: Handshake, tone: "text-foreground" },
+  endorsement_published: { icon: Handshake, tone: "text-foreground" },
   business_claimed: { icon: UserPlus, tone: "text-muted-foreground" },
   business_verified: { icon: ShieldCheck, tone: "text-muted-foreground" },
 };
@@ -68,16 +68,16 @@ const PRESENTATION = {
 // names are links.
 //
 // Note who is `actor` and who is `subject` in each: the actor DID it, the
-// subject is what it is ABOUT. On a vouch that is giver and receiver. The two
+// subject is what it is ABOUT. On an endorsement that is giver and receiver. The two
 // level types have no actor at all — an admin approved them, and staff never
 // appear in a members' feed.
 function Sentence({ event }) {
   const { type, actor, subject } = event;
 
-  if (type === "vouch_published") {
+  if (type === "endorsement_published") {
     return (
       <>
-        <BusinessLink business={actor} /> vouched for <BusinessLink business={subject} />
+        <BusinessLink business={actor} /> endorsed <BusinessLink business={subject} />
       </>
     );
   }
@@ -106,10 +106,10 @@ function Sentence({ event }) {
 //
 // A feed nobody can act on is a display, not a loop — every row here would
 // otherwise offer one thing, a link to a profile. What makes it a loop is that
-// vouching from a row produces the NEXT row: vouch -> feed row -> reminds
-// somebody else -> vouch.
+// endorsing from a row produces the NEXT row: endorsement -> feed row -> reminds
+// somebody else -> endorsement.
 //
-// The point is RECALL, not persuasion. A member would happily vouch for the
+// The point is RECALL, not persuasion. A member would happily endorse the
 // four or five firms they have actually worked with; they simply never think
 // of them while sitting at a desk. Every row names one at the moment the
 // reader is already thinking about trust.
@@ -117,36 +117,36 @@ function Sentence({ event }) {
 // WHAT MUST NEVER JOIN THESE TWO: like, react, comment, share. Every row in
 // this feed is a third-party positive act about somebody else, and that single
 // property is what lets the whole feature run with no cap, no expiry, no
-// report button and no moderation queue (see routes/feed.js). A vouch and a
+// report button and no moderation queue (see routes/feed.js). An endorsement and a
 // follow both preserve it — you can only praise, and a follow is invisible. A
 // reaction would be the first thing here that is about the READER, and it
 // would drag the entire moderation apparatus in behind it.
 //
 // The target is ALWAYS event.subject, never the actor. One rule, no per-type
-// branching: the subject is the vouch's receiver, or the business that just
+// branching: the subject is the endorsement's receiver, or the business that just
 // claimed or verified, and in every case the row reads "somebody else just
 // found them credible — do you know them too?".
-// Offering the actor as a second target would put two vouch buttons on one row
+// Offering the actor as a second target would put two endorsement buttons on one row
 // with nothing to tell them apart.
-function FeedActions({ event, onVouch }) {
+function FeedActions({ event, onEndorse }) {
   const { business: viewer } = useAuth();
   const { isFollowing, follow, unfollow } = useFollows();
   const [followBusy, setFollowBusy] = useState(false);
 
   const target = event.subject;
-  // Your own business, on a row about you — someone vouched for you, or you
+  // Your own business, on a row about you — someone endorsed you, or you
   // just got verified. Neither action means anything here: POST /follows
-  // refuses following yourself with a 400, and isVouchable already rules out
-  // the vouch. Returning early is what keeps a lone Follow button off the one
+  // refuses following yourself with a 400, and isEndorsable already rules out
+  // the endorsement. Returning early is what keeps a lone Follow button off the one
   // row in the feed where it could only ever produce an error toast.
   if (!viewer || target.id === viewer.id) return null;
 
-  // isVouchable checks only the TARGET (vouchRules.js) — self, their level,
-  // and whether a vouch already exists. The viewer's OWN level is a separate
-  // clause, exactly as BusinessProfile.jsx pairs them; relying on isVouchable
+  // isEndorsable checks only the TARGET (endorsementRules.js) — self, their level,
+  // and whether an endorsement already exists. The viewer's OWN level is a separate
+  // clause, exactly as BusinessProfile.jsx pairs them; relying on isEndorsable
   // alone is the bug that makes the dashboard's suggestions wrong.
-  const targetOk = isVouchable(target, viewer);
-  const viewerVerified = VOUCHABLE_VERIFICATION_LEVELS.has(viewer.verificationLevel);
+  const targetOk = isEndorsable(target, viewer);
+  const viewerVerified = ENDORSABLE_VERIFICATION_LEVELS.has(viewer.verificationLevel);
   const awaitingVerification = viewer.verificationLevel === CLAIMED;
 
   async function handleFollowToggle() {
@@ -169,7 +169,7 @@ function FeedActions({ event, onVouch }) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-2">
       {/* Nothing to sell and nothing to explain: you are looking at yourself,
-          at somebody you have already vouched for, or at a business not yet
+          at somebody you have already endorsed, or at a business not yet
           verified enough to receive one. Facts about the pair hide the button.
           Money never does — that asymmetry is the UpgradePrompt doctrine. */}
       {targetOk &&
@@ -177,18 +177,18 @@ function FeedActions({ event, onVouch }) {
           // A VERIFICATION gate, so no upgrade prompt: there is no plan that
           // opens this door. Disabled rather than hidden, with the free next
           // step named — the same treatment other empty states get on the
-          // board, and the same order the server checks in POST /vouches.
-          <Button size="sm" variant="outline" disabled title="Vouching unlocks once you're SSM-verified">
-            Vouch
+          // board, and the same order the server checks in POST /endorsements.
+          <Button size="sm" variant="outline" disabled title="Endorsing unlocks once you're SSM-verified">
+            Endorse
           </Button>
         ) : (
           viewerVerified && (
             // Fully styled on every plan, Free included. The click is what the
             // gate intercepts, and this is where the feed actually converts:
             // reaching for the button and being told the price beats watching
-            // vouches you cannot give scroll past.
-            <Button size="sm" variant="outline" onClick={() => onVouch(target)}>
-              Vouch for them too
+            // endorsements you cannot give scroll past.
+            <Button size="sm" variant="outline" onClick={() => onEndorse(target)}>
+              Endorse them too
             </Button>
           )
         ))}
@@ -204,7 +204,7 @@ function FeedActions({ event, onVouch }) {
   );
 }
 
-function FeedRow({ event, onVouch }) {
+function FeedRow({ event, onEndorse }) {
   const { icon: Icon, tone } = PRESENTATION[event.type] ?? PRESENTATION.business_claimed;
 
   return (
@@ -239,7 +239,7 @@ function FeedRow({ event, onVouch }) {
           <span className="text-xs text-muted-foreground">
             {[event.subject.category, event.subject.location].filter(Boolean).join(" · ")}
           </span>
-          <FeedActions event={event} onVouch={onVouch} />
+          <FeedActions event={event} onEndorse={onEndorse} />
         </div>
       </div>
     </li>

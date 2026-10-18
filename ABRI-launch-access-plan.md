@@ -8,7 +8,7 @@ The work list from the 11 Oct 2026 decisions on who can do what at signup and la
 |---|---|---|
 | Signed up, claim pending | Confirm their own email | Log in; browse, search, see their claim status. Acts as **no business** everywhere. |
 | Claimed (L1) | Code sent to the business's email on file (instant), **or** one admin review | Edit their page, connect, follow, log work, plus their plan's features |
-| SSM-Verified (L2) | The same single admin review (SSM number asked at claim). Email-code claimants submit SSM afterwards. | Give and receive vouches |
+| SSM-Verified (L2) | The same single admin review (SSM number asked at claim). Email-code claimants submit SSM afterwards. | Give and receive endorsements |
 | Founding | Approved before launch (no cap) | **Pro** until one end date (an editable setting); then Free, the badge forever, and a lasting founding discount |
 | Paid Plus/Pro | Pay any time after claiming | Non-SSM features at once; the 12 months start the day SSM passes; refund if it fails |
 
@@ -52,7 +52,7 @@ A wrong SSM number: on the email-code path they stay L1 and can resubmit (revoke
 - Approval before launch sets `isFoundingMember` (no 100 cap) and `membershipTier "pro"` with expiry = the end date.
 - Expiry enforced (lazily on read, plus a job): lapsed → `free`. Founding discount recorded for billing (amount TBD).
 - Rewrite the pricing page's "Founding 100, by invitation only" copy.
-- Built as: `AppSetting` table + lib/founding.js (`founding.closesAt`, `founding.proEndsAt`; GET/PUT `/admin/settings/founding`, panel on the admin claims screen). `Business.membershipTierGrant` ("founding" | "admin" | "paid") so a date change moves only Founding grants. lib/membershipExpiry.js: `effectiveMembershipTier` (used by `can()` and the vouch cap) plus an hourly sweep started in src/index.js. Migration 20261011110000_founding_and_plan_grants also moves existing founding members from Plus to Pro (grant "founding", no expiry).
+- Built as: `AppSetting` table + lib/founding.js (`founding.closesAt`, `founding.proEndsAt`; GET/PUT `/admin/settings/founding`, panel on the admin claims screen). `Business.membershipTierGrant` ("founding" | "admin" | "paid") so a date change moves only Founding grants. lib/membershipExpiry.js: `effectiveMembershipTier` (used by `can()` and the endorsement cap) plus an hourly sweep started in src/index.js. Migration 20261011110000_founding_and_plan_grants also moves existing founding members from Plus to Pro (grant "founding", no expiry).
 - Pricing copy rewritten ("Founding members — join before launch"); the Plan page states the term ("Founding Pro — free until …").
 - **To do by you:** set the two dates on the admin claims screen once launch is decided. Until then Founding is open and Pro has no end.
 - Discount amount: not stored. `isFoundingMember` is the key billing will use.
@@ -62,7 +62,7 @@ A wrong SSM number: on the email-code path they stay L1 and can resubmit (revoke
 - Drop `contactDetails` from the entitlements registry; update Plus's pricing copy (it no longer sells contact visibility).
 - Check the profile and upgrade copy that says "Plus publishes your contact details".
 - Built as: `contactVisibility` is now "logged in → visible"; `contactDetails` removed from both entitlement registries and the upgrade prompts; the owner's "your details are hidden" warning removed; the plan table's contact row is ticked for Free. Unclaimed profiles (ProfileSections.jsx) now show phone/email to members, with "These details come from public sources, not the business."
-- **Plus now sells:** giving and publishing vouches, testimonials, network overlap, the NFC card. Worth a pricing-copy pass.
+- **Plus now sells:** giving and publishing endorsements, testimonials, network overlap, the NFC card. Worth a pricing-copy pass.
 
 ### 6. Pay-first: the plan clock starts at SSM — **done 11 Oct** (tests: `founding.mjs` §6)
 - The admin plan screen: a plan set on an L1 business stores "paid, starts at verification"; the SSM approval sets `membershipTierStartedAt` and the expiry (+12 months).

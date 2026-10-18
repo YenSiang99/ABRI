@@ -46,7 +46,7 @@ function Footer() {
             </Link>
             <p className="mt-3 max-w-[26rem] text-[13.5px] text-grey-500 dark:text-muted-foreground">
               The verified business network — where verified means checked
-              against the SSM register, and trust is vouched for by real
+              against the SSM register, and trust is endorsed by real
               peers.
             </p>
           </div>

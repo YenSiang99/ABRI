@@ -12,7 +12,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { messageFor, pruneActivityEvents } from "../lib/activityEvents.js";
-import { vouchLevelFor } from "../lib/vouchLevel.js";
+import { endorsementLevelFor } from "../lib/endorsementLevel.js";
 import { publicBusinessView } from "../lib/accountView.js";
 import { can } from "../lib/entitlements.js";
 import { contactVisibility } from "../lib/contactVisibility.js";
@@ -23,7 +23,7 @@ import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { vouchersInNetworkFor } from "../lib/networkOverlap.js";
+import { endorsersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
 import { recordProfileView } from "../lib/profileView.js";
 import { verificationTimelineFor } from "../lib/verificationTimeline.js";
@@ -93,7 +93,7 @@ async function loadViewerBusiness(req) {
   });
 }
 
-// The vouch numbers, or nothing.
+// The endorsement numbers, or nothing.
 //
 // THE ONE RUNG BETWEEN A STRANGER AND A MEMBER, and it is deliberately the
 // only thing on that rung. An anonymous visitor still gets the verification
@@ -104,18 +104,18 @@ async function loadViewerBusiness(req) {
 //
 // Absent keys, never zeros. A withheld count and a genuine zero must not
 // render the same — BusinessCard has three strings for three states, and a
-// zeroed-out withheld count would show "No vouches yet" about a business with
+// zeroed-out withheld count would show "No endorsements yet" about a business with
 // forty. Same rule the contact gate follows: the key is missing, not masked.
 //
 // Shared by both routes so the directory and the lookup cannot disagree about
 // what a stranger is worth showing.
-function vouchFieldsFor(counts, viewer) {
+function endorsementFieldsFor(counts, viewer) {
   if (!viewer) return {};
   return {
-    vouchCount: counts.vouchesReceived,
-    vouchLevel: vouchLevelFor({
-      received: counts.vouchesReceived,
-      given: counts.vouchesGiven,
+    endorsementCount: counts.endorsementsReceived,
+    endorsementLevel: endorsementLevelFor({
+      received: counts.endorsementsReceived,
+      given: counts.endorsementsGiven,
     }),
   };
 }
@@ -230,11 +230,11 @@ router.get(
       ...(search ? REGISTRY_SSM_INCLUDE : {}),
       _count: {
         select: {
-          vouchesReceived: { where: { status: "published" } },
-          // Needed for the top vouch level, which is 25 received AND 10
+          endorsementsReceived: { where: { status: "published" } },
+          // Needed for the top endorsement level, which is 25 received AND 10
           // given. Counting only one direction caps every business at
           // "trusted" with nothing to show it happened.
-          vouchesGiven: { where: { status: "published" } },
+          endorsementsGiven: { where: { status: "published" } },
         },
       },
     };
@@ -367,7 +367,7 @@ router.get(
     const viewer = await loadViewerBusiness(req);
     const overlap =
       viewer && can(viewer, "networkOverlap")
-        ? await vouchersInNetworkFor(businesses.map((b) => b.id), viewer.id)
+        ? await endorsersInNetworkFor(businesses.map((b) => b.id), viewer.id)
         : new Map();
 
     res.json({
@@ -376,7 +376,7 @@ router.get(
       //
       // "Members see more" could have meant putting phone numbers on
       // directory cards, and it must not: BusinessCard.jsx renders
-      // name/category/location/level/vouches and has nowhere to put a phone
+      // name/category/location/level/endorsements and has nowhere to put a phone
       // number, so shipping one would send every listing's contact details to
       // every session to serve a card that does not display them. That is the
       // best scraping surface in the app, built for nothing. Contact stays on
@@ -388,8 +388,8 @@ router.get(
       // past the single profile route it occupies today.
       businesses: businesses.map(({ _count, ...business }) => ({
         ...publicBusinessView(business),
-        // Absent for an anonymous caller — see vouchFieldsFor.
-        ...vouchFieldsFor(_count, req.account),
+        // Absent for an anonymous caller — see endorsementFieldsFor.
+        ...endorsementFieldsFor(_count, req.account),
         // Why this row came back. Cheap here, and it is what lets the in-app
         // directory tell "your registration number matched" from "the name
         // contains what you typed" — the distinction that used to require a
@@ -398,7 +398,7 @@ router.get(
         // Absent unless there IS an overlap, so a Plus member browsing
         // strangers gets no empty arrays and the client can render on
         // presence. A Free member never gets the key at all.
-        ...(overlap.has(business.id) ? { vouchersInYourNetwork: overlap.get(business.id) } : {}),
+        ...(overlap.has(business.id) ? { endorsersInYourNetwork: overlap.get(business.id) } : {}),
         // Present only while a service filter is active, and ZERO IS SENT
         // rather than omitted: "nobody has confirmed this yet" is a real
         // answer on a screen that has just ranked by it, and leaving the key
@@ -424,7 +424,7 @@ router.get(
 
 // ─── Check a business ───────────────────────────────────────────────────────
 //
-// "Is this business real, verified, and vouched for?" — one pasted string in,
+// "Is this business real, verified, and endorsed?" — one pasted string in,
 // a short ranked list out. See lib/businessLookup.js for why this is a
 // separate route from the directory search above rather than a wider OR.
 //
@@ -546,8 +546,8 @@ router.get(
         ...REGISTRY_SSM_INCLUDE,
         _count: {
           select: {
-            vouchesReceived: { where: { status: "published" } },
-            vouchesGiven: { where: { status: "published" } },
+            endorsementsReceived: { where: { status: "published" } },
+            endorsementsGiven: { where: { status: "published" } },
           },
         },
       },
@@ -569,7 +569,7 @@ router.get(
 
     const overlap =
       viewer && can(viewer, "networkOverlap")
-        ? await vouchersInNetworkFor(ranked.map((m) => m.business.id), viewer.id)
+        ? await endorsersInNetworkFor(ranked.map((m) => m.business.id), viewer.id)
         : new Map();
 
     // Pro's check history. ONE OF TWO WRITE SITES — GET /:id records a profile
@@ -610,12 +610,12 @@ router.get(
           // one helper so the two surfaces cannot disagree about what a
           // stranger is worth showing. The verification level above is NOT
           // gated and never will be: it is the answer this screen promises.
-          ...vouchFieldsFor(_count, req.account),
+          ...endorsementFieldsFor(_count, req.account),
           contactLocked: !contact.visible,
           contactLockedReason: contact.reason,
           // Plus. Absent when there is no overlap or the viewer is below
           // Plus, so the client renders on presence rather than on a count.
-          ...(overlap.has(row.id) ? { vouchersInYourNetwork: overlap.get(row.id) } : {}),
+          ...(overlap.has(row.id) ? { endorsersInYourNetwork: overlap.get(row.id) } : {}),
         };
       }),
     });
@@ -637,12 +637,12 @@ router.get(
         // Registration numbers public registers published, shown with their
         // source and never as verified (see registryNumbersFor).
         sourceRecords: { where: { ssm: { not: null } }, select: { source: true, ssm: true }, orderBy: { source: "asc" } },
-        // Public profile — only ever show vouches the receiver has
-        // actually accepted (see the Vouch review state machine in
+        // Public profile — only ever show endorsements the receiver has
+        // actually accepted (see the Endorsement review state machine in
         // schema.prisma). This route returns the raw business object
         // (not through serializeBusiness), so the filter has to happen
         // here rather than being inherited from a shared helper.
-        vouchesReceived: {
+        endorsementsReceived: {
           where: { status: "published" },
           include: {
             fromBusiness: { select: { id: true, name: true, category: true, verificationLevel: true } },
@@ -661,7 +661,7 @@ router.get(
     // product is actually used. /businesses/lookup was the only one, which
     // assumed checking was a separate errand on a separate screen; the
     // directory folds that screen in, so opening a profile IS the check. A
-    // member who browses to a business and reads its vouches has done the
+    // member who browses to a business and reads its endorsements has done the
     // diligence the log exists to record, and leaving it unrecorded made the
     // history look broken rather than principled.
     //
@@ -706,11 +706,11 @@ router.get(
     const contact = contactVisibility(business, req.account);
 
     // Sent explicitly rather than left for the client to infer from
-    // vouchesReceived.length, which is what it used to do in three places.
+    // endorsementsReceived.length, which is what it used to do in three places.
     // The moment the array can be withheld, its length stops meaning "how
-    // many vouches" — and the count is the half of this that every plan
+    // many endorsements" — and the count is the half of this that every plan
     // keeps, so it must not travel inside the half that gets taken away.
-    const vouchCount = business.vouchesReceived.length;
+    const endorsementCount = business.endorsementsReceived.length;
 
     // PUBLIC ON EVERY PLAN AND TO ANONYMOUS VISITORS, deliberately, and the
     // only part of this response that is. Everything else here is gated on
@@ -730,19 +730,19 @@ router.get(
       portfolioSummaryFor(business.id),
     ]);
 
-    // Flatten the live revision's text onto each vouch as `testimonial`.
+    // Flatten the live revision's text onto each endorsement as `testimonial`.
     // The column of that name is gone (schema.prisma) — it was the copy a
     // revise overwrote — but the public shape is unchanged, so nothing
     // downstream needs to know a join happened.
     //
     // Withheld as an empty array rather than rows with `testimonial: null`:
     // the free tier shows a number and nothing else, and keeping the rows
-    // would still publish who vouched and when.
+    // would still publish who endorsed and when.
     res.json({
       business: {
         ...publicBusinessView(business, { showContact: contact.visible }),
         registryNumbers: registryNumbersFor(business.sourceRecords),
-        vouchCount,
+        endorsementCount,
         verificationTimeline,
         // viewerBusinessId is null: this is the PUBLIC view, so no
         // `counterparty` is resolved and no proposedByYou is claimed. A reader
@@ -767,8 +767,8 @@ router.get(
         // hasn't added any. Withheld and empty must not render the same.
         contactLocked: !contact.visible,
         contactLockedReason: contact.reason,
-        vouchesReceived: showTestimonials
-          ? business.vouchesReceived.map(({ currentRevision, ...v }) => ({
+        endorsementsReceived: showTestimonials
+          ? business.endorsementsReceived.map(({ currentRevision, ...v }) => ({
               ...v,
               testimonial: currentRevision?.comment ?? null,
             }))
@@ -779,7 +779,7 @@ router.get(
 );
 
 // Powers Dashboard.jsx's "Recent activity" — the notify step of the
-// give-first reciprocity loop (vouch -> notify -> thank -> vouch back).
+// give-first reciprocity loop (endorsement -> notify -> thank -> endorse back).
 // Two segments ("/me/activity"), so this never collides with GET /:id
 // above, which only matches a single path segment.
 router.get(
@@ -815,7 +815,7 @@ router.get(
     // pruning is housekeeping, so it must never add latency to the feed or
     // fail the request. A no-op whenever the business is under the cap.
     // Runs here rather than in createActivityEvent so the delete stays off
-    // the vouch write transactions; the tradeoff is that a business nobody
+    // the endorsement write transactions; the tradeoff is that a business nobody
     // ever logs into never gets pruned (see PRUNING note in BACKEND_STATUS.md).
     pruneActivityEvents(prisma, req.account.businessId).catch(() => {});
   }),
@@ -840,7 +840,7 @@ router.get(
 );
 
 // Marks everything currently unread as seen — the "Mark all read" escape
-// hatch for events the member has no reason to open (a vouch that was
+// hatch for events the member has no reason to open (an endorsement that was
 // cancelled, a connection they already know about). Opening a notification
 // is what normally clears it; see POST /me/activity/:id/read below.
 //

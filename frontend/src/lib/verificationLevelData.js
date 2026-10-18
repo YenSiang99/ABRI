@@ -37,7 +37,7 @@ function buildVerificationLevelData(account, business) {
         { id: "ssm", label: "SSM entity match", done: ssmDone },
         { id: "director", label: "Director-name match", done: ssmDone },
       ],
-      unlocks: "SSM-Verified badge · eligible to give and receive vouches · NFC card unlocked.",
+      unlocks: "SSM-Verified badge · eligible to give and receive endorsements · NFC card unlocked.",
     },
     {
       verificationLevel: VERIFICATION_LEVELS[3],

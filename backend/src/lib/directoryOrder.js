@@ -24,7 +24,7 @@ import { prisma } from "../prisma.js";
 // serialises to JSON) so every page, the last one included, is an index
 // read rather than a sort of the whole table.
 //
-// NO CRON, the same as vouchExpiry.js: the first browse of the day pays for
+// NO CRON, the same as endorsementExpiry.js: the first browse of the day pays for
 // the refresh (one UPDATE over the table, a second or two), and every other
 // request that day finds it done. A row added or claimed since the refresh
 // sits in the right band from tomorrow; until then a new row has no key and

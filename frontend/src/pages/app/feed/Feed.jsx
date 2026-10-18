@@ -4,18 +4,18 @@ import { Radio, Eye } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { VouchDialog } from "@/components/app/VouchDialog";
+import { EndorseDialog } from "@/components/app/EndorseDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { fetchFeed } from "@/lib/api/feed";
 import { FeedRow, Empty, PageHeader } from "./FeedCard";
 
-// The network's trust activity, in one column: vouches published,
+// The network's trust activity, in one column: endorsements published,
 // listings claimed and businesses verified.
 //
 // WHAT THIS SCREEN IS FOR. Today trust is invisible until you open a specific
 // profile, which means a member has to already be looking for it to find any.
-// A feed makes "14 verified businesses vouch for this company" something you
+// A feed makes "14 verified businesses endorse this company" something you
 // WITNESS, repeatedly, without asking — which is the difference between a
 // directory and a network.
 //
@@ -27,7 +27,7 @@ import { FeedRow, Empty, PageHeader } from "./FeedCard";
 // anyone's own words. Keep it that way — the moment this screen grows a
 // compose box it inherits every one of those problems.
 //
-// NOT gated by plan, ever. A Free member watching vouches go past that they
+// NOT gated by plan, ever. A Free member watching endorsements go past that they
 // cannot give is the best argument for Plus in the product; it only works if
 // they can watch. See the header of backend/src/routes/feed.js.
 
@@ -44,25 +44,25 @@ function Feed() {
   const [error, setError] = useState(null);
 
   // ONE dialog for the whole column, re-pointed per row, rather than one per
-  // FeedRow. VouchDialog's open-time reset (the prevOpen comparison, not a
+  // FeedRow. EndorseDialog's open-time reset (the prevOpen comparison, not a
   // useEffect) was written to make exactly this re-pointing safe, and a feed
   // can run to hundreds of rows.
   const { refreshAccount } = useAuth();
-  const vouchGate = useUpgradeGate("giveVouch");
-  const [vouchTarget, setVouchTarget] = useState(null);
+  const endorsementGate = useUpgradeGate("giveEndorsement");
+  const [endorsementTarget, setEndorsementTarget] = useState(null);
 
   // Guarded HERE rather than in the row, so the plan check sits in one place
   // and the row keeps rendering a plain button. Below Plus this opens the
-  // upgrade dialog and never touches vouchTarget — the button stays fully
+  // upgrade dialog and never touches endorsementTarget — the button stays fully
   // styled either way, which is the whole point of the gate.
-  const openVouch = vouchGate.guard((target) => setVouchTarget(target));
+  const openEndorsement = endorsementGate.guard((target) => setEndorsementTarget(target));
 
-  // vouchedFor lives on the session business, so without this the button
-  // stays lit on a row the server would now answer 409 for. The new vouch is
+  // endorsedFor lives on the session business, so without this the button
+  // stays lit on a row the server would now answer 409 for. The new endorsement is
   // "pending" until the receiver accepts, so it correctly does NOT appear in
   // the feed yet — the row's button simply goes away.
-  async function handleVouched() {
-    setVouchTarget(null);
+  async function handleEndorsed() {
+    setEndorsementTarget(null);
     await refreshAccount();
   }
 
@@ -115,11 +115,11 @@ function Feed() {
       return tab === "following" ? (
         <Empty icon={Eye}>
           Nothing from the businesses you follow yet. Following someone is private — they're never
-          told — so follow freely from any profile and their vouches show up here.
+          told — so follow freely from any profile and their endorsements show up here.
         </Empty>
       ) : (
         <Empty icon={Radio}>
-          Nothing has happened on the network yet. The first published vouch lands here.
+          Nothing has happened on the network yet. The first published endorsement lands here.
         </Empty>
       );
     }
@@ -128,7 +128,7 @@ function Feed() {
       <>
         <ul className="mt-2 divide-y divide-border">
           {events.map((event) => (
-            <FeedRow key={event.id} event={event} onVouch={openVouch} />
+            <FeedRow key={event.id} event={event} onEndorse={openEndorsement} />
           ))}
         </ul>
         {/* A button rather than infinite scroll. There is no scroll
@@ -150,7 +150,7 @@ function Feed() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <PageHeader eyebrow="Feed" title="The network">
-        Every vouch published, and every business that joins or gets
+        Every endorsement published, and every business that joins or gets
         verified. Nobody posts here — this is what the network did.
       </PageHeader>
 
@@ -173,15 +173,15 @@ function Feed() {
 
       {/* Both render nothing until something opens them, so they sit at the
           page root rather than inside a row. targetBusiness is the row's own
-          subject object — VouchDialog needs only id/name/category off it, all
+          subject object — EndorseDialog needs only id/name/category off it, all
           of which the feed already sends. */}
-      <VouchDialog
-        open={Boolean(vouchTarget)}
-        onOpenChange={(next) => !next && setVouchTarget(null)}
-        targetBusiness={vouchTarget}
-        onSuccess={handleVouched}
+      <EndorseDialog
+        open={Boolean(endorsementTarget)}
+        onOpenChange={(next) => !next && setEndorsementTarget(null)}
+        targetBusiness={endorsementTarget}
+        onSuccess={handleEndorsed}
       />
-      <UpgradePrompt gate={vouchGate} />
+      <UpgradePrompt gate={endorsementGate} />
     </div>
   );
 }

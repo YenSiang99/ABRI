@@ -2,13 +2,13 @@
 // about a membership tier, so a gate is never re-derived at a call site and never
 // drifts from another gate's idea of what a plan includes.
 //
-// The second tier-reading module after lib/vouchCap.js, and the split
-// between them is deliberate: vouchCap answers "how many", this answers
+// The second tier-reading module after lib/endorsementCap.js, and the split
+// between them is deliberate: endorsementCap answers "how many", this answers
 // "at all". A quantity and a boolean want different shapes, and collapsing
 // them would mean every yes/no feature carried a meaningless number.
 //
 // schema.prisma's membershipTier comment requires the plan union and
-// VOUCH_CAP_BY_MEMBERSHIP_TIER to move in the same commit. That invariant now covers
+// ENDORSEMENT_CAP_BY_MEMBERSHIP_TIER to move in the same commit. That invariant now covers
 // this file too: a new tier needs a MEMBERSHIP_TIER_RANK entry, or every gate denies
 // it (loudly — see below — but denies it).
 
@@ -19,10 +19,10 @@
 // and forgetting Pro.
 //
 // This comment used to call them "a ladder", and the change is not cosmetic:
-// "ladder" was the VOUCH axis's name, so the one sentence in this codebase
+// "ladder" was the ENDORSEMENT axis's name, so the one sentence in this codebase
 // that had to be clearest about billing was the sentence borrowing another
-// axis's word for it. The vouch axis is now vouchLevelFor() in
-// lib/vouchLevel.js and shares nothing with this file.
+// axis's word for it. The endorsement axis is now endorsementLevelFor() in
+// lib/endorsementLevel.js and shares nothing with this file.
 //
 // Ranks, not the ordered array lib/verificationLevels.js uses, because this
 // map is read with >= (see can() below) while verification levels are only
@@ -32,14 +32,14 @@ import { effectiveMembershipTier } from "./membershipExpiry.js";
 const MEMBERSHIP_TIER_RANK = { free: 0, plus: 1, pro: 2, enterprise: 3 };
 
 const FEATURE_MIN_MEMBERSHIP_TIER = {
-  // Third parties see the vouch COUNT on every plan; only paid plans show
-  // the words. See ABRI-feature-checklist.md's Free tier: "'12 vouches' is
+  // Third parties see the endorsement COUNT on every plan; only paid plans show
+  // the words. See ABRI-feature-checklist.md's Free tier: "'12 endorsements' is
   // visible, the written words are not."
   //
-  // Looks dead now that `acceptVouch` stops a Free business ever publishing
-  // a vouch — a Free profile has nothing for this to hide. It isn't. This is
+  // Looks dead now that `acceptEndorsement` stops a Free business ever publishing
+  // an endorsement — a Free profile has nothing for this to hide. It isn't. This is
   // the DOWNGRADE path, and it's the only thing that makes a downgrade mean
-  // anything: a business that published 12 vouches on Plus and then lapses
+  // anything: a business that published 12 endorsements on Plus and then lapses
   // to Free keeps the count on its page and loses the words. Without this
   // gate, cancelling Plus would cost them nothing they could see.
   //
@@ -52,25 +52,25 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // half of the contact gate. Contact details now reach every logged-in
   // member whatever the owner's plan; lib/contactVisibility.js says why.
 
-  // The two halves of the vouch paywall, and the shape of the Free tier.
-  // A Free business may RECEIVE a vouch request in full — the row is
+  // The two halves of the endorsement paywall, and the shape of the Free tier.
+  // A Free business may RECEIVE an endorsement request in full — the row is
   // created, the activity event fires, the card appears in their queue —
   // and may not move it. That is deliberate: the request sitting there
   // unanswerable is the pitch, and a gate that hid it would throw the pitch
   // away to save the member a disappointment.
   //
-  // Two features rather than one `vouching`, because they are enforced at
-  // opposite ends of the state machine (POST /vouches vs POST
-  // /vouches/:id/accept) and each reads at its own call site as the
+  // Two features rather than one `endorsing`, because they are enforced at
+  // opposite ends of the state machine (POST /endorsements vs POST
+  // /endorsements/:id/accept) and each reads at its own call site as the
   // question actually being asked.
   //
   // NOT gated, on purpose: cancel and flag. A member must always be able to
-  // get rid of a vouch they don't want and to report an abusive one —
+  // get rid of an endorsement they don't want and to report an abusive one —
   // paywalling either would make "pay us" the only way out of content
-  // somebody else put in front of you. `acceptVouch` covers revert too,
+  // somebody else put in front of you. `acceptEndorsement` covers revert too,
   // since reverting is a step towards publishing and nothing else.
-  giveVouch: "plus",
-  acceptVouch: "plus",
+  giveEndorsement: "plus",
+  acceptEndorsement: "plus",
 
   // DECLARED HERE, ENFORCED ONLY IN THE UI — for now. There is no server
   // endpoint: the card screen reads frontend/src/data/appMockData.js, which
@@ -119,7 +119,7 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // non-member at all:
   //
   //   networkOverlap — a comparison of the VIEWER's connections against the
-  //                    business's vouchers. A stranger has no network, so
+  //                    business's endorsers. A stranger has no network, so
   //                    there is nothing being taken from them.
   //   the other two   — work ABRI does FOR the viewer over time.
   //
@@ -127,7 +127,7 @@ const FEATURE_MIN_MEMBERSHIP_TIER = {
   // this by asking the business directly, gating it is charging the buyer and
   // it does not belong here.
 
-  // "2 of the businesses vouching for them are in your network." Plus, and
+  // "2 of the businesses endorsing them are in your network." Plus, and
   // the reason the check-a-business screen is worth opening twice.
   networkOverlap: "plus",
 
@@ -171,7 +171,7 @@ function can(business, feature) {
   // expires, before the hourly sweep rewrites the column (lib/membershipExpiry.js).
   const rank = MEMBERSHIP_TIER_RANK[effectiveMembershipTier(business)];
   if (rank === undefined) {
-    // Same call as vouchCap.js's: deny rather than throw, because an
+    // Same call as endorsementCap.js's: deny rather than throw, because an
     // off-union plan value is our data bug, not the visitor's, and a
     // public profile shouldn't 500 over it. Warn so we find out from the
     // logs rather than from a member asking why their page looks wrong.

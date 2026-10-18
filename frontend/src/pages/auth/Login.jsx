@@ -69,7 +69,7 @@ function Login() {
           Welcome back
         </h1>
         <p className="mt-2 text-[14px] text-grey-600 dark:text-muted-foreground">
-          Log in to manage your verified profile, vouches, and network.
+          Log in to manage your verified profile, endorsements, and network.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">

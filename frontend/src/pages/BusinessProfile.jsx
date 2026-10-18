@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import { ArrowLeft, MapPin, Building2, Clock } from "lucide-react";
 
-import { isVouchable, VOUCHABLE_VERIFICATION_LEVELS } from "@/lib/vouchRules";
+import { isEndorsable, ENDORSABLE_VERIFICATION_LEVELS } from "@/lib/endorsementRules";
 import { fetchBusiness } from "@/lib/api/businesses";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useFollows } from "@/context/FollowsContext";
@@ -23,37 +23,37 @@ import {
   KeyFacts,
   PortfolioSection,
   VerificationSection,
-  VouchesSection,
+  EndorsementsSection,
 } from "@/components/business/ProfileSections";
-import { VouchDialog } from "@/components/app/VouchDialog";
+import { EndorseDialog } from "@/components/app/EndorseDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
 import { UNCLAIMED } from "@/lib/verificationLevels";
 
-function VouchCard({ vouch }) {
+function EndorsementCard({ endorsement }) {
   return (
     <div className="rounded-2xl border border-grey-200 bg-white p-5 dark:border-border dark:bg-card">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-ink text-sm font-semibold text-yellow dark:bg-foreground dark:text-background">
-          {vouch.fromBusiness.name.charAt(0)}
+          {endorsement.fromBusiness.name.charAt(0)}
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-ink dark:text-foreground">
-            {vouch.fromBusiness.name}
+            {endorsement.fromBusiness.name}
           </div>
           <div className="text-xs text-grey-500 dark:text-muted-foreground">
-            {vouch.fromBusiness.category} ·{" "}
-            {new Date(vouch.createdAt).toLocaleDateString()}
+            {endorsement.fromBusiness.category} ·{" "}
+            {new Date(endorsement.createdAt).toLocaleDateString()}
           </div>
         </div>
       </div>
       {/* Guarded because the field is nullable in principle — an unguarded
           interpolation renders a bordered blockquote containing two bare
           quote marks, which reads as a bug rather than as absence. */}
-      {vouch.testimonial && (
+      {endorsement.testimonial && (
         <blockquote className="mt-4 border-l-2 border-yellow pl-4 text-sm italic text-grey-700 dark:text-foreground">
-          "{vouch.testimonial}"
+          "{endorsement.testimonial}"
         </blockquote>
       )}
     </div>
@@ -78,7 +78,7 @@ function BusinessProfile({ inApp = false }) {
   const { business: actingBusiness } = useAuth();
   const { connectionStateWith, connect, disconnect } = useConnections();
   const { isFollowing, follow, unfollow } = useFollows();
-  const [vouchOpen, setVouchOpen] = useState(false);
+  const [endorsementOpen, setEndorsementOpen] = useState(false);
   // Two designs of the same standard sections, being compared (28 Sep 2026):
   // "cards" (each section its own card) and "single" (one card). ?layout=single
   // picks the second; the switch that sets it only renders in development.
@@ -117,8 +117,8 @@ function BusinessProfile({ inApp = false }) {
 
   const status = loadedId !== id ? "loading" : (error ?? "ready");
 
-  // Submitting a vouch no longer changes anything visible immediately —
-  // it's pending until the receiver accepts (see the Vouch review state
+  // Submitting an endorsement no longer changes anything visible immediately —
+  // it's pending until the receiver accepts (see the Endorsement review state
   // machine) — but refetching keeps this page consistent with the
   // backend rather than silently going stale.
   function refetchBusiness() {
@@ -127,18 +127,18 @@ function BusinessProfile({ inApp = false }) {
       .catch(() => {});
   }
 
-  // Deliberately NOT part of `canVouch` below. The plan gate decides what
+  // Deliberately NOT part of `canEndorse` below. The plan gate decides what
   // the button DOES, not whether it renders — a Free member browsing the
   // directory is exactly who this feature is being sold to, and hiding the
   // button from them would hide the pitch too. Every other clause in
-  // `canVouch` is a fact about the pair (wrong tier, own business, already
-  // vouched) that no amount of money changes, which is why those still hide
+  // `canEndorse` is a fact about the pair (wrong tier, own business, already
+  // endorsed) that no amount of money changes, which is why those still hide
   // it. See components/app/UpgradePrompt.jsx.
-  const vouchGate = useUpgradeGate("giveVouch");
-  const canVouch =
+  const endorsementGate = useUpgradeGate("giveEndorsement");
+  const canEndorse =
     inApp &&
-    VOUCHABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) &&
-    isVouchable(business, actingBusiness);
+    ENDORSABLE_VERIFICATION_LEVELS.has(actingBusiness?.verificationLevel) &&
+    isEndorsable(business, actingBusiness);
   // Governs both buttons below: you have to be in the app, looking at
   // somebody else, and that somebody has to be claimed. An unclaimed listing
   // has no owner to agree to a connection or to generate anything worth
@@ -249,7 +249,7 @@ function BusinessProfile({ inApp = false }) {
       <ContactSection layout={layout} business={business} first />
       <AboutSection layout={layout} business={business} />
       <VerificationSection layout={layout} business={business} />
-      <VouchesSection layout={layout} business={business} VouchCard={VouchCard} />
+      <EndorsementsSection layout={layout} business={business} EndorsementCard={EndorsementCard} />
       <PortfolioSection layout={layout} business={business} />
       <CardSection layout={layout} business={business} />
     </>
@@ -367,13 +367,13 @@ function BusinessProfile({ inApp = false }) {
                     {isFollowing(business.id) ? "Following" : "Follow"}
                   </Button>
                 )}
-                {canVouch && (
+                {canEndorse && (
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={vouchGate.guard(() => setVouchOpen(true))}
+                    onClick={endorsementGate.guard(() => setEndorsementOpen(true))}
                   >
-                    Vouch
+                    Endorse
                   </Button>
                 )}
               </div>
@@ -390,15 +390,15 @@ function BusinessProfile({ inApp = false }) {
 
       {layout === "cards" && <div className="mt-6 space-y-6">{sections}</div>}
 
-      {canVouch && (
+      {canEndorse && (
         <>
-          <VouchDialog
-            open={vouchOpen}
-            onOpenChange={setVouchOpen}
+          <EndorseDialog
+            open={endorsementOpen}
+            onOpenChange={setEndorsementOpen}
             targetBusiness={business}
             onSuccess={refetchBusiness}
           />
-          <UpgradePrompt gate={vouchGate} />
+          <UpgradePrompt gate={endorsementGate} />
         </>
       )}
     </div>

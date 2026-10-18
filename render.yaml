@@ -6,7 +6,7 @@ services:
     rootDir: backend
     # `migrate deploy` applies any pending migrations before the new code
     # goes live. Without it a deploy that changes the schema ships code
-    # against the old tables — and since Vouch reads join through
+    # against the old tables — and since Endorsement reads join through
     # currentRevision (see lib/accountView.js), that breaks login and the
     # public profile, not just the feature being added. Safe to run every
     # time: it's a no-op when the database is already up to date, and a

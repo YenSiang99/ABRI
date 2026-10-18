@@ -4,7 +4,7 @@ import { InfoPage } from "./InfoPage";
 import { CONTACT_EMAIL, COMPANY_LEGAL_NAME } from "@/lib/site";
 
 // A DRAFT for legal review (lib/site.js LEGAL_DRAFT). Each section describes
-// a rule the product already enforces — claims, verification, vouches, the
+// a rule the product already enforces — claims, verification, endorsements, the
 // Founding programme, plans — so the terms and the software say the same
 // thing. Change both together.
 function Terms() {
@@ -26,7 +26,7 @@ function Terms() {
       <p>
         Many listings are compiled from public sources (see our{" "}
         <Link to="/privacy">privacy notice</Link>) and may be out of date or incomplete. A listing
-        is not an endorsement, and an unclaimed listing has not been checked by us. To change a
+        is not a recommendation by ABRI, and an unclaimed listing has not been checked by us. To change a
         listing, its owner claims it and edits it from their profile.
       </p>
 
@@ -47,11 +47,11 @@ function Terms() {
         </li>
       </ul>
 
-      <h2>4. Vouches and testimonials</h2>
+      <h2>4. Endorsements and testimonials</h2>
       <p>
-        A vouch says you have done business with another member and stand behind them. Vouch only
-        for businesses you know, and keep testimonials honest. Vouches are published under your
-        business&rsquo;s name. We may remove vouches that are false, traded or abusive.
+        An endorsement says you have done business with another member and stand behind them. Endorse only
+        businesses you know, and keep testimonials honest. Endorsements are published under your
+        business&rsquo;s name. We may remove endorsements that are false, traded or abusive.
       </p>
 
       <h2>5. Membership plans</h2>
@@ -67,7 +67,7 @@ function Terms() {
           your year starts on the day it is verified.
         </li>
         <li>
-          Paying for a plan never buys a verification level or vouches. We may change plans and
+          Paying for a plan never buys a verification level or endorsements. We may change plans and
           prices; changes apply from your next renewal.
         </li>
       </ul>
@@ -81,7 +81,7 @@ function Terms() {
 
       <h2>7. Your content</h2>
       <p>
-        You are responsible for what you put on your profile, in vouches and in messages. You
+        You are responsible for what you put on your profile, in endorsements and in messages. You
         allow us to show it on ABRI. Do not post anything unlawful, misleading or that belongs to
         someone else.
       </p>

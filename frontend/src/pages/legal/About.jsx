@@ -13,7 +13,7 @@ function About() {
       <p>
         Every business can be found in the directory. A business that claims its listing and
         passes our check against the SSM register earns the <b>SSM-Verified</b> badge, which no
-        one can buy. Verified members then vouch for the businesses they have actually worked
+        one can buy. Verified members then endorse the businesses they have actually worked
         with, so trust on ABRI comes from peers, not from advertising.
       </p>
       <p>

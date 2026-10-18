@@ -54,8 +54,8 @@ const QUESTIONS = [
     a: "Only members who are logged in. Visitors who aren't logged in see the business name, area, address and website.",
   },
   {
-    q: "What is a vouch?",
-    a: "A verified business saying publicly that it has worked with you and stands behind you. Vouches are tied to the voucher's own name, so they can't be bought or faked quietly.",
+    q: "What is an endorsement?",
+    a: "A verified business saying publicly that it has worked with you and stands behind you. Endorsements are tied to the endorser's own name, so they can't be bought or faked quietly.",
   },
   {
     q: "My personal data is on a listing I don't own.",

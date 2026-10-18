@@ -17,11 +17,11 @@ import { buildVerificationLevelData } from "@/lib/verificationLevelData";
 // The verification page — ONE axis, on purpose.
 //
 // It briefly tried to be all three ("Levels & tiers", at /app/levels), with
-// the vouch ladder and the membership table bolted underneath. That page
+// the endorsement ladder and the membership table bolted underneath. That page
 // answered two different questions at once and did neither well: a member who
 // only wanted to know why they were stuck at L1 had to scroll past pricing to
 // find out. The other two axes now live where you can act on them —
-// pages/app/Vouches.jsx and pages/app/Plan.jsx — and the "what does this mark
+// pages/app/Endorsements.jsx and pages/app/Plan.jsx — and the "what does this mark
 // mean" question, which is the one that actually gets asked and gets asked in
 // front of somebody else's badge, moved to components/badge/BadgeExplainer.jsx.
 //
@@ -224,7 +224,7 @@ function Verify() {
         </h1>
         <p className="mt-2 max-w-xl text-sm text-muted-foreground">
           Every level is a verifiable claim, not a self-assertion. Climb the ladder to unlock the next
-          surface of the network. No membership tier moves it, and neither do vouches.
+          surface of the network. No membership tier moves it, and neither do endorsements.
         </p>
       </div>
 

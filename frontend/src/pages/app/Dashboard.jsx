@@ -14,17 +14,17 @@ import {
 import { StatCard } from "@/components/app/StatCard";
 import { AppBusinessCard } from "@/components/app/AppBusinessCard";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
-import { VouchBadge } from "@/components/badge/VouchBadge";
+import { EndorsementBadge } from "@/components/badge/EndorsementBadge";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { verificationLevelLabel, vouchLevelLabel } from "@/lib/trustLabels";
+import { verificationLevelLabel, endorsementLevelLabel } from "@/lib/trustLabels";
 import { fetchBusinesses } from "@/lib/api/businesses";
-import { VouchDialog } from "@/components/app/VouchDialog";
+import { EndorseDialog } from "@/components/app/EndorseDialog";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
-import { fetchVouchesGiven, fetchVouchRequests } from "@/lib/api/vouches";
+import { fetchEndorsementsGiven, fetchEndorsementRequests } from "@/lib/api/endorsements";
 import { fetchMyActivity } from "@/lib/api/activity";
 import { fetchProfileViewers } from "@/lib/api/watches";
-import { isVouchable } from "@/lib/vouchRules";
+import { isEndorsable } from "@/lib/endorsementRules";
 import { activityLink } from "@/lib/activityLinks";
 import { cn } from "@/lib/utils";
 import { CLAIMED } from "@/lib/verificationLevels";
@@ -116,16 +116,16 @@ function Dashboard() {
   const [suggested, setSuggested] = useState([]);
   // One dialog for the whole suggestion grid, re-pointed per card — the
   // arrangement pages/app/feed/Feed.jsx uses, and the reason AppBusinessCard
-  // takes an onVouch callback rather than owning a dialog each.
+  // takes an onEndorse callback rather than owning a dialog each.
   //
-  // These cards used to carry a Vouch button that fired a toast and nothing
-  // else: it told a member they had vouched for somebody when no request had
+  // These cards used to carry a Endorsement button that fired a toast and nothing
+  // else: it told a member they had endorsed somebody when no request had
   // been made. Now it opens the real dialog through the same gate every other
-  // vouch affordance uses.
-  const vouchGate = useUpgradeGate("giveVouch");
-  const [vouchTarget, setVouchTarget] = useState(null);
-  const openVouch = vouchGate.guard((target) => setVouchTarget(target));
-  const [vouchesGivenCount, setVouchesGivenCount] = useState(0);
+  // endorsement affordance uses.
+  const endorsementGate = useUpgradeGate("giveEndorsement");
+  const [endorsementTarget, setEndorsementTarget] = useState(null);
+  const openEndorsement = endorsementGate.guard((target) => setEndorsementTarget(target));
+  const [endorsementsGivenCount, setEndorsementsGivenCount] = useState(0);
   const [needsYouCount, setNeedsYouCount] = useState(0);
   const [activity, setActivity] = useState([]);
   // GET /watches/viewers: the count answers on every plan (only the names
@@ -151,18 +151,18 @@ function Dashboard() {
     setActivity((current) => current.map((a) => (a.read ? a : { ...a, read: true })));
   }
 
-  // Extracted so a successful vouch can re-run it: isVouchable reads
-  // `vouchedFor` off the session business, so a business just vouched for
+  // Extracted so a successful endorsement can re-run it: isEndorsable reads
+  // `endorsedFor` off the session business, so a business just endorsed
   // must drop out of the suggestions rather than sit there offering a second
-  // vouch the server would refuse with a 409.
+  // endorsement the server would refuse with a 409.
   function loadSuggestions() {
     fetchBusinesses()
-      .then((all) => setSuggested(all.filter((b) => isVouchable(b, business)).slice(0, 3)))
+      .then((all) => setSuggested(all.filter((b) => isEndorsable(b, business)).slice(0, 3)))
       .catch(() => {});
   }
 
-  async function handleVouched() {
-    setVouchTarget(null);
+  async function handleEndorsed() {
+    setEndorsementTarget(null);
     await refreshAccount();
     loadSuggestions();
   }
@@ -178,20 +178,20 @@ function Dashboard() {
   useEffect(() => {
     if (pending) return;
     loadSuggestions();
-    fetchVouchesGiven()
+    fetchEndorsementsGiven()
       // Published only. This used to count the raw list, so declined
-      // vouches inflated the "Vouches given" stat — a number meant to
+      // endorsements inflated the "Endorsements given" stat — a number meant to
       // measure give-first contribution was counting rejections toward it.
-      .then((vouches) => setVouchesGivenCount(vouches.filter((v) => v.status === "published").length))
+      .then((endorsements) => setEndorsementsGivenCount(endorsements.filter((v) => v.status === "published").length))
       .catch(() => {});
-    fetchVouchRequests()
-      .then((vouches) => setNeedsYouCount(vouches.filter((v) => v.waitingOn === "you").length))
+    fetchEndorsementRequests()
+      .then((endorsements) => setNeedsYouCount(endorsements.filter((v) => v.waitingOn === "you").length))
       .catch(() => {});
     fetchMyActivity()
       .then(setActivity)
       .catch(() => {});
     // `business` rather than `business.id`: the suggestion filter now reads
-    // its `vouchedFor` list too, so a business you've just vouched for has
+    // its `endorsedFor` list too, so a business you've just endorsed has
     // to drop out of the suggestions on the next refreshAccount(). Identity
     // is stable between refreshes (useState in AuthContext), so this still
     // runs once per mount.
@@ -216,8 +216,8 @@ function Dashboard() {
             <Link to="/app/verify" aria-label="What the verification level means">
               <AppVerificationBadge verificationLevel={business.verificationLevel} />
             </Link>
-            <Link to="/app/vouches" aria-label="What the vouch level means">
-              <VouchBadge vouchLevel={business.vouchLevel} />
+            <Link to="/app/endorsements" aria-label="What the endorsement level means">
+              <EndorsementBadge endorsementLevel={business.endorsementLevel} />
             </Link>
           </div>
         </div>
@@ -243,7 +243,7 @@ function Dashboard() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Our team cross-checks it against the SSM register by hand, usually
-              within a couple of business days. Vouching and your NFC card unlock
+              within a couple of business days. Endorsing and your NFC card unlock
               once that's done. No action needed from you.
             </p>
           </div>
@@ -261,7 +261,7 @@ function Dashboard() {
                 Add your SSM registration number
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                We can't verify your business until we have it. Vouching and your
+                We can't verify your business until we have it. Endorsing and your
                 NFC card unlock once it's checked.
               </p>
             </div>
@@ -271,19 +271,19 @@ function Dashboard() {
       )}
 
       {/* A prompt, not a stat — the dashboard previously surfaced pending
-          vouch work only as past-tense lines in the activity feed further
+          endorsement work only as past-tense lines in the activity feed further
           down the page, which told you something had happened but not that
           it was still waiting on you, and didn't link anywhere. */}
       {!pending && needsYouCount > 0 && (
         <Link
-          to="/app/vouches"
+          to="/app/endorsements"
           className="mt-6 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:bg-secondary"
         >
           <div className="flex items-start gap-3">
             <Handshake className="mt-0.5 h-5 w-5 shrink-0 text-foreground" />
             <div>
               <div className="text-sm font-semibold text-foreground">
-                {needsYouCount} {needsYouCount === 1 ? "vouch needs" : "vouches need"} your response
+                {needsYouCount} {needsYouCount === 1 ? "endorsement needs" : "endorsements need"} your response
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Review, revise, or reply — they're waiting on you.
@@ -296,14 +296,14 @@ function Dashboard() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
-          label="Vouches received"
-          value={pending ? "—" : business.vouches.length}
+          label="Endorsements received"
+          value={pending ? "—" : business.endorsements.length}
           hint={pending ? "Unlocks after SSM verification" : "Real peers staking their name"}
           icon={Handshake}
         />
         <StatCard
-          label="Vouches given"
-          value={pending ? "—" : vouchesGivenCount}
+          label="Endorsements given"
+          value={pending ? "—" : endorsementsGivenCount}
           hint={pending ? "Unlocks after SSM verification" : "Give-first: keep going"}
           icon={TrendingUp}
         />
@@ -333,15 +333,15 @@ function Dashboard() {
           to="/app/verify"
         />
         <StatCard
-          label="Vouch level"
-          value={vouchLevelLabel[business.vouchLevel]}
+          label="Endorsement level"
+          value={endorsementLevelLabel[business.endorsementLevel]}
           hint={
-            business.vouches.length === 1
-              ? "1 vouch received"
-              : `${business.vouches.length} vouches received`
+            business.endorsements.length === 1
+              ? "1 endorsement received"
+              : `${business.endorsements.length} endorsements received`
           }
           icon={Award}
-          to="/app/vouches"
+          to="/app/endorsements"
         />
       </div>
 
@@ -410,7 +410,7 @@ function Dashboard() {
                 <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">
                   {newCount} new
                 </span>
-                {/* For the lines with nothing to open — a cancelled vouch, a
+                {/* For the lines with nothing to open — a cancelled endorsement, a
                     connection you already knew about. Without it those sit
                     unread forever, since opening is the only other way to
                     clear one. */}
@@ -445,7 +445,7 @@ function Dashboard() {
                 Give first
               </div>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
-                Businesses to vouch for
+                Businesses to endorse
               </h2>
             </div>
             <Link
@@ -457,7 +457,7 @@ function Dashboard() {
           </div>
           <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {suggested.map((b) => (
-              <AppBusinessCard key={b.id} business={b} onVouch={openVouch} />
+              <AppBusinessCard key={b.id} business={b} onEndorse={openEndorsement} />
             ))}
           </div>
         </div>
@@ -465,13 +465,13 @@ function Dashboard() {
 
       {/* Both render nothing until opened, so they sit at the page root
           rather than inside a card. */}
-      <VouchDialog
-        open={Boolean(vouchTarget)}
-        onOpenChange={(next) => !next && setVouchTarget(null)}
-        targetBusiness={vouchTarget}
-        onSuccess={handleVouched}
+      <EndorseDialog
+        open={Boolean(endorsementTarget)}
+        onOpenChange={(next) => !next && setEndorsementTarget(null)}
+        targetBusiness={endorsementTarget}
+        onSuccess={handleEndorsed}
       />
-      <UpgradePrompt gate={vouchGate} />
+      <UpgradePrompt gate={endorsementGate} />
     </div>
   );
 }

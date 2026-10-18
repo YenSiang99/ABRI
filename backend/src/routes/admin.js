@@ -18,12 +18,12 @@ import { getFoundingSettings, setFoundingSettings, parseDate } from "../lib/foun
 import { serializeAccount } from "../lib/serialize.js";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { sendVerificationEmail, devOnlyToken } from "../lib/mailer.js";
-import { serializeVouch, VOUCH_INCLUDE, BUSINESS_SELECT } from "../lib/vouchTurn.js";
+import { serializeEndorsement, ENDORSEMENT_INCLUDE, BUSINESS_SELECT } from "../lib/endorsementTurn.js";
 import { createActivityEvent } from "../lib/activityEvents.js";
 import { createNetworkEvent } from "../lib/networkEvents.js";
 import { notifyWatchers } from "../lib/businessWatch.js";
 import { MEMBERSHIP_TIER_RANK } from "../lib/entitlements.js";
-import { CLAIMED, SSM_VERIFIED, VOUCHABLE_VERIFICATION_LEVELS } from "../lib/verificationLevels.js";
+import { CLAIMED, SSM_VERIFIED, ENDORSABLE_VERIFICATION_LEVELS } from "../lib/verificationLevels.js";
 import { startPaidYear } from "../lib/businessClaim.js";
 
 const router = Router();
@@ -291,8 +291,8 @@ router.post(
 // this queue. A rejected marker would need clearing on resubmit anyway, and
 // the case where it wasn't is a business stuck looking refused forever.
 //
-// NO NOTE IS COLLECTED, and that is a deliberate difference from the vouch
-// and the vouch decisions in this file, which require one.
+// NO NOTE IS COLLECTED, and that is a deliberate difference from the endorsement
+// and the endorsement decisions in this file, which require one.
 //
 // Those write their note onto a Flag row that exists to hold it. There is no
 // equivalent row here — the submission is two columns on Business — and
@@ -385,7 +385,7 @@ router.post(
     // Checked against the entitlements rank rather than a list kept here:
     // a value this route accepted but can() didn't recognise would be sold,
     // stored, and then quietly denied every gated feature (and capped at
-    // the strictest vouch limit — see lib/vouchCap.js).
+    // the strictest endorsement limit — see lib/endorsementCap.js).
     if (!Object.hasOwn(MEMBERSHIP_TIER_RANK, membershipTier)) {
       return res
         .status(400)
@@ -414,7 +414,7 @@ router.post(
       if (membershipTier === "free") {
         return res.status(400).json({ error: "A paid tier can't be Free." });
       }
-      const verified = VOUCHABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
+      const verified = ENDORSABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
       const updated = await prisma.business.update({
         where: { id: business.id },
         data: verified ? startPaidYear(membershipTier) : { pendingMembershipTier: membershipTier },
@@ -469,12 +469,12 @@ router.put(
   }),
 );
 
-// A vouch as an admin needs to see it: everything both businesses see, plus
+// An endorsement as an admin needs to see it: everything both businesses see, plus
 // the reports and who ruled on them. Shared by the queue and by the decide
 // route's response, so a card refreshed after a decision is the same shape
 // as one that arrived in the list.
 const REVIEW_INCLUDE = {
-  ...VOUCH_INCLUDE,
+  ...ENDORSEMENT_INCLUDE,
   flags: {
     orderBy: { createdAt: "asc" },
     include: {
@@ -486,15 +486,15 @@ const REVIEW_INCLUDE = {
   },
 };
 
-function serializeReview(vouch) {
+function serializeReview(endorsement) {
   return {
     // viewerBusinessId null: an admin is party to neither side, so `role`
     // comes back null and `isYou` is false throughout the timeline, which is
     // exactly right for a third party reading it. includeAdminIdentity is
     // the one thing this payload has that the businesses' doesn't.
-    ...serializeVouch(vouch, null, { includeAdminIdentity: true }),
-    frozen: vouch.status === "under_review",
-    flags: vouch.flags.map((f) => ({
+    ...serializeEndorsement(endorsement, null, { includeAdminIdentity: true }),
+    frozen: endorsement.status === "under_review",
+    flags: endorsement.flags.map((f) => ({
       id: f.id,
       reason: f.reason,
       note: f.note,
@@ -505,7 +505,7 @@ function serializeReview(vouch) {
       resolvedBy: f.resolvedByAccount,
       raisedBy: f.raisedByBusiness,
       against: f.againstBusiness,
-      // The exact text the report was filed about — not the vouch's current
+      // The exact text the report was filed about — not the endorsement's current
       // text, which may since have been revised.
       revisionNumber: f.revision?.revisionNumber ?? null,
       revisionComment: f.revision?.comment ?? null,
@@ -513,30 +513,30 @@ function serializeReview(vouch) {
   };
 }
 
-// The vouch review queue: every vouch an admin has been asked to look at,
+// The endorsement review queue: every endorsement an admin has been asked to look at,
 // each with the whole audit trail attached rather than just the report
-// that raised it. Replaced GET /vouch-flags, which returned bare VouchFlag
+// that raised it. Replaced GET /endorsement-flags, which returned bare EndorsementFlag
 // rows — enough to see that somebody complained, not enough to judge it,
 // since the flag says nothing about what was written or what the two sides
 // had already said to each other.
 //
 // Two kinds of row land here and they are not the same job:
-//   status "under_review" — a live vouch the receiver flagged. It is
+//   status "under_review" — a live endorsement the receiver flagged. It is
 //     FROZEN: neither business can act on it (see TURN_BY_STATUS in
-//     lib/vouchTurn.js) and the 14-day expiry is paused, so it sits here
+//     lib/endorsementTurn.js) and the 14-day expiry is paused, so it sits here
 //     until an admin moves it.
-//   anything else with an open flag — a settled vouch (in practice a
+//   anything else with an open flag — a settled endorsement (in practice a
 //     cancelled one the giver called unfair). Tracking only; nothing is
 //     waiting on the outcome.
 //
-// The frozen ones are acted on through POST /vouch-reviews/:id/decide
-// below; the tracking-only ones through POST /vouch-flags/:id/resolve.
+// The frozen ones are acted on through POST /endorsement-reviews/:id/decide
+// below; the tracking-only ones through POST /endorsement-flags/:id/resolve.
 router.get(
-  "/vouch-reviews",
+  "/endorsement-reviews",
   asyncHandler(async (req, res) => {
     // Default view is the work: open reports, plus anything frozen in
     // under_review even if its flags have all been marked reviewed. That
-    // second clause exists so a frozen vouch can never quietly drop off
+    // second clause exists so a frozen endorsement can never quietly drop off
     // the queue while still being frozen for the two businesses.
     const openOnly = req.query.status !== "all";
     const where = {
@@ -546,12 +546,12 @@ router.get(
       ],
     };
 
-    const vouches = await prisma.vouch.findMany({ where, include: REVIEW_INCLUDE });
+    const endorsements = await prisma.endorsement.findMany({ where, include: REVIEW_INCLUDE });
 
     // Frozen first — those are the ones with two businesses waiting on the
     // admin — then most recently touched. Can't be expressed as a Prisma
     // orderBy, since it's a priority on one specific status value.
-    const reviews = vouches.map(serializeReview).sort((a, b) => {
+    const reviews = endorsements.map(serializeReview).sort((a, b) => {
       if (a.frozen !== b.frozen) return a.frozen ? -1 : 1;
       return new Date(b.lastActionAt) - new Date(a.lastActionAt);
     });
@@ -566,7 +566,7 @@ router.get(
 // two businesses notified, all in one transaction — and splitting that three
 // ways is three chances for the copies to drift.
 //
-// `outcome` is derived, not passed in: returning a vouch to its receiver
+// `outcome` is derived, not passed in: returning an endorsement to its receiver
 // says the report didn't stand up, and the other two say it did. Letting an
 // admin set the status and the verdict independently would allow
 // combinations that mean nothing ("sent back for edits, report dismissed")
@@ -578,8 +578,8 @@ const DECISIONS = {
     outcome: "dismissed",
     noteRequired: false,
     events: {
-      giver: "vouch_review_returned_giver",
-      receiver: "vouch_review_returned_receiver",
+      giver: "endorsement_review_returned_giver",
+      receiver: "endorsement_review_returned_receiver",
     },
   },
   send_back_to_sender: {
@@ -590,8 +590,8 @@ const DECISIONS = {
     // self-explanatory from the status it lands on; this one isn't.
     noteRequired: true,
     events: {
-      giver: "vouch_review_sent_back_giver",
-      receiver: "vouch_review_sent_back_receiver",
+      giver: "endorsement_review_sent_back_giver",
+      receiver: "endorsement_review_sent_back_receiver",
     },
   },
   cancel: {
@@ -600,14 +600,14 @@ const DECISIONS = {
     outcome: "upheld",
     noteRequired: false,
     events: {
-      giver: "vouch_review_cancelled",
-      receiver: "vouch_review_cancelled",
+      giver: "endorsement_review_cancelled",
+      receiver: "endorsement_review_cancelled",
     },
   },
 };
 
 router.post(
-  "/vouch-reviews/:id/decide",
+  "/endorsement-reviews/:id/decide",
   asyncHandler(async (req, res) => {
     const decision = DECISIONS[req.body?.decision];
     if (!decision) {
@@ -616,13 +616,13 @@ router.post(
       });
     }
 
-    const vouch = await prisma.vouch.findUnique({ where: { id: req.params.id } });
-    if (!vouch) return res.status(404).json({ error: "Vouch not found." });
-    // Only a frozen vouch is an admin's to move. Anything else is a live
+    const endorsement = await prisma.endorsement.findUnique({ where: { id: req.params.id } });
+    if (!endorsement) return res.status(404).json({ error: "Endorsement not found." });
+    // Only a frozen endorsement is an admin's to move. Anything else is a live
     // negotiation between two businesses or a settled record, and neither is
     // something this endpoint should be able to reach into.
-    if (vouch.status !== "under_review") {
-      return res.status(400).json({ error: "This vouch isn't under review." });
+    if (endorsement.status !== "under_review") {
+      return res.status(400).json({ error: "This endorsement isn't under review." });
     }
 
     const note = req.body?.note?.trim() || null;
@@ -631,12 +631,12 @@ router.post(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.vouch.update({
-        where: { id: vouch.id },
+      await tx.endorsement.update({
+        where: { id: endorsement.id },
         data: {
           status: decision.status,
           // Restarts the 14-day expiry clock from the decision rather than
-          // from whenever the vouch was flagged — the parties shouldn't lose
+          // from whenever the endorsement was flagged — the parties shouldn't lose
           // days they spent waiting in the queue.
           lastActionAt: new Date(),
           closedAt: decision.status === "cancelled" ? new Date() : null,
@@ -644,33 +644,33 @@ router.post(
       });
 
       // Deliberately leaves revisionCount and maxRevisions alone. A giver
-      // already at the cap can still make the fix (POST /vouches/:id/revise
+      // already at the cap can still make the fix (POST /endorsements/:id/revise
       // has no cap check — only the receiver's revert does), and the
       // receiver then gets accept/cancel and no further rounds. Granting an
       // extra round here would let a flag be worth a free revision.
-      await tx.vouchAction.create({
+      await tx.endorsementAction.create({
         data: {
-          vouchId: vouch.id,
-          attempt: vouch.attempt,
+          endorsementId: endorsement.id,
+          attempt: endorsement.attempt,
           action: decision.action,
-          revisionId: vouch.currentRevisionId,
+          revisionId: endorsement.currentRevisionId,
           actorId: null,
           actorAccountId: req.account.id,
           // Visible to both businesses. The flag's own note is not — that
           // one is the report, this one is the ruling.
           comment: note,
-          fromStatus: vouch.status,
+          fromStatus: endorsement.status,
           toStatus: decision.status,
         },
       });
 
-      // Every open report on the vouch, not just the one that froze it: a
+      // Every open report on the endorsement, not just the one that froze it: a
       // second business can't have filed one (only the receiver can flag a
-      // live vouch), but a giver's earlier unfair_cancel on a previous
+      // live endorsement), but a giver's earlier unfair_cancel on a previous
       // attempt could still be sitting open, and leaving it would keep the
-      // vouch in the queue after it had been dealt with.
-      await tx.vouchFlag.updateMany({
-        where: { vouchId: vouch.id, status: "open" },
+      // endorsement in the queue after it had been dealt with.
+      await tx.endorsementFlag.updateMany({
+        where: { endorsementId: endorsement.id, status: "open" },
         data: {
           status: "reviewed",
           outcome: decision.outcome,
@@ -680,56 +680,56 @@ router.post(
       });
 
       // actorBusinessId null — an admin isn't a business. Both sides get
-      // told, since the vouch just changed hands for both of them.
+      // told, since the endorsement just changed hands for both of them.
       await createActivityEvent(tx, {
-        businessId: vouch.fromBusinessId,
+        businessId: endorsement.fromBusinessId,
         actorBusinessId: null,
         type: decision.events.giver,
       });
       await createActivityEvent(tx, {
-        businessId: vouch.toBusinessId,
+        businessId: endorsement.toBusinessId,
         actorBusinessId: null,
         type: decision.events.receiver,
       });
     });
 
-    const fresh = await prisma.vouch.findUnique({
-      where: { id: vouch.id },
+    const fresh = await prisma.endorsement.findUnique({
+      where: { id: endorsement.id },
       include: REVIEW_INCLUDE,
     });
     res.json({ review: serializeReview(fresh) });
   }),
 );
 
-// Rules on a report against a vouch that's already settled — in practice a
+// Rules on a report against an endorsement that's already settled — in practice a
 // giver's "unfair_cancel" on a cancelled one. There's no state to move, so
 // this only records the judgement, and it records the SAME judgement fields
 // as a decide above: whoever later counts upheld flags per business must not
 // have to care which of the two paths produced the row.
 //
-// Refuses to touch a frozen vouch's flags. Marking those reviewed here would
-// resolve the report while leaving the vouch stuck in under_review, which is
+// Refuses to touch a frozen endorsement's flags. Marking those reviewed here would
+// resolve the report while leaving the endorsement stuck in under_review, which is
 // exactly the dead end this whole change removes — /decide is the way out.
 router.post(
-  "/vouch-flags/:id/resolve",
+  "/endorsement-flags/:id/resolve",
   asyncHandler(async (req, res) => {
     const outcome = req.body?.outcome;
     if (outcome !== "upheld" && outcome !== "dismissed") {
       return res.status(400).json({ error: "Outcome must be 'upheld' or 'dismissed'." });
     }
 
-    const flag = await prisma.vouchFlag.findUnique({
+    const flag = await prisma.endorsementFlag.findUnique({
       where: { id: req.params.id },
-      include: { vouch: { select: { status: true } } },
+      include: { endorsement: { select: { status: true } } },
     });
     if (!flag) return res.status(404).json({ error: "Flag not found." });
-    if (flag.vouch.status === "under_review") {
+    if (flag.endorsement.status === "under_review") {
       return res.status(400).json({
-        error: "This vouch is on hold — resolve it through the review decision instead.",
+        error: "This endorsement is on hold — resolve it through the review decision instead.",
       });
     }
 
-    const updated = await prisma.vouchFlag.update({
+    const updated = await prisma.endorsementFlag.update({
       where: { id: flag.id },
       data: {
         status: "reviewed",
@@ -924,10 +924,10 @@ router.delete(
 
     const either = (a, b) => ({ OR: [{ [a]: id }, { [b]: id }] });
     const counts = await Promise.all([
-      prisma.vouch.count({ where: either("fromBusinessId", "toBusinessId") }),
-      prisma.vouchRevision.count({ where: { createdById: id } }),
-      prisma.vouchFlag.count({ where: either("raisedByBusinessId", "againstBusinessId") }),
-      prisma.vouchAction.count({ where: { actorId: id } }),
+      prisma.endorsement.count({ where: either("fromBusinessId", "toBusinessId") }),
+      prisma.endorsementRevision.count({ where: { createdById: id } }),
+      prisma.endorsementFlag.count({ where: either("raisedByBusinessId", "againstBusinessId") }),
+      prisma.endorsementAction.count({ where: { actorId: id } }),
       prisma.connection.count({ where: { OR: [{ businessAId: id }, { businessBId: id }, { requestedById: id }] } }),
       prisma.follow.count({ where: either("followerId", "followedId") }),
       prisma.portfolioEntry.count({
@@ -946,7 +946,7 @@ router.delete(
     ]);
     if (counts.some((n) => n > 0)) {
       return res.status(409).json({
-        error: "This business has activity on the network (vouches, connections or similar), so it can't be deleted.",
+        error: "This business has activity on the network (endorsements, connections or similar), so it can't be deleted.",
       });
     }
 

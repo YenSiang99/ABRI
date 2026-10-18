@@ -27,8 +27,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
-import { VouchBadge } from "@/components/badge/VouchBadge";
-import { VouchListItem } from "@/components/app/VouchListItem";
+import { EndorsementBadge } from "@/components/badge/EndorsementBadge";
+import { EndorsementListItem } from "@/components/app/EndorsementListItem";
 import { LockedFeature } from "@/components/app/LockedFeature";
 import { useAuth } from "@/context/AuthContext";
 import { updateMyBusiness, fetchBusinesses } from "@/lib/api/businesses";
@@ -802,7 +802,7 @@ function Profile() {
   // The owner always sees their own testimonials here (/auth/me is
   // ungated) — this is only about what VISITORS get on the public profile.
   const testimonialsHidden =
-    business.vouchCount > 0 &&
+    business.endorsementCount > 0 &&
     !membershipTierAllows(business.membershipTier, "testimonials");
   // Same shape as the line above, and the same reason: /auth/me is ungated, so
   // the owner always sees their own contact details here. These two flags are
@@ -858,8 +858,8 @@ function Profile() {
                     verificationLevel={business.verificationLevel}
                   />
                 </Link>
-                <Link to="/app/vouches" aria-label="What the vouch level means">
-                  <VouchBadge vouchLevel={business.vouchLevel} />
+                <Link to="/app/endorsements" aria-label="What the endorsement level means">
+                  <EndorsementBadge endorsementLevel={business.endorsementLevel} />
                 </Link>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
                   <Radio className="h-3 w-3" /> Live
@@ -881,12 +881,12 @@ function Profile() {
           </div>
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Vouches Received
+              Endorsements Received
             </div>
             <div className="mt-1 text-sm text-foreground">
               {locked
                 ? "Unlocks after SSM verification"
-                : `${business.vouchCount} peers`}
+                : `${business.endorsementCount} peers`}
             </div>
           </div>
           <div>
@@ -903,8 +903,8 @@ function Profile() {
       <Tabs defaultValue="overview" className="mt-8">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="vouches">
-            Vouches ({locked ? 0 : business.vouchCount})
+          <TabsTrigger value="endorsements">
+            Endorsements ({locked ? 0 : business.endorsementCount})
           </TabsTrigger>
           <TabsTrigger value="card">NFC Card</TabsTrigger>
         </TabsList>
@@ -968,7 +968,7 @@ function Profile() {
           </div>
         </TabsContent>
 
-        <TabsContent value="vouches" className="mt-6 grid gap-4 md:grid-cols-2">
+        <TabsContent value="endorsements" className="mt-6 grid gap-4 md:grid-cols-2">
           {/* The upgrade pitch lives here and nowhere else. The owner is
               the only person who should be sold this, and this is the one
               screen where they're looking at the exact text that visitors
@@ -981,9 +981,9 @@ function Profile() {
             <div className="md:col-span-2">
               <LockedFeature
                 requiredMembershipTier="plus"
-                title="Your written vouches aren't shown"
-                description={`Visitors can see that you have ${business.vouchCount} ${
-                  business.vouchCount === 1 ? "vouch" : "vouches"
+                title="Your written endorsements aren't shown"
+                description={`Visitors can see that you have ${business.endorsementCount} ${
+                  business.endorsementCount === 1 ? "endorsement" : "endorsements"
                 } — but not what any of them say.`}
               />
             </div>
@@ -991,24 +991,24 @@ function Profile() {
           {locked ? (
             <div className="md:col-span-2">
               <LockedFeature
-                title="Vouches locked"
-                description="Vouches you receive will appear here once your SSM verification is complete."
+                title="Endorsements locked"
+                description="Endorsements you receive will appear here once your SSM verification is complete."
               />
             </div>
-          ) : business.vouchCount > 0 ? (
-            // onChanged was missing here, so "Vouch back" from this page
+          ) : business.endorsementCount > 0 ? (
+            // onChanged was missing here, so "Endorse back" from this page
             // submitted fine but left the UI showing pre-submit state.
-            business.vouches.map((v) => (
-              <VouchListItem
+            business.endorsements.map((v) => (
+              <EndorsementListItem
                 key={v.id}
-                vouch={v}
+                endorsement={v}
                 mode="received"
                 onChanged={refreshAccount}
               />
             ))
           ) : (
             <p className="text-sm text-muted-foreground md:col-span-2">
-              No vouches yet.
+              No endorsements yet.
             </p>
           )}
         </TabsContent>

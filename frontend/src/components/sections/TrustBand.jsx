@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 // Three MARKS, not levels — see components/badge/VerificationIcon.jsx.
 // Note this section deliberately blends the two earned axes into one ramp:
-// card 1 is a verification level, cards 2 and 3 are vouch levels.
+// card 1 is a verification level, cards 2 and 3 are endorsement levels.
 const MARKS = [
   {
     mark: "verified",
@@ -18,8 +18,8 @@ const MARKS = [
     mark: "trusted",
     heading: "Trusted Business",
     description:
-      "Vouched for by verified peers — ten businesses have staked their own name on this one.",
-    earn: "Earned: 10 verified vouches",
+      "Endorsed by verified peers — ten businesses have staked their own name on this one.",
+    earn: "Earned: 10 verified endorsements",
     featured: false,
   },
   {
@@ -30,7 +30,7 @@ const MARKS = [
     earn: "Earned: 25 received · 10 given",
     featured: false,
     // `soon` dropped Aug 2026: this rung was unreachable for months — the
-    // label map carried five and vouchLevelFor() could only ever return four
+    // label map carried five and endorsementLevelFor() could only ever return four
     // — so the flag was honest. It is implemented now, at the threshold this
     // card already advertised.
     soon: false,
@@ -39,16 +39,16 @@ const MARKS = [
 
 const CHECKLIST = [
   {
-    bold: "Only verified members can vouch",
-    rest: " — one vouch per business, tied publicly to the voucher's own profile.",
+    bold: "Only verified members can endorse",
+    rest: " — one endorsement per business, tied publicly to the endorser's own profile.",
   },
   {
-    bold: "Every vouch can carry a testimonial",
+    bold: "Every endorsement can carry a testimonial",
     rest: " — 140 characters, quotable, living on your profile permanently.",
   },
   {
     bold: "Generosity comes back",
-    rest: " — thank your voucher, vouch back, and both profiles grow.",
+    rest: " — thank your endorser, endorse back, and both profiles grow.",
   },
 ];
 
@@ -102,7 +102,7 @@ function TrustBand() {
         <div className="grid grid-cols-1 items-center gap-10 md:grid-cols-2 md:gap-16">
           <div>
             <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
-              Vouching · how status is earned
+              Endorsing · how status is earned
             </span>
             <h2 className="mt-3 text-[clamp(24px,2.8vw,32px)] leading-[1.15] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
               Credibility from peers who stake their name on it.
@@ -135,7 +135,7 @@ function TrustBand() {
                   Nimbus IT Consulting
                 </div>
                 <div className="font-mono text-[11px] text-grey-500 dark:text-muted-foreground">
-                  verified vouch · Jun 2026
+                  verified endorsement · Jun 2026
                 </div>
               </div>
             </div>
@@ -147,7 +147,7 @@ function TrustBand() {
                 variant="outline"
                 className="h-auto flex-1 justify-center rounded-sm border-grey-300 py-2.5 text-[13px] dark:border-border"
               >
-                Vouch back
+                Endorse back
               </Button>
             </div>
           </div>

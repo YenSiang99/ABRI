@@ -28,7 +28,7 @@ function AppLayout() {
   // assumes one exists — see AppSidebar/Dashboard) would break for them.
   // Keep admins confined to the /app/admin subtree instead of teaching
   // each page about the admin case. A prefix rather than an equality check
-  // so admin can have more than one screen (claims review, vouch review).
+  // so admin can have more than one screen (claims review, endorsement review).
   if (isAdmin && !pathname.startsWith("/app/admin")) {
     return <Navigate to="/app/admin" replace />;
   }

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 // `to` is optional. When present the whole card becomes a link, using the same
 // hover wash the Dashboard's work prompts use — so a member who doesn't know
-// what "SSM-Verified" or "First Vouch" means can press the thing that confused
+// what "SSM-Verified" or "First Endorsement" means can press the thing that confused
 // them and land on the page that explains it.
 //
 // Optional rather than required because most stat cards are terminal facts

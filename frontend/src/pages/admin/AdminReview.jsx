@@ -506,7 +506,7 @@ function AdminReview() {
   // This page used to pair each claim with a row from GET /businesses
   // instead, which runs every row through omitBillingFields — so
   // membershipTier never arrived and the tier step had nothing to show.
-  // Nothing here reads vouchCount or vouchLevel, the only fields that endpoint
+  // Nothing here reads endorsementCount or endorsementLevel, the only fields that endpoint
   // added, so the second request is gone rather than merged.
   function loadData() {
     return fetchAdminClaims()

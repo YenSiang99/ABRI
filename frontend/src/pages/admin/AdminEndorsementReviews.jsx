@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 
-import { fetchVouchReviews, decideVouchReview, resolveVouchFlag } from "@/lib/api/admin";
-import { VouchTimeline } from "@/components/app/VouchTimeline";
+import { fetchEndorsementReviews, decideEndorsementReview, resolveEndorsementFlag } from "@/lib/api/admin";
+import { EndorsementTimeline } from "@/components/app/EndorsementTimeline";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,9 +18,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/AuthContext";
 
-// Human labels for VouchFlag.reason (see schema.prisma). The two content
+// Human labels for EndorsementFlag.reason (see schema.prisma). The two content
 // reasons come from the receiver's Flag action; unfair_cancel is the
-// giver's, raised after the fact on an already-cancelled vouch.
+// giver's, raised after the fact on an already-cancelled endorsement.
 const REASON_LABEL = {
   abusive_content: "Abusive / bad-faith content",
   other: "Other",
@@ -28,14 +28,14 @@ const REASON_LABEL = {
 };
 
 // Mirrors DECISIONS in backend/src/routes/admin.js. Each entry spells out
-// where the vouch lands and who ends up holding it, because that — not the
+// where the endorsement lands and who ends up holding it, because that — not the
 // verdict on the report — is what the two businesses will actually
 // experience, and it's the thing an admin should be choosing between.
 const DECISIONS = {
   return_to_receiver: {
     label: "Return to receiver",
     title: "Return this to the receiver",
-    body: "The report doesn't stand up. The vouch goes back to the receiver, who can accept it, send it back for edits or cancel it as normal. The 14-day timeout restarts.",
+    body: "The report doesn't stand up. The endorsement goes back to the receiver, who can accept it, send it back for edits or cancel it as normal. The 14-day timeout restarts.",
     confirm: "Return it",
     variant: "default",
     noteRequired: false,
@@ -44,17 +44,17 @@ const DECISIONS = {
   send_back_to_sender: {
     label: "Send back for edits",
     title: "Send this back to the sender",
-    body: "The testimonial needs changing before it goes any further. The giver must revise it, and it then returns to the receiver as a normal pending vouch.",
+    body: "The testimonial needs changing before it goes any further. The giver must revise it, and it then returns to the receiver as a normal pending endorsement.",
     confirm: "Send it back",
     variant: "default",
     noteRequired: true,
     notePlaceholder: "What has to change? (required — both businesses see this)",
   },
   cancel: {
-    label: "Cancel the vouch",
-    title: "Cancel this vouch",
-    body: "It ends here and is never published. The giver can start a fresh attempt for this business later, same as any cancelled vouch.",
-    confirm: "Cancel the vouch",
+    label: "Cancel the endorsement",
+    title: "Cancel this endorsement",
+    body: "It ends here and is never published. The giver can start a fresh attempt for this business later, same as any cancelled endorsement.",
+    confirm: "Cancel the endorsement",
     variant: "destructive",
     noteRequired: false,
     notePlaceholder: "Note for both businesses (optional — they'll both see this)",
@@ -76,7 +76,7 @@ function DecisionDialog({ review, decision, onOpenChange, onDone }) {
   const [submitting, setSubmitting] = useState(false);
 
   // Adjust state during render rather than in a useEffect — the pattern used
-  // by every other dialog in this app (see components/app/VouchDialog.jsx).
+  // by every other dialog in this app (see components/app/EndorseDialog.jsx).
   const [prevDecision, setPrevDecision] = useState(decision);
   if (decision !== prevDecision) {
     setPrevDecision(decision);
@@ -93,7 +93,7 @@ function DecisionDialog({ review, decision, onOpenChange, onDone }) {
     }
     setSubmitting(true);
     try {
-      const updated = await decideVouchReview(review.id, {
+      const updated = await decideEndorsementReview(review.id, {
         decision,
         note: note.trim() || undefined,
       });
@@ -181,10 +181,10 @@ function FlagCard({ flag, onResolve, busy }) {
         </div>
       )}
 
-      {/* Only for reports on settled vouches. A frozen vouch's reports are
+      {/* Only for reports on settled endorsements. A frozen endorsement's reports are
           resolved by the decision that unfreezes it — the server rejects
           resolving them here, precisely so a report can't be closed while
-          the vouch it froze stays stuck. */}
+          the endorsement it froze stays stuck. */}
       {onResolve && flag.status === "open" && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => onResolve(flag, "upheld")} disabled={busy}>
@@ -199,8 +199,8 @@ function FlagCard({ flag, onResolve, busy }) {
   );
 }
 
-// The whole case, on one card: who vouched for whom, the reports, and the
-// complete audit trail — the same VouchTimeline both businesses see, so
+// The whole case, on one card: who endorsed whom, the reports, and the
+// complete audit trail — the same EndorsementTimeline both businesses see, so
 // there's no admin-only version of events to reconcile against theirs.
 function ReviewCard({ review, onReplace }) {
   const [decision, setDecision] = useState(null);
@@ -209,10 +209,10 @@ function ReviewCard({ review, onReplace }) {
   async function resolveFlag(flag, outcome) {
     setBusy(true);
     try {
-      await resolveVouchFlag(flag.id, { outcome });
+      await resolveEndorsementFlag(flag.id, { outcome });
       toast.success(outcome === "upheld" ? "Report upheld" : "Report dismissed");
       // Patch the one flag rather than refetching the whole queue: nothing
-      // else about a settled vouch changed, and a refetch would reorder the
+      // else about a settled endorsement changed, and a refetch would reorder the
       // list under the admin mid-read.
       onReplace({
         ...review,
@@ -232,7 +232,7 @@ function ReviewCard({ review, onReplace }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-bold text-foreground">{review.fromBusiness?.name}</span>
         <AppVerificationBadge verificationLevel={review.fromBusiness?.verificationLevel} />
-        <span className="text-muted-foreground">vouched for</span>
+        <span className="text-muted-foreground">endorsed</span>
         <span className="font-bold text-foreground">{review.toBusiness?.name}</span>
         <AppVerificationBadge verificationLevel={review.toBusiness?.verificationLevel} />
         {review.frozen ? (
@@ -296,7 +296,7 @@ function ReviewCard({ review, onReplace }) {
         <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Full history
         </div>
-        <VouchTimeline timeline={review.timeline} />
+        <EndorsementTimeline timeline={review.timeline} />
       </div>
 
       <DecisionDialog
@@ -322,7 +322,7 @@ function ReviewList({ reviews, empty, onReplace }) {
   );
 }
 
-// The only place a vouch can leave "under_review". Every card carries the
+// The only place an endorsement can leave "under_review". Every card carries the
 // reports, the exact text each was filed against, and the same timeline both
 // businesses see — an admin rules on the trail, not on the complaint alone.
 //
@@ -330,7 +330,7 @@ function ReviewList({ reviews, empty, onReplace }) {
 // card that has just been acted on stops being frozen and would otherwise
 // jump between tabs (or out of the list) under the cursor of the person who
 // just clicked it.
-function AdminVouchReviews() {
+function AdminEndorsementReviews() {
   const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
@@ -341,7 +341,7 @@ function AdminVouchReviews() {
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
-    fetchVouchReviews()
+    fetchEndorsementReviews()
       .then((rows) => {
         if (!cancelled) setReviews(rows);
       })
@@ -375,12 +375,12 @@ function AdminVouchReviews() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <h1 className="text-2xl font-extrabold tracking-[-0.02em] text-foreground">
-        Vouch review
+        Endorsement review
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        A receiver who flags a vouch freezes it: neither business can accept, edit or cancel it, and
+        A receiver who flags an endorsement freezes it: neither business can accept, edit or cancel it, and
         the 14-day timeout stops, so those sit here until you return it, send it back for edits or
-        cancel it. Reports on already-cancelled vouches are tracking only — there's nothing left to
+        cancel it. Reports on already-cancelled endorsements are tracking only — there's nothing left to
         move, so those just get a verdict.
       </p>
 
@@ -393,14 +393,14 @@ function AdminVouchReviews() {
           <ReviewList
             reviews={frozen}
             onReplace={replaceReview}
-            empty="No vouches are waiting on an admin right now."
+            empty="No endorsements are waiting on an admin right now."
           />
         </TabsContent>
         <TabsContent value="tracking">
           <ReviewList
             reviews={tracking}
             onReplace={replaceReview}
-            empty="No open reports on settled vouches."
+            empty="No open reports on settled endorsements."
           />
         </TabsContent>
       </Tabs>
@@ -408,4 +408,4 @@ function AdminVouchReviews() {
   );
 }
 
-export { AdminVouchReviews };
+export { AdminEndorsementReviews };

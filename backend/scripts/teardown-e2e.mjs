@@ -9,9 +9,9 @@
 //
 // ORDER IS LOAD-BEARING. The schema declares only three onDelete: Cascade
 // rules, so every other child has to go before its parent or Postgres refuses
-// the delete. The one genuine trap is Vouch <-> VouchRevision: the vouch points
-// at its current revision and the revision points back at the vouch, so the
-// pointer is nulled first and the revisions go before the vouch.
+// the delete. The one genuine trap is Endorsement <-> EndorsementRevision: the endorsement points
+// at its current revision and the revision points back at the endorsement, so the
+// pointer is nulled first and the revisions go before the endorsement.
 import { PrismaClient } from "@prisma/client";
 import fs from "node:fs";
 
@@ -35,20 +35,20 @@ if (bizIds.length === 0 && accIds.length === 0) {
   process.exit(0);
 }
 
-// Vouches owned by e2e businesses drag their own children along, so their ids
+// Endorsements owned by e2e businesses drag their own children along, so their ids
 // are needed before anything is deleted.
-const vouchIds = (await db.vouch.findMany({
+const endorsementIds = (await db.endorsement.findMany({
   where: { OR: [{ fromBusinessId: biz }, { toBusinessId: biz }] }, select: { id: true },
 })).map((v) => v.id);
 
 const steps = [
-  ["networkEvent",  { OR: [{ actorBusinessId: biz }, { subjectBusinessId: biz }, { vouchId: { in: vouchIds } }] }],
-  ["vouchFlag",     { OR: [{ vouchId: { in: vouchIds } }, { againstBusinessId: biz }, { raisedByBusinessId: biz }, { resolvedByAccountId: { in: accIds } }] }],
-  ["vouchAction",   { OR: [{ vouchId: { in: vouchIds } }, { actorAccountId: { in: accIds } }] }],
-  // Vouch.currentRevisionId -> VouchRevision.id has no cascade; break it first.
+  ["networkEvent",  { OR: [{ actorBusinessId: biz }, { subjectBusinessId: biz }, { endorsementId: { in: endorsementIds } }] }],
+  ["endorsementFlag",     { OR: [{ endorsementId: { in: endorsementIds } }, { againstBusinessId: biz }, { raisedByBusinessId: biz }, { resolvedByAccountId: { in: accIds } }] }],
+  ["endorsementAction",   { OR: [{ endorsementId: { in: endorsementIds } }, { actorAccountId: { in: accIds } }] }],
+  // Endorsement.currentRevisionId -> EndorsementRevision.id has no cascade; break it first.
   ["__nullRevisionPointers", null],
-  ["vouchRevision", { OR: [{ vouchId: { in: vouchIds } }, { createdById: { in: accIds } }] }],
-  ["vouch",         { id: { in: vouchIds } }],
+  ["endorsementRevision", { OR: [{ endorsementId: { in: endorsementIds } }, { createdById: { in: accIds } }] }],
+  ["endorsement",         { id: { in: endorsementIds } }],
   ["activityEvent", { OR: [{ actorBusinessId: biz }, { businessId: biz }] }],
   ["connection",    { OR: [{ businessAId: biz }, { businessBId: biz }, { requestedById: biz }] }],
   ["follow",        { OR: [{ followerId: biz }, { followedId: biz }] }],
@@ -73,7 +73,7 @@ const run = async (tx) => {
   const report = {};
   for (const [model, where] of steps) {
     if (model === "__nullRevisionPointers") {
-      if (!DRY) await tx.vouch.updateMany({ where: { id: { in: vouchIds } }, data: { currentRevisionId: null } });
+      if (!DRY) await tx.endorsement.updateMany({ where: { id: { in: endorsementIds } }, data: { currentRevisionId: null } });
       continue;
     }
     report[model] = DRY

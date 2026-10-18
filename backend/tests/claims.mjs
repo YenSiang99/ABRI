@@ -114,9 +114,9 @@ r = await a("/connections", { method: "POST", body: { businessId: `${P}a2`, sour
 assert.ok(r.status >= 400 && r.status < 500, `connect -> ${r.status}`);
 r = await a("/follows", { method: "POST", body: { businessId: `${P}a2` } });
 assert.ok(r.status >= 400 && r.status < 500, `follow -> ${r.status}`);
-r = await a("/vouches", { method: "POST", body: { toBusinessId: `${P}target`, testimonial: "x".repeat(40) } });
-assert.ok(r.status >= 400 && r.status < 500, `vouch -> ${r.status}`);
-ok("edit, SSM, connect, follow and vouch are all refused (4xx, never 5xx)");
+r = await a("/endorsements", { method: "POST", body: { toBusinessId: `${P}target`, testimonial: "x".repeat(40) } });
+assert.ok(r.status >= 400 && r.status < 500, `endorsement -> ${r.status}`);
+ok("edit, SSM, connect, follow and endorse are all refused (4xx, never 5xx)");
 
 r = await a("/businesses?page=1");
 assert.equal(r.status, 200, `directory -> ${r.status}`);

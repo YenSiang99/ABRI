@@ -1,7 +1,7 @@
 import { prisma } from "../prisma.js";
-import { VOUCHABLE_VERIFICATION_LEVELS } from "./verificationLevels.js";
+import { ENDORSABLE_VERIFICATION_LEVELS } from "./verificationLevels.js";
 import { serializeAccount } from "./serialize.js";
-import { vouchLevelFor } from "./vouchLevel.js";
+import { endorsementLevelFor } from "./endorsementLevel.js";
 import {
   confirmedPortfolioFor,
   portfolioSummaryFor,
@@ -10,18 +10,18 @@ import {
 import { verificationTimelineFor } from "./verificationTimeline.js";
 import { claimCodeTarget, maskEmail } from "./claimCode.js";
 
-// Shapes a Business row (with its vouchesReceived relation loaded) into what
-// the frontend expects: vouchCount/vouchLevel derived at read time (never
-// stored, per schema.prisma) plus a flat `vouches` list mirroring the old
-// mock store's shape so components like VouchListItem don't need to branch
+// Shapes a Business row (with its endorsementsReceived relation loaded) into what
+// the frontend expects: endorsementCount/endorsementLevel derived at read time (never
+// stored, per schema.prisma) plus a flat `endorsements` list mirroring the old
+// mock store's shape so components like EndorsementListItem don't need to branch
 // on where the data came from.
 //
 // Filters to status: "published" here, defensively, rather than relying on
-// every caller's query to have already filtered — a vouch only becomes a
-// trust signal once its receiver has accepted it (see the Vouch review
+// every caller's query to have already filtered — an endorsement only becomes a
+// trust signal once its receiver has accepted it (see the Endorsement review
 // state machine in schema.prisma); pending/reverted/under_review/cancelled
-// rows must never count toward vouchCount/vouchLevel or appear in the public
-// `vouches` list.
+// rows must never count toward endorsementCount/endorsementLevel or appear in the public
+// `endorsements` list.
 // Billing columns are for the business itself and for admins, never for
 // whoever is looking at it. They live on the same row as the public profile
 // fields, so any handler that spreads a raw Business row leaks them — which
@@ -148,7 +148,7 @@ const PUBLIC_BUSINESS_FIELDS = [
 // The owner and admins see it at every level, via serializeBusiness and the
 // admin routes — neither goes through this function.
 function ssmIsPublic(business) {
-  return VOUCHABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
+  return ENDORSABLE_VERIFICATION_LEVELS.has(business.verificationLevel);
 }
 
 function publicBusinessView(business, { showContact = false } = {}) {
@@ -173,35 +173,35 @@ function publicBusinessView(business, { showContact = false } = {}) {
 // special case anywhere else. Reached only via loadAccountView, i.e. /login,
 // /auth/me and /verify-claim.
 function serializeBusiness(business) {
-  const { vouchesReceived, vouchesGiven, ...rest } = business;
-  const published = vouchesReceived.filter((v) => v.status === "published");
-  const vouchCount = published.length;
-  // Both directions, because the top vouch level ("leader") is the one rung
+  const { endorsementsReceived, endorsementsGiven, ...rest } = business;
+  const published = endorsementsReceived.filter((v) => v.status === "published");
+  const endorsementCount = published.length;
+  // Both directions, because the top endorsement level ("leader") is the one rung
   // that rewards GIVING — 25 received AND 10 given. Passing only the received
   // count silently caps every business at "trusted", which is exactly how
   // that rung went unreachable for months.
-  const vouchesGivenPublished = (vouchesGiven ?? []).filter((v) => v.status === "published").length;
+  const endorsementsGivenPublished = (endorsementsGiven ?? []).filter((v) => v.status === "published").length;
   return {
     ...rest,
-    vouchCount,
-    vouchLevel: vouchLevelFor({ received: vouchCount, given: vouchesGivenPublished }),
-    // Who this business already has a vouch OUT to, and where it stands.
-    // Mirrors the 409 guard in routes/vouches.js exactly: cancelled rows are
-    // omitted because a cancelled pair may vouch again, and every other
-    // status blocks a fresh POST /vouches. Without this the client had no
-    // way to know its own outgoing vouches — /auth/me's `vouches` is the
-    // received direction — so every "vouch for them" affordance rendered
+    endorsementCount,
+    endorsementLevel: endorsementLevelFor({ received: endorsementCount, given: endorsementsGivenPublished }),
+    // Who this business already has an endorsement OUT to, and where it stands.
+    // Mirrors the 409 guard in routes/endorsements.js exactly: cancelled rows are
+    // omitted because a cancelled pair may endorse again, and every other
+    // status blocks a fresh POST /endorsements. Without this the client had no
+    // way to know its own outgoing endorsements — /auth/me's `endorsements` is the
+    // received direction — so every "endorse them" affordance rendered
     // unconditionally and failed on submit.
-    vouchedFor: (vouchesGiven ?? [])
+    endorsedFor: (endorsementsGiven ?? [])
       .filter((v) => v.status !== "cancelled")
       .map((v) => ({ businessId: v.toBusinessId, status: v.status })),
-    vouches: published.map((v) => ({
+    endorsements: published.map((v) => ({
       id: v.id,
       fromBusinessId: v.fromBusinessId,
       fromName: v.fromBusiness.name,
       fromCategory: v.fromBusiness.category,
       fromVerificationLevel: v.fromBusiness.verificationLevel,
-      // Joined through currentRevision rather than read off the Vouch row:
+      // Joined through currentRevision rather than read off the Endorsement row:
       // the denormalized `testimonial` column this used to read is gone
       // (see schema.prisma), because it was the thing a revise overwrote.
       testimonial: v.currentRevision?.comment ?? null,
@@ -234,17 +234,17 @@ async function loadAccountView(accountId) {
     include: {
       business: {
         include: {
-          vouchesReceived: {
+          endorsementsReceived: {
             include: {
               fromBusiness: { select: { name: true, category: true, verificationLevel: true } },
               currentRevision: { select: { comment: true } },
             },
             orderBy: { createdAt: "desc" },
           },
-          // Two scalars, no joins — this feeds the client's "can I vouch for
+          // Two scalars, no joins — this feeds the client's "can I endorse
           // them" gate, which needs the target and the status and nothing
-          // else. The testimonials on this side belong to /vouches/given.
-          vouchesGiven: { select: { toBusinessId: true, status: true } },
+          // else. The testimonials on this side belong to /endorsements/given.
+          endorsementsGiven: { select: { toBusinessId: true, status: true } },
 
         },
       },

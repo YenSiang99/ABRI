@@ -8,11 +8,11 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { VouchRequestCard } from "@/components/app/VouchRequestCard";
+import { EndorsementRequestCard } from "@/components/app/EndorsementRequestCard";
 import { RequestCard } from "@/pages/app/network/NetworkRequests";
 import { useConnections } from "@/context/ConnectionsContext";
 import { useNotifications } from "@/context/NotificationsContext";
-import { fetchVouchRequests } from "@/lib/api/vouches";
+import { fetchEndorsementRequests } from "@/lib/api/endorsements";
 import {
   fetchPortfolio,
   confirmPortfolioEntry,
@@ -23,15 +23,15 @@ import { toast } from "@/lib/toast";
 // Everything waiting on this member, in one place.
 //
 // THE PROBLEM THIS SOLVES is that "what needs me?" used to be four badges on
-// four rows in two sidebar groups — unread activity on Dashboard, vouch turns
-// on Vouches, work waiting to be confirmed, and connection requests two
+// four rows in two sidebar groups — unread activity on Dashboard, endorsement turns
+// on Endorsements, work waiting to be confirmed, and connection requests two
 // levels deep under Network. The badge doctrine in AppSidebar.jsx was already right
 // (a count means somebody is owed something); what was wrong was that a
 // member had to assemble the answer from four places.
 //
 // IT OWNS THE WORK, IT DOES NOT DUPLICATE IT. Every card here is the component
-// the original page already renders — VouchRequestCard, and RequestCard
-// exported from NetworkRequests — so accepting a vouch or a connection runs
+// the original page already renders — EndorsementRequestCard, and RequestCard
+// exported from NetworkRequests — so accepting an endorsement or a connection runs
 // exactly one implementation. The pages those came from still exist and still
 // show the same items in their own fuller context; this is a second door onto
 // the same rows, not a second copy of them.
@@ -42,7 +42,7 @@ import { toast } from "@/lib/toast";
 // instead of "things you owe" — which is the distinction that makes an inbox
 // worth opening at all. It stays on Home.
 
-const TABS = ["vouches", "connections", "portfolio"];
+const TABS = ["endorsements", "connections", "portfolio"];
 
 // One proposed portfolio entry waiting on this member.
 //
@@ -161,15 +161,15 @@ function Empty({ children }) {
 function Inbox() {
   const { incoming } = useConnections();
   const {
-    vouchActionCount,
-    refreshVouchActions,
+    endorsementActionCount,
+    refreshEndorsementActions,
   } = useNotifications();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("tab");
-  const tab = TABS.includes(requested) ? requested : "vouches";
+  const tab = TABS.includes(requested) ? requested : "endorsements";
 
-  const [vouches, setVouches] = useState([]);
+  const [endorsements, setEndorsements] = useState([]);
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState("loading");
 
@@ -178,13 +178,13 @@ function Inbox() {
   // appeared after you opened the pile would defeat the point of the row.
   function load() {
     return Promise.all([
-      fetchVouchRequests().catch(() => []),
+      fetchEndorsementRequests().catch(() => []),
       fetchPortfolio("pending").catch(() => []),
-    ]).then(([vouchRows, portfolioRows]) => {
-      setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
+    ]).then(([endorsementRows, portfolioRows]) => {
+      setEndorsements(endorsementRows.filter((v) => v.waitingOn === "you"));
       // Only the ones waiting on THIS member. A pending portfolio entry they
       // proposed is waiting on the other side and is not their work — the same
-      // rule the vouch filter above applies with waitingOn.
+      // rule the endorsement filter above applies with waitingOn.
       setEntries(portfolioRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
@@ -193,11 +193,11 @@ function Inbox() {
   useEffect(() => {
     let live = true;
     Promise.all([
-      fetchVouchRequests().catch(() => []),
+      fetchEndorsementRequests().catch(() => []),
       fetchPortfolio("pending").catch(() => []),
-    ]).then(([vouchRows, portfolioRows]) => {
+    ]).then(([endorsementRows, portfolioRows]) => {
       if (!live) return;
-      setVouches(vouchRows.filter((v) => v.waitingOn === "you"));
+      setEndorsements(endorsementRows.filter((v) => v.waitingOn === "you"));
       setEntries(portfolioRows.filter((e) => !e.proposedByYou));
       setStatus("ready");
     });
@@ -206,27 +206,27 @@ function Inbox() {
     };
   }, []);
 
-  // Acting on a vouch changes both this list and the sidebar badge, and the
+  // Acting on an endorsement changes both this list and the sidebar badge, and the
   // two read from different places — refetch both rather than adjusting one
   // and letting them drift.
-  async function onVouchChanged() {
+  async function onEndorsementChanged() {
     await load();
-    refreshVouchActions?.();
+    refreshEndorsementActions?.();
   }
 
   function setTab(next) {
-    setSearchParams(next === "vouches" ? {} : { tab: next }, { replace: true });
+    setSearchParams(next === "endorsements" ? {} : { tab: next }, { replace: true });
   }
 
   // Counted off the fetched rows, not the context badges: the context is the
   // sidebar's copy and can be a moment stale after an accept, while these are
   // what the member is looking at.
   const counts = {
-    vouches: status === "ready" ? vouches.length : vouchActionCount,
+    endorsements: status === "ready" ? endorsements.length : endorsementActionCount,
     connections: incoming.length,
     entries: entries.length,
   };
-  const total = counts.vouches + counts.connections + counts.entries;
+  const total = counts.endorsements + counts.connections + counts.entries;
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -244,12 +244,12 @@ function Inbox() {
 
       <div role="tablist" className="mt-8 flex gap-6 border-b border-border">
         <TabButton
-          active={tab === "vouches"}
-          onClick={() => setTab("vouches")}
-          count={counts.vouches}
+          active={tab === "endorsements"}
+          onClick={() => setTab("endorsements")}
+          count={counts.endorsements}
           icon={Handshake}
         >
-          Vouches
+          Endorsements
         </TabButton>
         <TabButton
           active={tab === "connections"}
@@ -273,19 +273,18 @@ function Inbox() {
         <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
       )}
 
-      {status === "ready" && tab === "vouches" && (
+      {status === "ready" && tab === "endorsements" && (
         <div className="mt-6 flex flex-col gap-4">
-          {vouches.length === 0 ? (
+          {endorsements.length === 0 ? (
             <Empty>
-              No vouch requests need you. They appear here when someone vouches
-              for you, or sends one back for editing.
+              No endorsement requests need you. They appear here when someone endorses you, or sends one back for editing.
             </Empty>
           ) : (
-            vouches.map((v) => (
-              <VouchRequestCard
+            endorsements.map((v) => (
+              <EndorsementRequestCard
                 key={v.id}
-                vouch={v}
-                onChanged={onVouchChanged}
+                endorsement={v}
+                onChanged={onEndorsementChanged}
               />
             ))
           )}

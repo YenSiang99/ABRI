@@ -147,21 +147,21 @@ const raw = JSON.stringify(d);
 for (const key of ["phone", "whatsapp", "membershipTier", "passwordHash", "isFoundingMember"]) {
   assert.ok(!raw.includes(`"${key}"`), `an anonymous lookup must not carry ${key}`);
 }
-// The vouch numbers moved behind a session in Sep 2026, on BOTH this route
+// The endorsement numbers moved behind a session in Sep 2026, on BOTH this route
 // and the directory, so the two surfaces cannot disagree about what a
 // stranger is worth showing. What an anonymous visitor keeps is the
 // verification level — the honest answer to "are they real", which is this
 // screen's whole promise and is never for sale.
-assert.ok(!("vouchCount" in d.matches[0]), "the vouch count needs an account");
+assert.ok(!("endorsementCount" in d.matches[0]), "the endorsement count needs an account");
 assert.ok(d.matches[0].verificationLevel, "the verification level never does");
-assert.ok(!("vouchesReceived" in d.matches[0]), "voucher names are never on this route, at any tier");
+assert.ok(!("endorsementsReceived" in d.matches[0]), "endorser names are never on this route, at any tier");
 // The internal lookup key must never leave the server, at any level or to
 // any viewer — it is a derived index, not a fact about the business.
 assert.ok(!raw.includes("ssmNormalized"), "ssmNormalized is server-side only");
 ok("level yes; count, contact, billing and lookup key all withheld");
 
 d = await look(member, "E2E Recommended");
-assert.ok("vouchCount" in d.matches[0], "and a free account is what reveals it");
+assert.ok("endorsementCount" in d.matches[0], "and a free account is what reveals it");
 ok("a session turns the count on — a real number, not a blurred one");
 
 // ─────────────────────────────────────────────────────────────────────────

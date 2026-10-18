@@ -38,7 +38,7 @@ function setBusinessMembershipTier(businessId, { membershipTier, expiresAt, paid
   }).then((data) => data.business);
 }
 
-// Every vouch an admin has been asked to look at, each with its full
+// Every endorsement an admin has been asked to look at, each with its full
 // timeline and the reports raised against it. `status: "all"` also returns
 // ones whose reports have already been marked reviewed.
 // The SSM review queue: businesses that submitted a registration number and
@@ -58,27 +58,27 @@ function rejectSsm(businessId) {
   return apiFetch(`/admin/businesses/${businessId}/reject-ssm`, { method: "POST" });
 }
 
-function fetchVouchReviews({ status } = {}) {
+function fetchEndorsementReviews({ status } = {}) {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiFetch(`/admin/vouch-reviews${query}`).then((data) => data.reviews);
+  return apiFetch(`/admin/endorsement-reviews${query}`).then((data) => data.reviews);
 }
 
-// Moves a frozen vouch out of under_review. `decision` is one of
+// Moves a frozen endorsement out of under_review. `decision` is one of
 // "return_to_receiver" | "send_back_to_sender" | "cancel"; `note` is
 // required for send_back_to_sender and shown to both businesses. Resolves
-// the vouch's open reports as a side effect and returns the refreshed
+// the endorsement's open reports as a side effect and returns the refreshed
 // review card.
-function decideVouchReview(id, { decision, note } = {}) {
-  return apiFetch(`/admin/vouch-reviews/${id}/decide`, {
+function decideEndorsementReview(id, { decision, note } = {}) {
+  return apiFetch(`/admin/endorsement-reviews/${id}/decide`, {
     method: "POST",
     body: { decision, note },
   }).then((data) => data.review);
 }
 
-// The settled-vouch path: records a verdict on a report without moving
+// The settled-endorsement path: records a verdict on a report without moving
 // anything, since there's nothing left to move.
-function resolveVouchFlag(id, { outcome, note } = {}) {
-  return apiFetch(`/admin/vouch-flags/${id}/resolve`, {
+function resolveEndorsementFlag(id, { outcome, note } = {}) {
+  return apiFetch(`/admin/endorsement-flags/${id}/resolve`, {
     method: "POST",
     body: { outcome, note },
   }).then((data) => data.flag);
@@ -133,7 +133,7 @@ export {
   verifySsm,
   revokeSsm,
   setBusinessMembershipTier,
-  fetchVouchReviews,
-  decideVouchReview,
-  resolveVouchFlag,
+  fetchEndorsementReviews,
+  decideEndorsementReview,
+  resolveEndorsementFlag,
 };

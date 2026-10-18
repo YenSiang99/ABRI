@@ -7,15 +7,15 @@
 
 // Events that land on the giver's own record rather than their queue —
 // they name something that has already settled, and the Requests tab (which
-// only lists in-flight vouches) won't contain it.
+// only lists in-flight endorsements) won't contain it.
 const GIVEN_TAB_TYPES = new Set([
-  "vouch_published",
-  "vouch_cancelled",
-  "vouch_expired",
+  "endorsement_published",
+  "endorsement_cancelled",
+  "endorsement_expired",
 ]);
 
 // Portfolio entries. All four land on the Inbox tab rather than a specific row, for
-// the structural reason this file already states about vouches:
+// the structural reason this file already states about endorsements:
 // ActivityEvent carries a type and an actor and no subject id, so there is
 // nothing to deep-link to.
 //
@@ -56,12 +56,12 @@ function activityLink(event) {
 
   if (PORTFOLIO_TYPES.has(event.type)) return "/app/inbox?tab=portfolio";
 
-  if (GIVEN_TAB_TYPES.has(event.type)) return "/app/vouches?tab=given";
+  if (GIVEN_TAB_TYPES.has(event.type)) return "/app/endorsements?tab=given";
 
-  // Everything else in the vouch lifecycle is an in-flight negotiation, which
+  // Everything else in the endorsement lifecycle is an in-flight negotiation, which
   // is exactly what the Requests tab holds — including the flagged ones, which
   // sit in its "Under review" section.
-  if (event.type.startsWith("vouch_")) return "/app/vouches";
+  if (event.type.startsWith("endorsement_")) return "/app/endorsements";
 
   return null;
 }

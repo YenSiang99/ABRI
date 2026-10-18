@@ -11,16 +11,16 @@ import {
   markActivityRead,
   markOneActivityRead,
 } from "@/lib/api/activity";
-import { fetchVouchRequests } from "@/lib/api/vouches";
+import { fetchEndorsementRequests } from "@/lib/api/endorsements";
 import { fetchPortfolio } from "@/lib/api/portfolio";
 import { useAuth } from "./AuthContext";
 
-// The two numbers the sidebar puts on nav items: unread activity, and vouches
+// The two numbers the sidebar puts on nav items: unread activity, and endorsements
 // whose turn is yours. Both answer "what needs me?", both have to be readable
 // from the sidebar and writable from the page that clears them, and those two
 // never share a subtree — AppSidebar sits beside the <Outlet> in AppLayout.
 // Without a shared copy the badges would hold their mount-time numbers for the
-// whole session, so a member who had just cleared their vouch queue would
+// whole session, so a member who had just cleared their endorsement queue would
 // still be told three were waiting.
 const NotificationsContext = createContext(null);
 
@@ -29,7 +29,7 @@ function NotificationsProvider({ children }) {
   const [loaded, setLoaded] = useState({
     businessId: null,
     unread: 0,
-    vouchActions: 0,
+    endorsementActions: 0,
   });
 
   const businessId = business?.id ?? null;
@@ -47,24 +47,24 @@ function NotificationsProvider({ children }) {
     Promise.all([
       fetchUnreadActivityCount().catch(() => 0),
       // Counts only what's on you, matching the "Needs you" section and tab
-      // badge in Vouches.jsx. A badge that included vouches awaiting the
+      // badge in Endorsements.jsx. A badge that included endorsements awaiting the
       // other party's revision would nag about work the member can't do.
-      fetchVouchRequests()
-        .then((vouches) => vouches.filter((v) => v.waitingOn === "you").length)
+      fetchEndorsementRequests()
+        .then((endorsements) => endorsements.filter((v) => v.waitingOn === "you").length)
         .catch(() => 0),
       // Only the ones waiting on THIS member. A portfolio entry they proposed is
       // waiting on the other side, and counting it would nag them about work
-      // that is not theirs — the same rule the vouch count applies with
+      // that is not theirs — the same rule the endorsement count applies with
       // waitingOn, and the reason the Sent connection tab has no badge.
       fetchPortfolio("pending")
         .then((rows) => rows.filter((e) => !e.proposedByYou).length)
         .catch(() => 0),
-    ]).then(([unread, vouchActions, portfolioActions]) => {
+    ]).then(([unread, endorsementActions, portfolioActions]) => {
       if (!cancelled)
         setLoaded({
           businessId,
           unread,
-          vouchActions,
+          endorsementActions,
           portfolioActions,
         });
     });
@@ -81,7 +81,7 @@ function NotificationsProvider({ children }) {
   // in flight.
   const isCurrent = Boolean(businessId) && loaded.businessId === businessId;
   const unreadCount = isCurrent ? loaded.unread : 0;
-  const vouchActionCount = isCurrent ? loaded.vouchActions : 0;
+  const endorsementActionCount = isCurrent ? loaded.endorsementActions : 0;
   const portfolioCount = isCurrent ? loaded.portfolioActions : 0;
 
   // Opening a notification clears that one. Decrements rather than refetching
@@ -124,15 +124,15 @@ function NotificationsProvider({ children }) {
     }
   }, []);
 
-  // Called by Vouches.jsx after any action that can change whose turn it is.
-  // Refetches rather than decrementing: accepting one vouch can settle others
+  // Called by Endorsements.jsx after any action that can change whose turn it is.
+  // Refetches rather than decrementing: accepting one endorsement can settle others
   // (an expiry swept on read, an admin decision landing between loads), so the
   // server's count is the only one worth trusting.
-  const refreshVouchActions = useCallback(async () => {
+  const refreshEndorsementActions = useCallback(async () => {
     try {
-      const vouches = await fetchVouchRequests();
-      const vouchActions = vouches.filter((v) => v.waitingOn === "you").length;
-      setLoaded((current) => ({ ...current, vouchActions }));
+      const endorsements = await fetchEndorsementRequests();
+      const endorsementActions = endorsements.filter((v) => v.waitingOn === "you").length;
+      setLoaded((current) => ({ ...current, endorsementActions }));
     } catch {
       // Leave the badge as-is. The page that triggered this shows the real
       // list anyway, so a stale number beside it is better than a wrong one.
@@ -143,11 +143,11 @@ function NotificationsProvider({ children }) {
     <NotificationsContext.Provider
       value={{
         unreadCount,
-        vouchActionCount,
+        endorsementActionCount,
         portfolioCount,
         markOneRead,
         markAllRead,
-        refreshVouchActions,
+        refreshEndorsementActions,
       }}
     >
       {children}

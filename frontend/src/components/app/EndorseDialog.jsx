@@ -13,21 +13,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { isVouchable } from "@/lib/vouchRules";
-import { submitVouch, reviseVouch } from "@/lib/api/vouches";
+import { isEndorsable } from "@/lib/endorsementRules";
+import { submitEndorsement, reviseEndorsement } from "@/lib/api/endorsements";
 import { toast } from "@/lib/toast";
 
-// mode "create": submit a fresh vouch (against a fixed targetBusiness, or
-// picked from a search list). mode "revise": editing an existing vouch
-// that's in "reverted" — vouchId/initialTestimonial required,
-// no business picker (the target is already fixed by the existing vouch).
-function VouchDialog({
+// mode "create": submit a fresh endorsement (against a fixed targetBusiness, or
+// picked from a search list). mode "revise": editing an existing endorsement
+// that's in "reverted" — endorsementId/initialTestimonial required,
+// no business picker (the target is already fixed by the existing endorsement).
+function EndorseDialog({
   open,
   onOpenChange,
   targetBusiness,
   businesses,
   mode = "create",
-  vouchId,
+  endorsementId,
   initialTestimonial = "",
   onSuccess,
 }) {
@@ -38,7 +38,7 @@ function VouchDialog({
   const [submitting, setSubmitting] = useState(false);
 
   // Fields are reset on every open (not on close) so a dialog reused for
-  // different vouches — e.g. "Vouch back" pre-targeting a different
+  // different endorsements — e.g. "Endorse back" pre-targeting a different
   // business each time — never shows stale state from a previous use.
   // Adjusting state during render (guarded by comparing against the
   // previous `open` value) rather than in a useEffect, per
@@ -50,7 +50,7 @@ function VouchDialog({
       setSelected(null);
       setSearch("");
       // Seeded in both modes: "revise" starts from the text being changed,
-      // and "Vouch again" on a closed vouch starts from what was written
+      // and "Endorse again" on a closed endorsement starts from what was written
       // last time rather than a blank box.
       setTestimonial(initialTestimonial ?? "");
     }
@@ -62,7 +62,7 @@ function VouchDialog({
   const filtered = fixed || !businesses
     ? []
     : businesses
-        .filter((b) => isVouchable(b, business) && b.name.toLowerCase().includes(search.toLowerCase()))
+        .filter((b) => isEndorsable(b, business) && b.name.toLowerCase().includes(search.toLowerCase()))
         .slice(0, 6);
 
   async function submit() {
@@ -73,7 +73,7 @@ function VouchDialog({
       }
       setSubmitting(true);
       try {
-        await reviseVouch(vouchId, testimonial.trim());
+        await reviseEndorsement(endorsementId, testimonial.trim());
         toast.success("Revision sent for review");
         onOpenChange(false);
         onSuccess?.();
@@ -91,8 +91,8 @@ function VouchDialog({
     }
     setSubmitting(true);
     try {
-      await submitVouch({ toBusinessId: active.id, testimonial: testimonial.trim() });
-      toast.success(`Vouch sent to ${active.name} for review`);
+      await submitEndorsement({ toBusinessId: active.id, testimonial: testimonial.trim() });
+      toast.success(`Endorsement sent to ${active.name} for review`);
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -106,11 +106,11 @@ function VouchDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{mode === "revise" ? "Revise your vouch" : "Vouch for a business"}</DialogTitle>
+          <DialogTitle>{mode === "revise" ? "Revise your endorsement" : "Endorse a business"}</DialogTitle>
           <DialogDescription>
             {mode === "revise"
               ? "Update your testimonial based on their feedback, then resend it for review."
-              : "You're staking your reputation. Vouch only for businesses you'd genuinely recommend."}
+              : "You're staking your reputation. Endorse only businesses you'd genuinely recommend."}
           </DialogDescription>
         </DialogHeader>
 
@@ -177,7 +177,7 @@ function VouchDialog({
             <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               {/* Not optional, despite what this label used to say: both
                   branches of submit() reject empty text, and it's the body
-                  of the vouch's first VouchRevision server-side. */}
+                  of the endorsement's first EndorsementRevision server-side. */}
               Testimonial (140 chars)
             </label>
             <Textarea
@@ -197,7 +197,7 @@ function VouchDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={submitting}>
-            {submitting ? "Sending…" : mode === "revise" ? "Resend vouch" : "Submit vouch"}
+            {submitting ? "Sending…" : mode === "revise" ? "Resend endorsement" : "Submit endorsement"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -205,4 +205,4 @@ function VouchDialog({
   );
 }
 
-export { VouchDialog };
+export { EndorseDialog };

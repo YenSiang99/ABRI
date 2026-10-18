@@ -68,7 +68,7 @@ function AppDirectory() {
         page,
       });
       // Your own business is never a search result — you cannot connect to,
-      // follow or vouch for yourself, so every action on the card would be
+      // follow or endorse yourself, so every action on the card would be
       // dead. Filtered here rather than server-side because the same route
       // serves logged-out callers, who have no "own business".
       const rows = data.businesses.filter((b) => b.id !== business?.id);
@@ -195,7 +195,7 @@ function AppDirectory() {
                 />
                 {/* Plus, and silent when there is no overlap. */}
                 <NetworkOverlap
-                  vouchers={b.vouchersInYourNetwork}
+                  endorsers={b.endorsersInYourNetwork}
                   basePath="/app/business"
                 />
                 {/* Pro. STILL A SIBLING OF THE CARD, NOT A CHILD — BusinessCard

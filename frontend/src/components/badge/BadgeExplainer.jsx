@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { VERIFICATION_LEVEL_SUBTITLE } from "@/components/badge/VerificationBadge";
 import { VERIFICATION_LEVELS } from "@/lib/verificationLevels";
-import { verificationLevelLabel, vouchLevelLabel } from "@/lib/trustLabels";
-import { VOUCH_LEVELS, reachedAt } from "@/lib/vouchLevelData";
+import { verificationLevelLabel, endorsementLevelLabel } from "@/lib/trustLabels";
+import { ENDORSEMENT_LEVELS, reachedAt } from "@/lib/endorsementLevelData";
 import {
   MEMBERSHIP_TIER_ORDER,
   membershipTierLabel,
@@ -27,13 +27,13 @@ import { cn } from "@/lib/utils";
 // This exists because a destination page structurally cannot solve that. The
 // confusion happens while looking at a mark on somebody ELSE'S profile in the
 // directory, and nobody leaves the page they're on to go read a glossary.
-// pages/app/Verify.jsx, pages/app/Vouches.jsx and pages/app/Plan.jsx answer
+// pages/app/Verify.jsx, pages/app/Endorsements.jsx and pages/app/Plan.jsx answer
 // the other question — "where do I stand and how do I move up" — which is
 // deliberate, self-directed, and does deserve a page.
 //
 // Every string below is imported. Not one line of copy is written here: the
 // rung meanings are the same VERIFICATION_LEVEL_SUBTITLE the badge itself
-// renders, the thresholds are lib/vouchLevelData.js, and the tier pitches are
+// renders, the thresholds are lib/endorsementLevelData.js, and the tier pitches are
 // lib/membershipTiers.js. An explainer that paraphrases the thing it explains
 // is how the old Dashboard and Verify pages came to disagree about what L3
 // needed — see the header of lib/verificationLevelData.js.
@@ -54,13 +54,13 @@ const AXES = {
     // Circular mark, per the visual grammar in components/app/AppSidebar.jsx.
     triggerShape: "rounded-full",
   },
-  vouch: {
-    title: "Vouch level",
+  endorsement: {
+    title: "Endorsement level",
     what: "How many verified peers have staked their own reputation on you.",
     movedBy: "Other businesses do.",
     buyable: "No — and you can't give it to yourself.",
-    to: "/app/vouches",
-    cta: "Your vouches",
+    to: "/app/endorsements",
+    cta: "Your endorsements",
     // Pill.
     triggerShape: "rounded-full",
   },
@@ -95,12 +95,12 @@ function rowsFor(axis, business) {
       current: business?.verificationLevel === level,
     }));
   }
-  if (axis === "vouch") {
-    return VOUCH_LEVELS.map((level) => ({
+  if (axis === "endorsement") {
+    return ENDORSEMENT_LEVELS.map((level) => ({
       key: level.key,
-      label: vouchLevelLabel[level.key],
+      label: endorsementLevelLabel[level.key],
       note: reachedAt(level),
-      current: business?.vouchLevel === level.key,
+      current: business?.endorsementLevel === level.key,
     }));
   }
   return MEMBERSHIP_TIER_ORDER.map((tier) => ({
@@ -131,8 +131,8 @@ function ExplainBadge({ axis, business, children, className }) {
   // part that works — so they get it without the link.
   const { account } = useAuth();
   // Suppress the link when it points at the page the reader is already on.
-  // The vouch strip on /app/vouches opens this dialog, and offering "Your
-  // vouches →" from there sends someone back where they started, which reads
+  // The endorsement strip on /app/endorsements opens this dialog, and offering "Your
+  // endorsements →" from there sends someone back where they started, which reads
   // as a broken link rather than as a no-op.
   const { pathname } = useLocation();
   const meta = AXES[axis];

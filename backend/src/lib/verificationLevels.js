@@ -14,7 +14,7 @@
 // Before this module existed, the level values appeared as bare literals in
 // thirty-odd places across both packages. A value change meant finding all fourteen and getting every
 // one right, with a silent failure if you didn't: a business holding a value
-// no Set contains is refused vouching and rendered with
+// no Set contains is refused endorsing and rendered with
 // no badge icon, with nothing in the logs to say why.
 const VERIFICATION_LEVELS = ["L0", "L1", "L2", "L3", "L4"];
 
@@ -29,19 +29,19 @@ const UNCLAIMED = VERIFICATION_LEVELS[0];
 const CLAIMED = VERIFICATION_LEVELS[1];
 const SSM_VERIFIED = VERIFICATION_LEVELS[2];
 
-// SSM-verified and above. Gives a vouch.
+// SSM-verified and above. Gives an endorsement.
 //
 // ASK_POSTING_VERIFICATION_LEVELS sat beside this and held the same three
 // values, kept separate so one could be widened without silently widening the
 // other. It went with the asks board in Sept 2026. If a second gate at this
 // level arrives, give it its own Set again for the same reason rather than
 // sharing this one — what they must NOT be is two independent literals.
-const VOUCHABLE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
+const ENDORSABLE_VERIFICATION_LEVELS = new Set(VERIFICATION_LEVELS.slice(2));
 
 // Every level from `level` upwards, as an array ready for a Prisma `in`.
 //
 // The ONE place the ordering above is used for anything but labelling, and it
-// reads the order the same way VOUCHABLE_VERIFICATION_LEVELS does — by
+// reads the order the same way ENDORSABLE_VERIFICATION_LEVELS does — by
 // slicing the array — rather than by comparing two stored values with `<`.
 // The distinction is the one the header makes: the order lives here and only
 // here, so the stored strings stay free to change.
@@ -67,7 +67,7 @@ export {
   UNCLAIMED,
   CLAIMED,
   SSM_VERIFIED,
-  VOUCHABLE_VERIFICATION_LEVELS,
+  ENDORSABLE_VERIFICATION_LEVELS,
   verificationLevelsAtOrAbove,
   isValidVerificationLevel,
 };

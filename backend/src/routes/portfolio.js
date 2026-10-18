@@ -251,7 +251,7 @@ router.get(
       orderBy: [{ lastActionAt: "desc" }, { id: "desc" }],
     });
 
-    // Swept on read, the same shape routes/vouches.js uses:
+    // Swept on read, the same shape routes/endorsements.js uses:
     // there is no cron, so the list read is where a lapse gets noticed.
     const swept = await Promise.all(rows.map(applyExpiryIfNeeded));
     res.json({ entries: swept.map((e) => serializePortfolioEntry(e, own.id)) });

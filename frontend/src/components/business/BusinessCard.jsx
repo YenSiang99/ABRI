@@ -92,26 +92,26 @@ function BusinessCard({
       </div>
       {/* FOUR states, four strings, and the order matters.
           
-          "Log in to see vouches" is checked on the KEY BEING ABSENT, not on a
-          zero: GET /businesses withholds vouchCount from an anonymous caller
+          "Log in to see endorsements" is checked on the KEY BEING ABSENT, not on a
+          zero: GET /businesses withholds endorsementCount from an anonymous caller
           rather than zeroing it, precisely so this line can tell "we're not
           telling you" from "the answer is none". Collapsing them would show
-          "No vouches yet" about a business with forty, which is a lie told to
+          "No endorsements yet" about a business with forty, which is a lie told to
           exactly the reader we are trying to convince to sign up.
           
           The verification line comes first because an L1 business has no
-          vouches to withhold — telling a stranger to log in for a number that
+          endorsements to withhold — telling a stranger to log in for a number that
           does not exist spends the one action we asked of them and teaches
           them the prompt lies. Same precedence contactVisibility uses when it
           reports owner_plan ahead of viewer_anonymous. */}
       <div className="mt-4 text-[13px] text-grey-500 dark:text-muted-foreground">
         {business.verificationLevel === CLAIMED
-          ? "Vouches unlock after SSM verification"
-          : business.vouchCount === undefined
-            ? "Log in to see vouches"
-            : business.vouchCount > 0
-              ? `${business.vouchCount} vouches`
-              : "No vouches yet"}
+          ? "Endorsements unlock after SSM verification"
+          : business.endorsementCount === undefined
+            ? "Log in to see endorsements"
+            : business.endorsementCount > 0
+              ? `${business.endorsementCount} endorsements`
+              : "No endorsements yet"}
       </div>
       {showActions && (
         <div className="mt-auto flex gap-2 pt-4">

@@ -8,14 +8,14 @@
 // THE ONE INVARIANT IN THIS FILE, and the thing to preserve above all else:
 // a NetworkEvent is a POINTER, never a copy. It carries the ids of the two
 // businesses and a foreign key to the content — the testimonial text lives on
-// VouchRevision and the feed joins through for it. Nothing here is a second
+// EndorsementRevision and the feed joins through for it. Nothing here is a second
 // copy of anything that can be edited, withdrawn, frozen or revoked.
 //
 // That is what buys moderation for free. visibleNetworkEventsWhere below
 // requires each event's source to STILL be in a publishable state, so a
-// flagged vouch or a revoked SSM verification drops its own announcement out
+// flagged endorsement or a revoked SSM verification drops its own announcement out
 // of the feed with no compensating write anywhere. Nothing in routes/admin.js
-// or routes/vouches.js has to know this table exists in order to un-say
+// or routes/endorsements.js has to know this table exists in order to un-say
 // something.
 import {
   VERIFICATION_LEVELS,
@@ -28,12 +28,12 @@ import {
 // NetworkEvent.type. String column, so this Set is what actually constrains
 // it — the role BUSINESS_CATEGORIES plays in lib/businessVocab.js.
 //
-// "vouch_published" deliberately shares its name with the ActivityEvent type
+// "endorsement_published" deliberately shares its name with the ActivityEvent type
 // of the same name. It is one real-world event written for two audiences —
 // the giver's inbox and the network — and a second name would hide that they
 // are the same thing.
 const NETWORK_EVENT_TYPES = new Set([
-  "vouch_published",
+  "endorsement_published",
   "business_claimed",
   "business_verified",
   // RECORDED BUT NEVER ANNOUNCED, and the asymmetry is deliberate.
@@ -94,12 +94,12 @@ const NETWORK_BUSINESS_SELECT = {
 //
 // The content relation is selected down to the single field the card renders
 // plus the status the `where` already filtered on. An explicit select rather
-// than `include: true`, so widening Vouch later cannot push a new column into
+// than `include: true`, so widening Endorsement later cannot push a new column into
 // a public feed by default.
 const NETWORK_EVENT_INCLUDE = {
   subjectBusiness: { select: NETWORK_BUSINESS_SELECT },
   actorBusiness: { select: NETWORK_BUSINESS_SELECT },
-  vouch: {
+  endorsement: {
     select: { status: true, currentRevision: { select: { comment: true } } },
   },
 };
@@ -115,14 +115,14 @@ const NETWORK_EVENT_INCLUDE = {
 // level types read as `(id, null, null, "L2")` at the call site.
 function createNetworkEvent(
   client,
-  { type, subjectBusinessId, actorBusinessId = null, vouchId = null },
+  { type, subjectBusinessId, actorBusinessId = null, endorsementId = null },
 ) {
   return client.networkEvent.create({
     data: {
       type,
       subjectBusinessId,
       actorBusinessId,
-      vouchId,
+      endorsementId,
       // Derived from the type, never passed in — the same call routes/admin.js
       // makes with a flag's `outcome`. A caller that could set this
       // independently could write a business_verified row announcing L1.
@@ -152,7 +152,7 @@ function createNetworkEvent(
 function visibleNetworkEventsWhere({ followedIds = null } = {}) {
   const live = {
     OR: [
-      { type: "vouch_published", vouch: { is: { status: "published" } } },
+      { type: "endorsement_published", endorsement: { is: { status: "published" } } },
       ...VERIFICATION_LEVELS.map((level) => ({
         type: { in: LEVEL_EVENT_TYPES },
         toVerificationLevel: level,
@@ -165,7 +165,7 @@ function visibleNetworkEventsWhere({ followedIds = null } = {}) {
 
   if (!followedIds) return live;
 
-  // Either end counts: a vouch written BY someone you follow is as much news
+  // Either end counts: an endorsement written BY someone you follow is as much news
   // as one written ABOUT them.
   return {
     AND: [
@@ -200,10 +200,10 @@ function serializeNetworkEvent(event) {
     actor: event.actorBusiness ?? null,
     subject: event.subjectBusiness,
     // Null on the two level types, which announce a fact rather than quote
-    // anyone. `currentRevision` is optional on Vouch, so a published vouch
+    // anyone. `currentRevision` is optional on Endorsement, so a published endorsement
     // with no revision row (impossible today, cheap to survive) renders as a
     // quoteless card instead of throwing.
-    quote: event.vouch?.currentRevision?.comment ?? null,
+    quote: event.endorsement?.currentRevision?.comment ?? null,
     // Only the level types carry this; the card reads it for its label so it
     // does not need a second copy of which type means which level.
     toVerificationLevel: event.toVerificationLevel ?? null,

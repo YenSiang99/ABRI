@@ -9,7 +9,7 @@ import { membershipTierLabel } from "@/lib/membershipTiers";
 // `requiredMembershipTier` is opt-in rather than derived from the feature, because
 // the same lock is worth selling against in one place and not in another.
 // A visitor reading someone else's profile is the wrong person to pitch an
-// upgrade to (see the comment at the vouches tab in BusinessProfile.jsx);
+// upgrade to (see the comment at the endorsements tab in BusinessProfile.jsx);
 // the owner looking at their own profile is exactly the right one. Passing
 // it adds the membership-tier chip and the link to pricing; leaving it off renders
 // the panel exactly as it did before the prop existed.
@@ -28,7 +28,7 @@ function LockedFeature({ title, description, requiredMembershipTier }) {
           {/* Same squared mono chip the sidebar uses for the member's own
               membership tier, for the same reason: it has to read as the
               thing you BUY, not as a third trust signal beside the
-              verification level and the vouch level. Squared, mono, muted,
+              verification level and the endorsement level. Squared, mono, muted,
               never yellow. See schema.prisma's membershipTier comment. */}
           <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
             Included in {tierName}

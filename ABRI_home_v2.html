@@ -82,9 +82,9 @@
   .verline .vh{display:flex;justify-content:space-between;background:var(--surface);border-bottom:1px solid var(--grey-200);padding:8px 14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey-500)}
   .verline .vb{padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.7}
   .verline .ok{color:var(--yellow-ink);background:var(--yellow-soft);border-radius:4px;padding:0 5px}
-  .vouchline{border-left:2px solid var(--grey-200);padding-left:14px;margin:16px 0 4px}
-  .vouchline p{font-style:italic;font-size:14px;color:#4a473f}
-  .vouchline .who{display:flex;align-items:center;gap:7px;margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--grey-500)}
+  .endorseline{border-left:2px solid var(--grey-200);padding-left:14px;margin:16px 0 4px}
+  .endorseline p{font-style:italic;font-size:14px;color:#4a473f}
+  .endorseline .who{display:flex;align-items:center;gap:7px;margin-top:7px;font-family:var(--mono);font-size:11px;color:var(--grey-500)}
   .pactions{display:flex;gap:10px;margin-top:18px}
   .pactions .btn{padding:10px 15px;font-size:13.5px;flex:1;justify-content:center}
 
@@ -117,7 +117,7 @@
   .step .mono-tag{display:inline-block;margin-top:16px;font-family:var(--mono);font-size:11.5px;color:var(--grey-500);background:var(--surface-2);border-radius:5px;padding:4px 9px}
   .quiet-pain{text-align:center;margin-top:44px;font-size:15px;color:var(--grey-500);font-style:italic}
 
-  /* badge + vouch combined */
+  /* badge + endorsement combined */
   .trust-band{background:#fff;border-top:1px solid var(--grey-200);border-bottom:1px solid var(--grey-200)}
   .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:72px}
   @media(max-width:860px){.tiers{grid-template-columns:1fr}}
@@ -128,15 +128,15 @@
   .tier-card .earn{margin-top:14px;font-family:var(--mono);font-size:11.5px;color:var(--grey-500)}
   .soon{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border:1px dashed var(--grey-300);border-radius:999px;padding:3px 8px;color:var(--grey-500)}
 
-  .vouch-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
-  @media(max-width:920px){.vouch-grid{grid-template-columns:1fr;gap:40px}}
-  .vouch-demo{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:26px;max-width:420px}
-  .vouch-demo .q{font-size:16.5px;font-style:italic;color:#3d3a34;line-height:1.55}
-  .vouch-demo .who{display:flex;align-items:center;gap:9px;margin-top:14px}
-  .vouch-demo .who .nm{font-weight:700;font-size:13.5px}
-  .vouch-demo .who .vf{font-family:var(--mono);font-size:11px;color:var(--grey-500)}
-  .vouch-demo .loop{border-top:1px solid var(--grey-100);margin-top:18px;padding-top:16px;display:flex;gap:10px}
-  .vouch-demo .loop .btn{flex:1;justify-content:center;padding:10px;font-size:13px}
+  .endorsement-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+  @media(max-width:920px){.endorsement-grid{grid-template-columns:1fr;gap:40px}}
+  .endorsement-demo{background:#fff;border:1px solid var(--grey-200);border-radius:var(--r-lg);box-shadow:var(--shadow-card);padding:26px;max-width:420px}
+  .endorsement-demo .q{font-size:16.5px;font-style:italic;color:#3d3a34;line-height:1.55}
+  .endorsement-demo .who{display:flex;align-items:center;gap:9px;margin-top:14px}
+  .endorsement-demo .who .nm{font-weight:700;font-size:13.5px}
+  .endorsement-demo .who .vf{font-family:var(--mono);font-size:11px;color:var(--grey-500)}
+  .endorsement-demo .loop{border-top:1px solid var(--grey-100);margin-top:18px;padding-top:16px;display:flex;gap:10px}
+  .endorsement-demo .loop .btn{flex:1;justify-content:center;padding:10px;font-size:13px}
   .checklist{display:grid;gap:16px;margin-top:26px;padding:0}
   .checklist li{display:grid;grid-template-columns:24px 1fr;gap:12px;list-style:none;font-size:15.5px;color:var(--grey-600)}
   .checklist b{color:var(--ink)}
@@ -249,7 +249,7 @@
       </div>
     </div>
     <div class="stage">
-      <div class="pcard" role="img" aria-label="Example verified ABRI company profile showing SSM verification and a peer vouch">
+      <div class="pcard" role="img" aria-label="Example verified ABRI company profile showing SSM verification and a peer endorsement">
         <span class="tap-hint">● live · tapped just now</span>
         <div class="pcard-top">
           <div class="plogo" aria-hidden="true">M</div>
@@ -267,9 +267,9 @@
           <div class="vh"><span>SSM record</span><span>✓ checked 24 Jun 2026</span></div>
           <div class="vb">Reg. 201801019345 · <span class="ok">Active</span> · Authorised representative confirmed</div>
         </div>
-        <div class="vouchline">
+        <div class="endorseline">
           <p>“Sorted our SSM filing in a day — completely reliable.”</p>
-          <div class="who"><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Sentul Corp Services · verified vouch</div>
+          <div class="who"><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Sentul Corp Services · verified endorsement</div>
         </div>
         <div class="pactions">
           <button class="btn btn-ink">Save contact</button>
@@ -308,7 +308,7 @@
   </div>
 </section>
 
-<!-- 3 · THE BADGE + VOUCHING (combined trust band) -->
+<!-- 3 · THE BADGE + ENDORSING (combined trust band) -->
 <section id="trust" class="trust-band">
   <div class="wrap">
     <div class="sec-head rv">
@@ -324,8 +324,8 @@
       </div>
       <div class="tier-card">
         <h3>★ Trusted Business</h3>
-        <p>Vouched for by verified peers — ten businesses have staked their own name on this one.</p>
-        <div class="earn">Earned: 10 verified vouches</div>
+        <p>Endorsed by verified peers — ten businesses have staked their own name on this one.</p>
+        <div class="earn">Earned: 10 verified endorsements</div>
       </div>
       <div class="tier-card">
         <h3>Network Leader <span class="soon">coming</span></h3>
@@ -334,26 +334,26 @@
       </div>
     </div>
 
-    <div class="vouch-grid">
+    <div class="endorsement-grid">
       <div class="rv">
-        <span class="eyebrow">Vouching · how status is earned</span>
+        <span class="eyebrow">Endorsing · how status is earned</span>
         <h2 style="font-size:clamp(24px,2.8vw,32px)">Credibility from peers who stake their name on it.</h2>
         <ul class="checklist">
-          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Only verified members can vouch</b> — one vouch per business, tied publicly to the voucher's own profile.</span></li>
-          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Every vouch can carry a testimonial</b> — 140 characters, quotable, living on your profile permanently.</span></li>
-          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Generosity comes back</b> — thank your voucher, vouch back, and both profiles grow.</span></li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Only verified members can endorse</b> — one endorsement per business, tied publicly to the endorser's own profile.</span></li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Every endorsement can carry a testimonial</b> — 140 characters, quotable, living on your profile permanently.</span></li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span><span><b>Generosity comes back</b> — thank your endorser, endorse back, and both profiles grow.</span></li>
         </ul>
       </div>
       <div class="rv">
-        <div class="vouch-demo" role="img" aria-label="Example vouch: a verified peer testimonial with thank and vouch-back actions">
+        <div class="endorsement-demo" role="img" aria-label="Example endorsement: a verified peer testimonial with thank and endorsement-back actions">
           <p class="q">“Our go-to for anything tax. Responsive, honest, and they know SME realities.”</p>
           <div class="who">
             <span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>
-            <div><div class="nm">Nimbus IT Consulting</div><div class="vf">verified vouch · Jun 2026</div></div>
+            <div><div class="nm">Nimbus IT Consulting</div><div class="vf">verified endorsement · Jun 2026</div></div>
           </div>
           <div class="loop">
             <button class="btn btn-primary">Thank them</button>
-            <button class="btn btn-ghost">Vouch back</button>
+            <button class="btn btn-ghost">Endorse back</button>
           </div>
         </div>
       </div>
@@ -389,7 +389,7 @@
     <div class="rv">
       <span class="eyebrow">The card</span>
       <h2>One tap. Your whole verified identity.</h2>
-      <p style="color:var(--grey-600);font-size:17px;margin-top:14px;max-width:34rem">Tap your ABRI card to any phone — no app needed. They instantly see your verified company, your vouches, and your live SSM status. Verification renders first, before contact details. It's the business card that proves itself.</p>
+      <p style="color:var(--grey-600);font-size:17px;margin-top:14px;max-width:34rem">Tap your ABRI card to any phone — no app needed. They instantly see your verified company, your endorsements, and your live SSM status. Verification renders first, before contact details. It's the business card that proves itself.</p>
       <div style="margin-top:26px"><a class="btn btn-ink" href="#pricing">See membership</a>
       <span style="display:block;margin-top:12px;font-family:var(--mono);font-size:12px;color:var(--grey-500)">card included with membership</span></div>
     </div>
@@ -412,7 +412,7 @@
         <ul>
           <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Full verified profile + SSM badge</li>
           <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>NFC card included</li>
-          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Directory presence · vouching</li>
+          <li><span class="mini-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-11"/></svg></span>Directory presence · endorsing</li>
         </ul>
         <div class="value-line">One referral from a verified partner typically covers this several times over.</div>
         <a class="btn btn-primary" href="ABRI_register.html">Claim your business</a>
@@ -457,7 +457,7 @@
     <div class="foot-grid">
       <div>
         <a class="brand" href="#"><span class="brand-mark">A</span>ABRI</a>
-        <p style="font-size:13.5px;color:var(--grey-500);max-width:26rem;margin-top:12px">The verified business network — where every member is SSM-verified, vouched for by real peers, and trusted from day one.</p>
+        <p style="font-size:13.5px;color:var(--grey-500);max-width:26rem;margin-top:12px">The verified business network — where every member is SSM-verified, endorsed by real peers, and trusted from day one.</p>
       </div>
       <div><h4>Product</h4><a href="#how">How it works</a><a href="#trust">The badge</a><a href="#pricing">Membership</a><a href="#">Directory</a></div>
       <div><h4>Company</h4><a href="#">About</a><a href="#">Contact</a><a href="#">FAQ</a></div>

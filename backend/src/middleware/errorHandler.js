@@ -24,7 +24,7 @@ function errorHandler(err, req, res, next) {
   if (err.status) {
     return res.status(err.status).json({
       error: err.message,
-      // Only set by a paywall throw (failUpgrade in routes/vouches.js), and
+      // Only set by a paywall throw (failUpgrade in routes/endorsements.js), and
       // the reason those are 402s rather than 403s: the client shows an
       // upgrade prompt naming this membership tier instead of toasting the
       // message. Renamed from `upgradeRequired`, which never said upgrade to

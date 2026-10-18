@@ -14,7 +14,7 @@ import { verificationLevelLabel } from "@/lib/trustLabels";
 //
 // THE ONE PANEL HERE THAT CAN SAY SOMETHING UNFLATTERING, and that is the
 // point of it. Every other surface on this page shows what is currently true:
-// the badge, the vouch count. A counterparty deciding
+// the badge, the endorsement count. A counterparty deciding
 // whether to trust this business with work needs the other half — that the
 // SSM verification they can see today was granted in April, or that one they
 // cannot see was lost in August. No other directory will print that.

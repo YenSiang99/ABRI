@@ -12,10 +12,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AppVerificationBadge } from "@/components/badge/AppVerificationBadge";
-import { VouchDialog } from "@/components/app/VouchDialog";
-import { VouchTimeline } from "@/components/app/VouchTimeline";
+import { EndorseDialog } from "@/components/app/EndorseDialog";
+import { EndorsementTimeline } from "@/components/app/EndorsementTimeline";
 import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
-import { acceptVouch, cancelVouch, flagVouch, revertVouch } from "@/lib/api/vouches";
+import { acceptEndorsement, cancelEndorsement, flagEndorsement, revertEndorsement } from "@/lib/api/endorsements";
 import {
   revisionCapFor,
   canAccept,
@@ -24,17 +24,17 @@ import {
   canRevert,
   canRevise,
   isUnderReview,
-} from "@/lib/vouchRules";
+} from "@/lib/endorsementRules";
 import { toast } from "@/lib/toast";
 
-// Send it back to be edited. Not a rejection — the vouch stays alive and
+// Send it back to be edited. Not a rejection — the endorsement stays alive and
 // the giver gets the note.
-function RevertDialog({ vouch, open, onOpenChange, onSuccess }) {
+function RevertDialog({ endorsement, open, onOpenChange, onSuccess }) {
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Adjust state during render rather than in a useEffect — see
-  // components/app/VouchDialog.jsx for the same pattern and its rationale.
+  // components/app/EndorseDialog.jsx for the same pattern and its rationale.
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
@@ -48,8 +48,8 @@ function RevertDialog({ vouch, open, onOpenChange, onSuccess }) {
     }
     setSubmitting(true);
     try {
-      await revertVouch(vouch.id, note.trim());
-      toast.success(`Sent ${vouch.counterparty.name}'s vouch back for edits`);
+      await revertEndorsement(endorsement.id, note.trim());
+      toast.success(`Sent ${endorsement.counterparty.name}'s endorsement back for edits`);
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -65,9 +65,9 @@ function RevertDialog({ vouch, open, onOpenChange, onSuccess }) {
         <DialogHeader>
           <DialogTitle>Send back for edits</DialogTitle>
           <DialogDescription>
-            They'll see your note and can revise their testimonial. Until they do, this vouch is theirs
+            They'll see your note and can revise their testimonial. Until they do, this endorsement is theirs
             to act on — you won't be able to accept or cancel it in the meantime. Up to{" "}
-            {revisionCapFor(vouch)} rounds per vouch.
+            {revisionCapFor(endorsement)} rounds per endorsement.
           </DialogDescription>
         </DialogHeader>
         <Textarea rows={3} placeholder="What would you like changed?" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -85,12 +85,12 @@ function RevertDialog({ vouch, open, onOpenChange, onSuccess }) {
 }
 
 // Terminal, and only that. The flag checkbox that used to live in this
-// dialog is now its own action — ending a vouch and reporting the business
+// dialog is now its own action — ending an endorsement and reporting the business
 // that sent it are different decisions, and bundling them meant you
-// couldn't report without also killing the vouch, or cancel a perfectly
-// civil vouch without the reporting checkbox sitting there implying you
+// couldn't report without also killing the endorsement, or cancel a perfectly
+// civil endorsement without the reporting checkbox sitting there implying you
 // should.
-function CancelDialog({ vouch, open, onOpenChange, onSuccess }) {
+function CancelDialog({ endorsement, open, onOpenChange, onSuccess }) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -103,8 +103,8 @@ function CancelDialog({ vouch, open, onOpenChange, onSuccess }) {
   async function confirm() {
     setSubmitting(true);
     try {
-      await cancelVouch(vouch.id, reason.trim() || undefined);
-      toast(`Cancelled ${vouch.counterparty.name}'s vouch`);
+      await cancelEndorsement(endorsement.id, reason.trim() || undefined);
+      toast(`Cancelled ${endorsement.counterparty.name}'s endorsement`);
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
@@ -118,9 +118,9 @@ function CancelDialog({ vouch, open, onOpenChange, onSuccess }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Cancel this vouch</DialogTitle>
+          <DialogTitle>Cancel this endorsement</DialogTitle>
           <DialogDescription>
-            It won't be published or count toward your vouch total, and this ends the exchange.
+            It won't be published or count toward your endorsement total, and this ends the exchange.
             They're free to try again later.
           </DialogDescription>
         </DialogHeader>
@@ -139,7 +139,7 @@ function CancelDialog({ vouch, open, onOpenChange, onSuccess }) {
             Close
           </Button>
           <Button variant="destructive" onClick={confirm} disabled={submitting}>
-            {submitting ? "Cancelling…" : "Cancel vouch"}
+            {submitting ? "Cancelling…" : "Cancel endorsement"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -147,11 +147,11 @@ function CancelDialog({ vouch, open, onOpenChange, onSuccess }) {
   );
 }
 
-// The escalation path. Distinct from cancel in what it does to the vouch:
+// The escalation path. Distinct from cancel in what it does to the endorsement:
 // cancel ends it, this one freezes it — which is why the copy says so
 // rather than leaving the receiver to guess whether they've also rejected
 // it.
-function FlagDialog({ vouch, open, onOpenChange, onSuccess }) {
+function FlagDialog({ endorsement, open, onOpenChange, onSuccess }) {
   const [reason, setReason] = useState("abusive_content");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -168,7 +168,7 @@ function FlagDialog({ vouch, open, onOpenChange, onSuccess }) {
   async function confirm() {
     setSubmitting(true);
     try {
-      await flagVouch(vouch.id, { reason, note: note.trim() || undefined });
+      await flagEndorsement(endorsement.id, { reason, note: note.trim() || undefined });
       toast.success("Sent to admins for review");
       onOpenChange(false);
       onSuccess?.();
@@ -185,7 +185,7 @@ function FlagDialog({ vouch, open, onOpenChange, onSuccess }) {
         <DialogHeader>
           <DialogTitle>Flag for admin review</DialogTitle>
           <DialogDescription>
-            This puts the vouch on hold and sends it to an admin with the full history. Neither of
+            This puts the endorsement on hold and sends it to an admin with the full history. Neither of
             you can act on it — accept, edit or cancel — until they've looked at it. They'll either
             return it to you to decide, send it back for edits, or cancel it outright.
           </DialogDescription>
@@ -236,8 +236,8 @@ function FlagDialog({ vouch, open, onOpenChange, onSuccess }) {
   );
 }
 
-// The in-flight vouch card, for BOTH sides of the negotiation — it reads
-// `role`/`waitingOn` off the vouch rather than taking a direction prop, so
+// The in-flight endorsement card, for BOTH sides of the negotiation — it reads
+// `role`/`waitingOn` off the endorsement rather than taking a direction prop, so
 // giver and receiver get the same layout and the same timeline and differ
 // only in which actions render.
 //
@@ -246,34 +246,34 @@ function FlagDialog({ vouch, open, onOpenChange, onSuccess }) {
 // confusing ("did my change request go through?"); the fix is to keep the
 // process visible and drop the buttons, replacing them with a line naming
 // whose move it is.
-function VouchRequestCard({ vouch, onChanged }) {
+function EndorsementRequestCard({ endorsement, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
   const [flagOpen, setFlagOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
   // Covers Accept and Revert, which are one decision priced together — see
-  // the `acceptVouch` note in backend/src/lib/entitlements.js. Cancel and
+  // the `acceptEndorsement` note in backend/src/lib/entitlements.js. Cancel and
   // Flag stay open to every tier on purpose: a member must always be able to
-  // refuse a vouch or report an abusive one without paying for the privilege.
+  // refuse an endorsement or report an abusive one without paying for the privilege.
   //
   // The card itself is never gated. A Free member sees the request, the
   // testimonial, the timeline and whose turn it is — the whole thing, priced
   // only at the moment they reach for it. That is the pitch, and hiding the
   // card would be hiding the reason to upgrade.
-  const reviewGate = useUpgradeGate("acceptVouch");
+  const reviewGate = useUpgradeGate("acceptEndorsement");
 
-  const other = vouch.counterparty;
+  const other = endorsement.counterparty;
   if (!other) return null;
 
-  const yourTurn = vouch.waitingOn === "you";
-  const underReview = isUnderReview(vouch);
+  const yourTurn = endorsement.waitingOn === "you";
+  const underReview = isUnderReview(endorsement);
 
   async function accept() {
     setBusy(true);
     try {
-      await acceptVouch(vouch.id);
-      toast.success(`Accepted ${other.name}'s vouch`);
+      await acceptEndorsement(endorsement.id);
+      toast.success(`Accepted ${other.name}'s endorsement`);
       onChanged?.();
     } catch (err) {
       toast.error(err.message);
@@ -286,7 +286,7 @@ function VouchRequestCard({ vouch, onChanged }) {
   // when it isn't their turn — otherwise the buttons say it better.
   const waitingLabel = underReview
     ? "Under admin review"
-    : vouch.role === "giver"
+    : endorsement.role === "giver"
       ? `Waiting on ${other.name} to review`
       : `Waiting on ${other.name} to revise`;
 
@@ -294,9 +294,9 @@ function VouchRequestCard({ vouch, onChanged }) {
   // into the giver/receiver pair: neither "nothing to do until they review
   // it" nor "it's their move" is true when an admin has it.
   const waitingBody = underReview
-    ? "An admin is reviewing this vouch — it's on hold for both of you and the 14-day timeout is paused. They'll either hand it back to be reviewed as normal, send it back for edits, or cancel it."
-    : vouch.role === "receiver"
-      ? "You've sent it back for edits — it's their move now. If they don't respond within 14 days this vouch closes automatically."
+    ? "An admin is reviewing this endorsement — it's on hold for both of you and the 14-day timeout is paused. They'll either hand it back to be reviewed as normal, send it back for edits, or cancel it."
+    : endorsement.role === "receiver"
+      ? "You've sent it back for edits — it's their move now. If they don't respond within 14 days this endorsement closes automatically."
       : "Nothing to do until they review it.";
 
   return (
@@ -320,7 +320,7 @@ function VouchRequestCard({ vouch, onChanged }) {
             )}
           </div>
           <div className="text-xs text-muted-foreground">
-            {other.category} · {vouch.role === "giver" ? "You vouched for them" : "They vouched for you"}
+            {other.category} · {endorsement.role === "giver" ? "You endorsed them" : "They endorsed you"}
           </div>
         </div>
 
@@ -329,11 +329,11 @@ function VouchRequestCard({ vouch, onChanged }) {
             same decision. Accept / Revert / Cancel are the turn — one of
             them is what you came to do. Reporting the content is a rare
             escape hatch, and sitting it in the row gave it equal billing
-            with the three moves that actually advance the vouch.
+            with the three moves that actually advance the endorsement.
 
             Still rendered on the giver's turn (see canFlag) — abuse can't
             wait for the turn to come back around. */}
-        {canFlag(vouch) && (
+        {canFlag(endorsement) && (
           <button
             type="button"
             onClick={() => setFlagOpen(true)}
@@ -348,22 +348,22 @@ function VouchRequestCard({ vouch, onChanged }) {
       </div>
 
       <blockquote className="mt-4 border-l-2 border-accent pl-4 text-sm italic text-foreground">
-        "{vouch.testimonial}"
+        "{endorsement.testimonial}"
       </blockquote>
 
-      <VouchTimeline timeline={vouch.timeline} />
+      <EndorsementTimeline timeline={endorsement.timeline} />
 
       {/* Only the turn's moves. Now that Flag has moved to the header the
-          row is exactly "what can I do about this vouch right now", which
+          row is exactly "what can I do about this endorsement right now", which
           is why it can go back to gating on `yourTurn` alone. */}
       {yourTurn ? (
         <div className="mt-4 flex flex-wrap gap-2">
-          {canAccept(vouch) && (
+          {canAccept(endorsement) && (
             <Button size="sm" onClick={reviewGate.guard(accept)} disabled={busy}>
               Accept
             </Button>
           )}
-          {canRevert(vouch) && (
+          {canRevert(endorsement) && (
             <Button
               size="sm"
               variant="secondary"
@@ -373,12 +373,12 @@ function VouchRequestCard({ vouch, onChanged }) {
               Revert
             </Button>
           )}
-          {canCancel(vouch) && (
+          {canCancel(endorsement) && (
             <Button size="sm" variant="ghost" onClick={() => setCancelOpen(true)} disabled={busy}>
               Cancel
             </Button>
           )}
-          {canRevise(vouch) && (
+          {canRevise(endorsement) && (
             <Button size="sm" onClick={() => setReviseOpen(true)} disabled={busy}>
               Revise
             </Button>
@@ -388,21 +388,21 @@ function VouchRequestCard({ vouch, onChanged }) {
 
       {!yourTurn && <p className="mt-4 text-xs text-muted-foreground">{waitingBody}</p>}
 
-      <CancelDialog vouch={vouch} open={cancelOpen} onOpenChange={setCancelOpen} onSuccess={onChanged} />
-      <RevertDialog vouch={vouch} open={revertOpen} onOpenChange={setRevertOpen} onSuccess={onChanged} />
-      <FlagDialog vouch={vouch} open={flagOpen} onOpenChange={setFlagOpen} onSuccess={onChanged} />
+      <CancelDialog endorsement={endorsement} open={cancelOpen} onOpenChange={setCancelOpen} onSuccess={onChanged} />
+      <RevertDialog endorsement={endorsement} open={revertOpen} onOpenChange={setRevertOpen} onSuccess={onChanged} />
+      <FlagDialog endorsement={endorsement} open={flagOpen} onOpenChange={setFlagOpen} onSuccess={onChanged} />
       <UpgradePrompt gate={reviewGate} />
-      <VouchDialog
+      <EndorseDialog
         open={reviseOpen}
         onOpenChange={setReviseOpen}
         targetBusiness={other}
         mode="revise"
-        vouchId={vouch.id}
-        initialTestimonial={vouch.testimonial}
+        endorsementId={endorsement.id}
+        initialTestimonial={endorsement.testimonial}
         onSuccess={onChanged}
       />
     </div>
   );
 }
 
-export { VouchRequestCard };
+export { EndorsementRequestCard };

@@ -63,7 +63,7 @@ function NfcSection() {
           </h2>
           <p className="mt-3.5 max-w-[34rem] text-[17px] text-grey-600 dark:text-muted-foreground">
             Tap your ABRI card to any phone — no app needed. They instantly
-            see your verified company, your vouches, and your live SSM
+            see your verified company, your endorsements, and your live SSM
             status. Verification renders first, before contact details. It's
             the business card that proves itself.
           </p>

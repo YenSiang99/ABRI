@@ -12,7 +12,7 @@
 // correctly and looks broken.
 //
 // This layers the part that makes them mean something: owners, verification,
-// registration numbers, a vouch graph, connections, a work record, and the feed events
+// registration numbers, an endorsement graph, connections, a work record, and the feed events
 // that announce all of it.
 //
 // IDEMPOTENT. Every row it writes carries a deterministic `demo-` id and is
@@ -21,7 +21,7 @@
 // ever moves verificationLevel/ssm/membershipTier on the businesses it names,
 // and never touches a business it doesn't.
 //
-// NOT FOR PRODUCTION. It writes published vouches nobody wrote and accepted
+// NOT FOR PRODUCTION. It writes published endorsements nobody wrote and accepted
 // answers nobody gave. On a real database that is fabricated trust evidence,
 // which is the one thing this product cannot contain. The guard at
 // the bottom of main() refuses to run against a non-local database unless
@@ -317,18 +317,18 @@ const CLAIMED_ONLY = [
   },
 ];
 
-// ── The vouch graph ───────────────────────────────────────────────────────
+// ── The endorsement graph ───────────────────────────────────────────────────────
 //
-// Uneven ON PURPOSE. A graph where everyone has four vouches makes vouchLevel
+// Uneven ON PURPOSE. A graph where everyone has four endorsements makes endorsementLevel
 // a constant and the directory's sort meaningless. This runs 5 down to 0, and
 // two L2 members (novatech, puchong-tax) end with none — a verified business
-// with no vouches yet is the most common real state and the ladder has to
+// with no endorsements yet is the most common real state and the ladder has to
 // show it.
 //
-// Every giver is L2+, mirroring VOUCHABLE_VERIFICATION_LEVELS in
-// routes/vouches.js. Seeding a vouch the API would have refused would make
+// Every giver is L2+, mirroring ENDORSABLE_VERIFICATION_LEVELS in
+// routes/endorsements.js. Seeding an endorsement the API would have refused would make
 // the demo prove something the product doesn't do.
-const VOUCHES = [
+const ENDORSEMENTS = [
   ["sentul-corp-services", "meridian-accounting", 78, "We hand Meridian every client that outgrows our in-house bookkeeping. Three years, no filing ever late, and they call us before a deadline slips rather than after."],
   ["bangsar-legal-partners", "meridian-accounting", 71, "Meridian handled the accounts for two of our clients through a messy restructuring. They explained the tax position in language a director could actually act on."],
   ["novatech-consulting", "meridian-accounting", 64, "They took over our books mid-year with the previous agent's records in poor shape and had us clean by the next quarter. Straight answers on cost from the first meeting."],
@@ -360,7 +360,7 @@ const VOUCHES = [
 
 // ── Connections and follows ───────────────────────────────────────────────
 //
-// Connections are the mutual edge that powers the "vouched for by N in your
+// Connections are the mutual edge that powers the "endorsed by N in your
 // network" overlap on check-a-business; follows are one-way and drive the
 // feed's "Following" scope. Both are seeded so those two features have
 // something to compute against for whoever you log in as.
@@ -604,12 +604,12 @@ async function upsertAccount({ id, businessId, person, email, phone, hash, claim
 // NetworkEvent comment in schema.prisma). This script kept passing it and has
 // been failing on every run since — the argument simply does not exist any
 // more, and Prisma rejects the whole upsert rather than ignoring it.
-async function upsertEvent({ id, type, subjectBusinessId, actorBusinessId = null, vouchId = null, at }) {
+async function upsertEvent({ id, type, subjectBusinessId, actorBusinessId = null, endorsementId = null, at }) {
   const data = {
     type,
     subjectBusinessId,
     actorBusinessId,
-    vouchId,
+    endorsementId,
     toVerificationLevel: LEVEL_EVENT_LEVEL[type] ?? null,
     createdAt: at,
   };
@@ -622,7 +622,7 @@ async function main() {
   if (!isLocal && !process.env.ABRI_SEED_DEMO_CONFIRM) {
     console.error(
       "Refusing to run against a non-local database.\n" +
-        "This writes published vouches and accepted answers that nobody made.\n" +
+        "This writes published endorsements and accepted answers that nobody made.\n" +
         "If you really mean to seed a shared environment, re-run with:\n" +
         "  ABRI_SEED_DEMO_CONFIRM=1 node scripts/seed-demo.mjs",
     );
@@ -750,14 +750,14 @@ async function main() {
     }
   }
 
-  // ── Vouches ─────────────────────────────────────────────────────────────
+  // ── Endorsements ─────────────────────────────────────────────────────────────
   //
-  // Three rows each, in the order the schema requires: the Vouch header, the
-  // VouchRevision holding the text, then the header pointed at it. The text
-  // lives in the revision and NOWHERE else — Vouch has no testimonial column,
+  // Three rows each, in the order the schema requires: the Endorsement header, the
+  // EndorsementRevision holding the text, then the header pointed at it. The text
+  // lives in the revision and NOWHERE else — Endorsement has no testimonial column,
   // deliberately, and the feed quotes through this same pointer.
-  for (const [from, to, ago, comment] of VOUCHES) {
-    const id = `demo-vouch-${from}--${to}`;
+  for (const [from, to, ago, comment] of ENDORSEMENTS) {
+    const id = `demo-endorsement-${from}--${to}`;
     const revisionId = `${id}-r1`;
     const at = daysAgo(ago);
     const header = {
@@ -770,7 +770,7 @@ async function main() {
       lastActionAt: at,
       closedAt: at,
     };
-    await prisma.vouch.upsert({
+    await prisma.endorsement.upsert({
       where: { id },
       // currentRevisionId is set in the second pass below, not here — the
       // revision row does not exist yet on a first run.
@@ -778,26 +778,26 @@ async function main() {
       create: { id, ...header },
     });
     const revision = {
-      vouchId: id,
+      endorsementId: id,
       attempt: 1,
       revisionNumber: 1,
       comment,
       createdById: from,
       createdAt: at,
     };
-    await prisma.vouchRevision.upsert({
+    await prisma.endorsementRevision.upsert({
       where: { id: revisionId },
       update: revision,
       create: { id: revisionId, ...revision },
     });
-    await prisma.vouch.update({ where: { id }, data: { currentRevisionId: revisionId } });
+    await prisma.endorsement.update({ where: { id }, data: { currentRevisionId: revisionId } });
 
     await upsertEvent({
-      id: `demo-ev-vouch-${from}--${to}`,
-      type: "vouch_published",
+      id: `demo-ev-endorsement-${from}--${to}`,
+      type: "endorsement_published",
       subjectBusinessId: to,
       actorBusinessId: from,
-      vouchId: id,
+      endorsementId: id,
       at,
     });
   }
@@ -858,7 +858,7 @@ async function main() {
       "",
       `  ${MEMBERS.length} verified members (L2) with owner accounts`,
       `  ${PENDING_SSM.length} awaiting SSM review · ${CLAIMED_ONLY.length} claimed, no number yet`,
-      `  ${VOUCHES.length} published vouches`,
+      `  ${ENDORSEMENTS.length} published endorsements`,
       `  ${CONNECTIONS.length} connections · ${FOLLOWS.length} follows`,
       `  ${PORTFOLIO.length} portfolio entries`,
       `  ${events} feed events`,

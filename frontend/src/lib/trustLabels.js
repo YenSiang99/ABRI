@@ -20,7 +20,7 @@
 //
 // Both maps mirror server-side values and must move with them:
 //   verificationLevelLabel — the union in backend/src/lib/verificationLevels.js
-//   vouchLevelLabel        — vouchLevelFor() in backend/src/lib/vouchLevel.js
+//   endorsementLevelLabel        — endorsementLevelFor() in backend/src/lib/endorsementLevel.js
 const verificationLevelLabel = {
   L0: "Unclaimed",
   L1: "Claimed",
@@ -29,12 +29,12 @@ const verificationLevelLabel = {
   L4: "Transaction-Trusted",
 };
 
-const vouchLevelLabel = {
+const endorsementLevelLabel = {
   none: "New Member",
-  first: "First Vouch",
+  first: "First Endorsement",
   top20: "Top 20%",
   trusted: "Trusted Business",
   leader: "Network Leader",
 };
 
-export { verificationLevelLabel, vouchLevelLabel };
+export { verificationLevelLabel, endorsementLevelLabel };

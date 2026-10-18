@@ -1,6 +1,6 @@
 # ABRI backend
 
-Node.js + Express API, PostgreSQL via Prisma. Schema lives in `prisma/schema.prisma`, modeled directly on the frontend's mock store layer (`frontend/src/lib/store/*.js`) — see the comments in the schema for what's intentionally different from the mock (real password hashing, no denormalized vouch counts, a uniqueness constraint on vouches, etc).
+Node.js + Express API, PostgreSQL via Prisma. Schema lives in `prisma/schema.prisma`, modeled directly on the frontend's mock store layer (`frontend/src/lib/store/*.js`) — see the comments in the schema for what's intentionally different from the mock (real password hashing, no denormalized endorsement counts, a uniqueness constraint on endorsements, etc).
 
 ## Setup
 

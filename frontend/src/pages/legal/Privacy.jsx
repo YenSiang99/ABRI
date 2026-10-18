@@ -78,12 +78,12 @@ function Privacy() {
 
       <h2>4. What you do on ABRI</h2>
       <p>
-        We record activity that the product is built on: vouches you give and receive and their
+        We record activity that the product is built on: endorsements you give and receive and their
         testimonials, connections and follows, businesses you check or watch, and which
         businesses open your profile. Some of this is visible to others by design:
       </p>
       <ul>
-        <li>published vouches and testimonials appear on both businesses&rsquo; profiles;</li>
+        <li>published endorsements and testimonials appear on both businesses&rsquo; profiles;</li>
         <li>
           when you open a business&rsquo;s profile, that business can see that it was viewed.
           Members on plans that include it can see which business viewed them, unless the

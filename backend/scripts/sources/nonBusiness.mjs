@@ -4,7 +4,7 @@
 //
 // THE TEST, agreed 27 Sep 2026: could this listing ever claim its page, pass
 // SSM verification, and want other businesses to find it? ABRI's model —
-// claim, verify, vouch, then Plus/Pro — only works for listings that can.
+// claim, verify, endorsement, then Plus/Pro — only works for listings that can.
 // A government school, a hospital ward, a condo or a pasar malam never will.
 //
 // WHEN UNSURE, KEEP. A wrong removal hides a business that could have been a

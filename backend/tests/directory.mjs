@@ -4,7 +4,7 @@
 // Two things this file exists to hold:
 //
 //   1. THE LADDER. An anonymous visitor gets the verification level (the
-//      honest answer to "are they real", never for sale) and NOT the vouch
+//      honest answer to "are they real", never for sale) and NOT the endorsement
 //      count (the depth, which a free account buys). Steps 1 and 2 are that
 //      rule from both sides.
 //
@@ -55,14 +55,14 @@ const plus = await login(`${P}a3@e2e.test`);
 const pro  = await login(`${P}a4@e2e.test`);
 
 // ─────────────────────────────────────────────────────────────────────────
-console.log("\n1. An anonymous visitor gets no vouch numbers");
+console.log("\n1. An anonymous visitor gets no endorsement numbers");
 let r = await dir(null, "?limit=5");
 assert.equal(r.status, 200, "and is not refused — the directory stays public");
 for (const b of r.data.businesses) {
-  assert.ok(!("vouchCount" in b), `${b.id} leaked vouchCount to an anonymous caller`);
-  assert.ok(!("vouchLevel" in b), `${b.id} leaked vouchLevel`);
+  assert.ok(!("endorsementCount" in b), `${b.id} leaked endorsementCount to an anonymous caller`);
+  assert.ok(!("endorsementLevel" in b), `${b.id} leaked endorsementLevel`);
 }
-ok("no vouchCount, no vouchLevel, still a 200");
+ok("no endorsementCount, no endorsementLevel, still a 200");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n2. The verification level is NEVER gated");
@@ -77,8 +77,8 @@ ok("every anonymous row still carries verificationLevel");
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n3. A free account is the whole step — Plus and Pro add nothing");
 const [f, p, pr] = await Promise.all([dir(free, "?limit=5"), dir(plus, "?limit=5"), dir(pro, "?limit=5")]);
-assert.ok("vouchCount" in f.data.businesses[0], "a logged-in Free member gets the count");
-assert.ok("vouchLevel" in f.data.businesses[0], "and the level");
+assert.ok("endorsementCount" in f.data.businesses[0], "a logged-in Free member gets the count");
+assert.ok("endorsementLevel" in f.data.businesses[0], "and the level");
 // Byte-identical across the three paid tiers: this ladder rung is about
 // having an account, not about paying. Anything tier-shaped belongs in the
 // separate network-overlap work, not here.

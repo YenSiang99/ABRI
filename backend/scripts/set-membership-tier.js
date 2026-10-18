@@ -17,7 +17,7 @@ import { MEMBERSHIP_TIER_RANK } from "../src/lib/entitlements.js";
 // Derived from the entitlements rank rather than repeated, so this script
 // and POST /admin/businesses/:id/plan can never disagree about what a valid
 // plan is. That leaves schema.prisma's membershipTier union and
-// VOUCH_CAP_BY_MEMBERSHIP_TIER in src/lib/vouchCap.js as the two places still kept in
+// ENDORSEMENT_CAP_BY_MEMBERSHIP_TIER in src/lib/endorsementCap.js as the two places still kept in
 // step by hand — a value missing from either is a bug in that one.
 const PLANS = Object.keys(MEMBERSHIP_TIER_RANK);
 

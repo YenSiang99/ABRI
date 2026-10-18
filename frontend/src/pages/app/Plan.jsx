@@ -125,7 +125,7 @@ function TierCard({ tier, currentTier, founding }) {
               <span>
                 <span className="text-foreground">{f.label}</span>
                 {/* A colon, not a dash. A label can already contain an em
-                    dash ("Trust feed — vouches and verifications as they happen"),
+                    dash ("Trust feed — endorsements and verifications as they happen"),
                     and joining with another one reads as a third clause
                     rather than as the value. */}
                 {f.detail && <span className="text-muted-foreground">: {f.detail}</span>}
@@ -223,8 +223,8 @@ function Plan() {
           verification level
         </Link>{" "}
         and your{" "}
-        <Link to="/app/vouches" className="font-medium text-foreground underline underline-offset-4">
-          vouch level
+        <Link to="/app/endorsements" className="font-medium text-foreground underline underline-offset-4">
+          endorsement level
         </Link>{" "}
         are earned, and neither is for sale.
       </p>

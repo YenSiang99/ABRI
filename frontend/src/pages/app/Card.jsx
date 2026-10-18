@@ -95,7 +95,7 @@ function Card() {
   const { business } = useAuth();
 
   // Verification lock first, and it wins when both apply — same precedence
-  // as the vouches tab in BusinessProfile.jsx. "Finish getting verified" is
+  // as the endorsements tab in BusinessProfile.jsx. "Finish getting verified" is
   // more useful to someone who can't use the feature either way than "this
   // is on a paid plan", which would only be true after they had.
   if (business.verificationLevel === CLAIMED) {
@@ -114,7 +114,7 @@ function Card() {
 
   // Free members get the card SHOWN to them rather than a locked panel — the
   // artwork with their own name on it is a better argument for Plus than a
-  // description of it ever was. Same principle as the vouch buttons in
+  // description of it ever was. Same principle as the endorsement buttons in
   // components/app/UpgradePrompt.jsx: don't hide the thing you're selling.
   //
   // Note the ordering: the T1 check above wins, so this preview is only ever
@@ -129,7 +129,7 @@ function Card() {
 
           <p className="mt-6 text-sm text-muted-foreground">
             This is your card, with your real details on it. Plus gets it printed and posted — one
-            tap opens your verified profile, badge and vouch count first, for someone who has never
+            tap opens your verified profile, badge and endorsement count first, for someone who has never
             heard of ABRI.
           </p>
 

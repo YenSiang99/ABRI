@@ -60,9 +60,9 @@ function AuthProvider({ children }) {
   }, []);
 
   // Re-fetches /auth/me without touching `loading` — for refreshing
-  // `business` (vouches/vouchCount/vouchLevel) after an action elsewhere in
-  // the app changes it, e.g. accepting a vouch changes *this* business's
-  // own received-vouch state, which nothing else would otherwise refresh
+  // `business` (endorsements/endorsementCount/endorsementLevel) after an action elsewhere in
+  // the app changes it, e.g. accepting an endorsement changes *this* business's
+  // own received-endorsement state, which nothing else would otherwise refresh
   // since AuthContext only fetches once on mount.
   async function refreshAccount() {
     try {

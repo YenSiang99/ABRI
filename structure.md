@@ -40,7 +40,7 @@ We go in this order (simplest → most complex), each as its own component file,
 
 1. Hero.jsx (headline, CTAs, the profile-card preview using VerificationBadge)
 2. HowItWorks.jsx (3-step grid — good repetition/.map() exercise)
-3. TrustBand.jsx (tier cards + vouching copy — reuses VerificationBadge again)
+3. TrustBand.jsx (tier cards + endorsing copy — reuses VerificationBadge again)
 4. NfcSection.jsx
 5. Pricing.jsx
 6. FinalCta.jsx

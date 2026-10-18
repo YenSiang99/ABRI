@@ -72,7 +72,7 @@ async function recordProfileView(viewedId, viewerId, { anonymous = false } = {})
 // THIS HALF IS NEVER GATED, and that is what makes the gated half sellable.
 // "Someone viewed your profile" with no name is a real signal a Free member
 // can act on — it is the reason to open the app — and withholding it too would
-// leave nothing to upgrade FOR. Same shape as the vouch gate on a public
+// leave nothing to upgrade FOR. Same shape as the endorsement gate on a public
 // profile: the count is the free half, the identities are the paid half.
 async function viewerSummary(viewedId) {
   const since = viewerWindowStart();

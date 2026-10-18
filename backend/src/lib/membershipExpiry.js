@@ -7,7 +7,7 @@ import { prisma } from "../prisma.js";
 //
 // Two halves, on purpose:
 //   - effectiveMembershipTier() is exact. Every gate (lib/entitlements.js
-//     can(), the vouch cap) asks it, so a tier stops working the moment it
+//     can(), the endorsement cap) asks it, so a tier stops working the moment it
 //     expires, whatever the stored column still says.
 //   - sweepExpiredMemberships() makes the stored column catch up, so the
 //     member's own screens (which read the column) and the admin screens say

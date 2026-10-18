@@ -17,7 +17,7 @@ import { toast } from "@/lib/toast";
 // rejecting clears the number. Either way the row leaves by the same rule that
 // put it here.
 //
-// NO NOTE FIELD, unlike the vouch and ask queues. Those write their note onto
+// NO NOTE FIELD, unlike the endorsement and ask queues. Those write their note onto
 // a Flag row that exists to hold it; there is no equivalent row here, and
 // ActivityEvent has no detail column, so a reason typed here would be
 // collected and then discarded before reaching the member. Asking for input

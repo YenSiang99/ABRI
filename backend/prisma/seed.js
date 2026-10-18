@@ -7,9 +7,9 @@ const prisma = new PrismaClient();
 
 // Ported from the frontend's data/businesses.js — the same 21 sample
 // listings, seeded here as unclaimed (T0) so the claim flow has real rows
-// to claim against. Drops the frontend's fake vouchCount/pre-claimed tiers
+// to claim against. Drops the frontend's fake endorsementCount/pre-claimed tiers
 // (T1/T2 with no real account behind them) since a real database shouldn't
-// contain claims or vouches nobody actually made.
+// contain claims or endorsements nobody actually made.
 const businesses = [
   { id: "meridian-accounting", name: "Meridian Accounting", category: "Accounting & Tax", location: "Petaling Jaya", domain: "meridianaccounting.my", description: "Full-service accounting and tax filing for SMEs, with a focus on fast SSM annual return turnaround.", phone: "03-7955 1234", whatsapp: "60123451234", email: "hello@meridianaccounting.my", website: "https://meridianaccounting.my", address: "Level 8, Menara MPPJ, Jalan Tengah, 46200 Petaling Jaya, Selangor", openingHours: "Mon–Fri 9am–6pm\nSat 9am–1pm\nClosed Sunday and public holidays" },
   { id: "sentul-corp-services", name: "Sentul Corp Services", category: "Corporate Secretarial", location: "Kuala Lumpur", domain: "sentulcorpservices.my", description: "Company secretarial services covering incorporation, statutory filings, and compliance advisory.", phone: "03-4045 8820", whatsapp: "60193348820", email: "enquiry@sentulcorpservices.my", website: "https://sentulcorpservices.my", address: "22 Jalan Sentul Pasar, 51000 Kuala Lumpur", openingHours: "Mon–Fri 9am–5.30pm" },

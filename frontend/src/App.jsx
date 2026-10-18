@@ -14,7 +14,7 @@ import { VerifyClaimLink } from "@/pages/auth/VerifyClaimLink";
 import { AppLayout } from "@/pages/app/AppLayout";
 import { Dashboard } from "@/pages/app/Dashboard";
 import { Profile } from "@/pages/app/Profile";
-import { Vouches } from "@/pages/app/Vouches";
+import { Endorsements } from "@/pages/app/Endorsements";
 import { NetworkRequests } from "@/pages/app/network/NetworkRequests";
 import { NetworkConnections } from "@/pages/app/network/NetworkConnections";
 import { NetworkFollowing } from "@/pages/app/network/NetworkFollowing";
@@ -26,7 +26,7 @@ import { Verify } from "@/pages/app/Verify";
 import { Plan } from "@/pages/app/Plan";
 import { Card } from "@/pages/app/Card";
 import { AdminReview } from "@/pages/admin/AdminReview";
-import { AdminVouchReviews } from "@/pages/admin/AdminVouchReviews";
+import { AdminEndorsementReviews } from "@/pages/admin/AdminEndorsementReviews";
 import { AdminSsmReviews } from "@/pages/admin/AdminSsmReviews";
 import { AdminBusinesses } from "@/pages/admin/AdminBusinesses";
 import { About } from "@/pages/legal/About";
@@ -75,7 +75,9 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="profile" element={<Profile />} />
-            <Route path="vouches" element={<Vouches />} />
+            <Route path="endorsements" element={<Endorsements />} />
+            {/* Renamed from /app/vouches in Oct 2026; catches old bookmarks and emailed links. */}
+            <Route path="vouches" element={<Navigate to="/app/endorsements" replace />} />
             {/* Network is a section, not a page — the sidebar expands to
                 its three children and there is no combined view. Bare
                 /app/network lands on Connections, which is what a member
@@ -86,7 +88,7 @@ function App() {
             <Route path="network/connections" element={<NetworkConnections />} />
             <Route path="network/following" element={<NetworkFollowing />} />
             {/* The network's trust activity. No :id child and no public
-                counterpart — a logged-out firehose of who-vouched-for-whom is
+                counterpart — a logged-out firehose of who-endorsed-for-whom is
                 a scrape of the trust graph, which is the asset the product
                 sells. See backend/src/routes/feed.js. */}
             <Route path="feed" element={<Feed />} />
@@ -104,8 +106,8 @@ function App() {
             <Route path="verify" element={<Verify />} />
             <Route path="plan" element={<Plan />} />
             {/* /app/levels was one page explaining all three axes at once.
-                It was split: verification kept this page, the vouch ladder
-                moved onto /app/vouches where you can act on it, and the tier
+                It was split: verification kept this page, the endorsement ladder
+                moved onto /app/endorsements where you can act on it, and the tier
                 table became /app/plan. The "what does this mark mean" half of
                 its job went to components/badge/BadgeExplainer.jsx instead,
                 because that question gets asked in front of somebody else's
@@ -119,7 +121,8 @@ function App() {
             <Route path="levels" element={<Navigate to="/app/verify" replace />} />
             <Route path="card" element={<Card />} />
             <Route path="admin" element={<AdminReview />} />
-            <Route path="admin/vouch-reviews" element={<AdminVouchReviews />} />
+            <Route path="admin/endorsement-reviews" element={<AdminEndorsementReviews />} />
+            <Route path="admin/vouch-reviews" element={<Navigate to="/app/admin/endorsement-reviews" replace />} />
             <Route path="admin/ssm-reviews" element={<AdminSsmReviews />} />
             <Route path="admin/businesses" element={<AdminBusinesses />} />
           </Route>

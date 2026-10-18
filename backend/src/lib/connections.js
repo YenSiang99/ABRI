@@ -13,7 +13,7 @@ import { UNCLAIMED } from "./verificationLevels.js";
 
 // The valid Connection.source values. Free text at the DB level (see
 // schema.prisma), so this is what actually constrains it — same role as
-// RECEIVER_FLAG_REASONS in routes/vouches.js. "nfc_scan" is a physical card
+// RECEIVER_FLAG_REASONS in routes/endorsements.js. "nfc_scan" is a physical card
 // tap; "directory" is the in-app connect button.
 const CONNECTION_SOURCES = new Set(["nfc_scan", "directory"]);
 
@@ -34,9 +34,9 @@ function statusForSource(source) {
   return AUTO_ACCEPT_SOURCES.has(source) ? "accepted" : "pending";
 }
 
-// Wider than vouchTurn.js's BUSINESS_SELECT by one field: Network.jsx
+// Wider than endorsementTurn.js's BUSINESS_SELECT by one field: Network.jsx
 // renders the counterparty's location on every card. Kept separate rather
-// than widening that one, which would silently add a field to every vouch
+// than widening that one, which would silently add a field to every endorsement
 // payload for the sake of an unrelated consumer.
 const CONNECTION_BUSINESS_SELECT = {
   id: true,
@@ -47,7 +47,7 @@ const CONNECTION_BUSINESS_SELECT = {
 };
 
 // One include for every connection read. Lives next to serializeConnection
-// below, which can't work without it (same reasoning as VOUCH_INCLUDE).
+// below, which can't work without it (same reasoning as ENDORSEMENT_INCLUDE).
 const CONNECTION_INCLUDE = {
   businessA: { select: CONNECTION_BUSINESS_SELECT },
   businessB: { select: CONNECTION_BUSINESS_SELECT },

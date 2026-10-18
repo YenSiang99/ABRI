@@ -6,7 +6,7 @@
 // charging the viewer for facts about the seller — "charging the buyer for the
 // privilege of contacting a paying seller paywalls that seller's own leads
 // away from them". So step 3 is the one that matters most: a Free viewer must
-// still get the badge, the vouch count and the contact details. Everything
+// still get the badge, the endorsement count and the contact details. Everything
 // these tiers add is something that did not exist for a stranger.
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password.js";
@@ -50,35 +50,35 @@ await db.account.upsert({
 
 // ── The graph under test ──────────────────────────────────────────────────
 //
-//   e2e-primary  (the VIEWER)  ──connected──> e2e-a2 ──vouches for──> e2e-target
-//                                            e2e-a3 ──vouches for──> e2e-target  (NOT connected)
+//   e2e-primary  (the VIEWER)  ──connected──> e2e-a2 ──endorses───> e2e-target
+//                                            e2e-a3 ──endorses───> e2e-target  (NOT connected)
 //
 // So the viewer should be told about a2 and never about a3: one is somebody
-// they know, the other is a stranger who happens to have vouched.
+// they know, the other is a stranger who happens to have endorsed.
 const TARGET = `${P}target`;
 await db.business.update({ where: { id: TARGET }, data: { verificationLevel: "L2", membershipTier: "plus" } });
 for (const id of [`${P}primary`, `${P}a2`, `${P}a3`]) {
   await db.business.update({ where: { id }, data: { verificationLevel: "L2", membershipTier: "plus" } });
 }
 
-async function resetVouch(fromId, toId, status) {
-  const stale = await db.vouch.findMany({ where: { fromBusinessId: fromId, toBusinessId: toId }, select: { id: true } });
+async function resetEndorsement(fromId, toId, status) {
+  const stale = await db.endorsement.findMany({ where: { fromBusinessId: fromId, toBusinessId: toId }, select: { id: true } });
   for (const { id } of stale) {
-    await db.vouch.update({ where: { id }, data: { currentRevisionId: null } });
-    await db.networkEvent.deleteMany({ where: { vouchId: id } });
-    await db.vouchAction.deleteMany({ where: { vouchId: id } });
-    await db.vouchFlag.deleteMany({ where: { vouchId: id } });
-    await db.vouchRevision.deleteMany({ where: { vouchId: id } });
-    await db.vouch.delete({ where: { id } });
+    await db.endorsement.update({ where: { id }, data: { currentRevisionId: null } });
+    await db.networkEvent.deleteMany({ where: { endorsementId: id } });
+    await db.endorsementAction.deleteMany({ where: { endorsementId: id } });
+    await db.endorsementFlag.deleteMany({ where: { endorsementId: id } });
+    await db.endorsementRevision.deleteMany({ where: { endorsementId: id } });
+    await db.endorsement.delete({ where: { id } });
   }
-  const vouch = await db.vouch.create({ data: { fromBusinessId: fromId, toBusinessId: toId, status, closedAt: new Date() } });
-  const rev = await db.vouchRevision.create({ data: {
-    vouchId: vouch.id, attempt: 1, revisionNumber: 1, comment: "Solid work.", createdById: fromId } });
-  await db.vouch.update({ where: { id: vouch.id }, data: { currentRevisionId: rev.id } });
-  return vouch;
+  const endorsement = await db.endorsement.create({ data: { fromBusinessId: fromId, toBusinessId: toId, status, closedAt: new Date() } });
+  const rev = await db.endorsementRevision.create({ data: {
+    endorsementId: endorsement.id, attempt: 1, revisionNumber: 1, comment: "Solid work.", createdById: fromId } });
+  await db.endorsement.update({ where: { id: endorsement.id }, data: { currentRevisionId: rev.id } });
+  return endorsement;
 }
-await resetVouch(`${P}a2`, TARGET, "published");
-await resetVouch(`${P}a3`, TARGET, "published");
+await resetEndorsement(`${P}a2`, TARGET, "published");
+await resetEndorsement(`${P}a3`, TARGET, "published");
 
 // Connect the viewer to a2 only. ACCEPTED — a pending request must not count.
 await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}primary` }, { businessBId: `${P}primary` }] } });
@@ -104,22 +104,22 @@ await setTier("free");
 let v = await viewer();
 let hit = await lookTarget(v);
 assert.ok(hit, "the business is still found");
-assert.ok(!("vouchersInYourNetwork" in hit), "the overlap is a Plus feature");
-ok("no vouchersInYourNetwork below Plus");
+assert.ok(!("endorsersInYourNetwork" in hit), "the overlap is a Plus feature");
+ok("no endorsersInYourNetwork below Plus");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n2. A Plus viewer is told WHO they already know");
 await setTier("plus");
 v = await viewer();
 hit = await lookTarget(v);
-assert.ok(hit.vouchersInYourNetwork, "the overlap appears at Plus");
-const ids = hit.vouchersInYourNetwork.map((b) => b.id);
-assert.deepEqual(ids, [`${P}a2`], `expected only the connected voucher, got ${ids.join(",")}`);
+assert.ok(hit.endorsersInYourNetwork, "the overlap appears at Plus");
+const ids = hit.endorsersInYourNetwork.map((b) => b.id);
+assert.deepEqual(ids, [`${P}a2`], `expected only the connected endorser, got ${ids.join(",")}`);
 // Names, not just a count: "2 of them are in your network" is interesting and
-// "Tan & Co vouches for them" is what makes somebody pick up the phone.
-assert.ok(hit.vouchersInYourNetwork[0].name, "and names them");
-assert.equal(hit.vouchCount, 2, "while the public count still says 2 — both vouches are real");
-ok("names the connected voucher, excludes the stranger, count unchanged");
+// "Tan & Co endorses them" is what makes somebody pick up the phone.
+assert.ok(hit.endorsersInYourNetwork[0].name, "and names them");
+assert.equal(hit.endorsementCount, 2, "while the public count still says 2 — both endorsements are real");
+ok("names the connected endorser, excludes the stranger, count unchanged");
 
 // ─────────────────────────────────────────────────────────────────────────
 console.log("\n3. Plus takes NOTHING away from Free");
@@ -133,7 +133,7 @@ const asPlus = await lookTarget(await viewer());
 for (const key of Object.keys(asFree)) {
   assert.deepEqual(asPlus[key], asFree[key], `Plus changed "${key}" — it must only ADD`);
 }
-assert.ok(!("vouchersInYourNetwork" in asFree) && "vouchersInYourNetwork" in asPlus,
+assert.ok(!("endorsersInYourNetwork" in asFree) && "endorsersInYourNetwork" in asPlus,
   "the only difference is the added key");
 ok(`Plus adds one key and alters none of the other ${Object.keys(asFree).length}`);
 
@@ -141,8 +141,8 @@ ok(`Plus adds one key and alters none of the other ${Object.keys(asFree).length}
 console.log("\n4. A pending connection is not a network");
 await db.connection.updateMany({ where: { businessAId: pair[0], businessBId: pair[1] }, data: { status: "pending" } });
 hit = await lookTarget(await viewer());
-assert.ok(!("vouchersInYourNetwork" in hit),
-  "an unanswered request must not manufacture 'somebody you know vouches for them'");
+assert.ok(!("endorsersInYourNetwork" in hit),
+  "an unanswered request must not manufacture 'somebody you know endorses them'");
 await db.connection.updateMany({ where: { businessAId: pair[0], businessBId: pair[1] }, data: { status: "accepted" } });
 ok("only accepted connections count — a request cannot forge the signal");
 
@@ -288,16 +288,16 @@ ok("both routes read the session only; a target id changes nothing");
 
 // ── Clean up ──────────────────────────────────────────────────────────────
 //
-// This file builds a vouch graph on shared fixtures. Leaving it behind makes
+// This file builds an endorsement graph on shared fixtures. Leaving it behind makes
 // another suite fail depending on the order the two are run in — which is the
 // worst kind of failure, because it looks like the other file's bug.
 for (const from of [`${P}a2`, `${P}a3`]) {
-  const rows = await db.vouch.findMany({ where: { fromBusinessId: from, toBusinessId: TARGET }, select: { id: true } });
+  const rows = await db.endorsement.findMany({ where: { fromBusinessId: from, toBusinessId: TARGET }, select: { id: true } });
   for (const { id } of rows) {
-    await db.vouch.update({ where: { id }, data: { currentRevisionId: null } });
-    await db.networkEvent.deleteMany({ where: { vouchId: id } });
-    await db.vouchRevision.deleteMany({ where: { vouchId: id } });
-    await db.vouch.delete({ where: { id } });
+    await db.endorsement.update({ where: { id }, data: { currentRevisionId: null } });
+    await db.networkEvent.deleteMany({ where: { endorsementId: id } });
+    await db.endorsementRevision.deleteMany({ where: { endorsementId: id } });
+    await db.endorsement.delete({ where: { id } });
   }
 }
 await db.connection.deleteMany({ where: { OR: [{ businessAId: `${P}primary` }, { businessBId: `${P}primary` }] } });

@@ -42,7 +42,7 @@ import { CLAIMED } from "@/lib/verificationLevels";
 // faults:
 //
 //   FOUR INBOXES. "What needs me?" was four badges on four rows in two
-//     groups — unread on Dashboard, vouch turns on Vouches, work waiting to
+//     groups — unread on Dashboard, endorsement turns on Endorsements, work waiting to
 //     be confirmed, and connection requests two levels deep under Network.
 //     The badge
 //     doctrine below was right; the placement made a member assemble one
@@ -51,7 +51,7 @@ import { CLAIMED } from "@/lib/verificationLevels";
 //
 //   MY BUSINESS WAS SPLIT. Profile sat in Workspace while Verification and
 //     the NFC card sat in Trust, and "Trust" was a weak name for the pair —
-//     vouches, checks and viewers are all trust surfaces too. It read as the
+//     endorsements, checks and viewers are all trust surfaces too. It read as the
 //     leftovers group.
 //
 //   PLAN WAS NOT IN THE NAV AT ALL. Every LockedFeature in the app ends in
@@ -95,11 +95,11 @@ const FIND_ITEMS = [
 // they overlap.
 const BUSINESS_ITEMS = [
   { title: "Profile", url: "/app/profile", icon: UserCircle },
-  // The record of vouches given and received. The ones WAITING on this member
+  // The record of endorsements given and received. The ones WAITING on this member
   // are in the Inbox; this page is where the finished relationship lives.
   {
-    title: "Vouches",
-    url: "/app/vouches",
+    title: "Endorsements",
+    url: "/app/endorsements",
     icon: Handshake,
     lockWhenPending: true,
   },
@@ -118,8 +118,8 @@ const BUSINESS_ITEMS = [
 ];
 
 // The admin's two queues are siblings, and the sidebar is where that has to
-// be visible. Vouch review used to be reachable only through a link on the
-// claims page, which read as though flagged vouches were part of claim
+// be visible. Endorsement review used to be reachable only through a link on the
+// claims page, which read as though flagged endorsements were part of claim
 // review — a different job on different records.
 // An account with no approved business (see AppLayout's CLAIMANT_PATHS):
 // its claim, and the directory. Nothing else would load for it.
@@ -136,7 +136,7 @@ const CLAIMANT_ITEMS = [
 
 const ADMIN_ITEMS = [
   { title: "Claims review", url: "/app/admin", icon: ClipboardCheck },
-  { title: "Vouch review", url: "/app/admin/vouch-reviews", icon: Flag },
+  { title: "Endorsement review", url: "/app/admin/endorsement-reviews", icon: Flag },
   // A third queue, and the one that makes L2 real: until it existed an
   // admin granted SSM-Verified from the claims screen with no number in front
   // of them. See pages/admin/AdminSsmReviews.jsx.
@@ -202,14 +202,14 @@ function SidebarNav({
   isAdmin,
   locked,
   unreadCount,
-  vouchActionCount,
+  endorsementActionCount,
   portfolioCount,
   incomingCount,
   onSignOut,
 }) {
   // Prefix match, except for the urls that are prefixes of their own
   // children — /app is under everything, /app/admin is under
-  // /app/admin/vouch-reviews, and /app/network is under all three of its own
+  // /app/admin/endorsement-reviews, and /app/network is under all three of its own
   // children. Those need an exact match or they'd light up alongside the
   // child that's actually open. (/app/network never renders as a row at all,
   // but it goes in the set anyway so the next reader doesn't have to work out
@@ -313,21 +313,21 @@ function SidebarNav({
                     <NavBadge count={unreadCount} label="unread" />
                   )}
                   {/* THE ONE WORK BADGE, and the reason this row exists. The
-                      counts that used to sit on Vouches and Network ›
+                      counts that used to sit on Endorsements and Network ›
                       Requests are summed here, because the Inbox is the page
                       that can clear them all — which is exactly what
                       the badge doctrine asks of whatever a count points at.
 
-                      vouchActionCount is NOT suppressed while `locked`, unlike
-                      the old Vouches badge: the Inbox is not a LockedFeature,
+                      endorsementActionCount is NOT suppressed while `locked`, unlike
+                      the old Endorsements badge: the Inbox is not a LockedFeature,
                       so the work behind this number is genuinely openable. A
-                      Free member's vouch requests are real and readable in
+                      Free member's endorsement requests are real and readable in
                       full; only publishing one is priced, and the nag is the
                       pitch. */}
                   {item.url === "/app/inbox" && (
                     <NavBadge
                       count={
-                        vouchActionCount + incomingCount + portfolioCount
+                        endorsementActionCount + incomingCount + portfolioCount
                       }
                       label="waiting on you"
                     />
@@ -421,11 +421,11 @@ function SidebarNav({
 
                 Three shapes, three meanings, and they must stay distinct:
                   verification level — circular mark, bold sans, yellow/ink
-                  vouch level        — rounded-full pill, inline icon
+                  endorsement level        — rounded-full pill, inline icon
                   membership tier    — squared rounded-sm mono chip, muted
 
                 Squared rather than the circular mark VerificationBadge uses
-                or the pill VouchBadge uses, so it can't be misread as a rank
+                or the pill EndorsementBadge uses, so it can't be misread as a rank
                 alongside the verification level shown directly above it.
                 Both chips stay muted for the same reason: the yellow this
                 first used is VerificationIcon's "verified" colour, which one
@@ -479,7 +479,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { business, claim, isAdmin, logout } = useAuth();
-  const { unreadCount, vouchActionCount, portfolioCount } =
+  const { unreadCount, endorsementActionCount, portfolioCount } =
     useNotifications();
   // Requests waiting on THIS member, for the Network badge. Read here rather
   // than inside NavSection so the sidebar has one place that talks to
@@ -515,7 +515,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
           isAdmin={isAdmin}
           locked={locked}
           unreadCount={unreadCount}
-          vouchActionCount={vouchActionCount}
+          endorsementActionCount={endorsementActionCount}
           portfolioCount={portfolioCount}
           incomingCount={incoming.length}
           onSignOut={handleSignOut}
@@ -545,7 +545,7 @@ function AppSidebar({ mobileOpen, onCloseMobile }) {
               isAdmin={isAdmin}
               locked={locked}
               unreadCount={unreadCount}
-              vouchActionCount={vouchActionCount}
+              endorsementActionCount={endorsementActionCount}
               portfolioCount={portfolioCount}
               incomingCount={incoming.length}
               onSignOut={handleSignOut}

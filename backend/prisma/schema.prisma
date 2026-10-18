@@ -39,7 +39,7 @@ model Business {
   // migrations/20260831120000_rename_axes_tier_level. The union lives in
   // lib/verificationLevels.js — this schema has no Prisma enums, so that
   // module is the only thing constraining this column, and a value outside
-  // it fails every Set.has gate silently: no vouching, no ask posting, no
+  // it fails every Set.has gate silently: no endorsing, no ask posting, no
   // badge icon, and nothing in the logs.
   verificationLevel String   @default("L0")
   description       String?
@@ -118,13 +118,13 @@ model Business {
 
   // "free" | "plus" | "pro" | "enterprise" — the membership TIER, and the
   // third axis on a business after the verification LEVEL above and the
-  // vouch LEVEL, which is derived and has no column at all.
+  // endorsement LEVEL, which is derived and has no column at all.
   //
   // The names are the rule, and the rule is one sentence: a TIER is bought,
   // a LEVEL is earned or claimed. This column is the only thing in the
   // product anyone can buy. If a fourth axis ever appears, its name decides
   // itself — money moves it, or it doesn't.
-  // Determines the vouch-giving cap (see lib/vouchCap.js), which is
+  // Determines the endorsement-giving cap (see lib/endorsementCap.js), which is
   // currently the only behaviour it gates. Deliberately never surfaced as
   // a profile badge — it must not read as a third kind of TRUST signal
   // sitting beside the other two, so the only place it appears is the
@@ -133,7 +133,7 @@ model Business {
   // Renamed from "basic"/"premium"/"enterprise" in
   // migrations/20260817120000_rename_membership_plans, and from
   // `membershipPlan` in 20260831120000_rename_axes_tier_level. Any change to
-  // this union has to move VOUCH_CAP_BY_MEMBERSHIP_TIER in lib/vouchCap.js
+  // this union has to move ENDORSEMENT_CAP_BY_MEMBERSHIP_TIER in lib/endorsementCap.js
   // in the same commit — a value here with no entry there silently removes
   // the cap — and MEMBERSHIP_TIER_RANK in lib/entitlements.js, which is
   // where the tier half of the contact gate (`contactDetails`) is ranked.
@@ -177,20 +177,20 @@ model Business {
   // to support both that transient dispute window AND (later) multiple
   // legitimate team members under one business.
   accounts             Account[]
-  vouchesReceived      Vouch[]              @relation("VouchTarget")
-  vouchesGiven         Vouch[]              @relation("VouchSource")
+  endorsementsReceived      Endorsement[]              @relation("EndorsementTarget")
+  endorsementsGiven         Endorsement[]              @relation("EndorsementSource")
   connectionsAsA       Connection[]         @relation("ConnectionA")
   connectionsAsB       Connection[]         @relation("ConnectionB")
   connectionsRequested Connection[]         @relation("ConnectionRequester")
   following            Follow[]             @relation("FollowFrom")
   followers            Follow[]             @relation("FollowTo")
   deferredConnections  DeferredConnection[]
-  flagsRaised          VouchFlag[]          @relation("FlagRaisedBy")
-  flagsAgainst         VouchFlag[]          @relation("FlagAgainst")
+  flagsRaised          EndorsementFlag[]          @relation("FlagRaisedBy")
+  flagsAgainst         EndorsementFlag[]          @relation("FlagAgainst")
   activityEvents       ActivityEvent[]      @relation("ActivityEventOwner")
   activityAsActor      ActivityEvent[]      @relation("ActivityEventActor")
-  vouchRevisions       VouchRevision[]      @relation("VouchRevisionAuthor")
-  vouchActionsAsActor  VouchAction[]        @relation("VouchActionActor")
+  endorsementRevisions       EndorsementRevision[]      @relation("EndorsementRevisionAuthor")
+  endorsementActionsAsActor  EndorsementAction[]        @relation("EndorsementActionActor")
 
   // The network feed. Two relations for the same reason ActivityEvent needs
   // two: an event is ABOUT one business and was DONE BY another, and the feed
@@ -304,19 +304,19 @@ model Account {
   claimSsm           String?
 
   deferredConnections DeferredConnection[]
-  // Admin-only back-relations: the vouch interventions this account made and
+  // Admin-only back-relations: the endorsement interventions this account made and
   // the reports it ruled on. Empty for every non-admin account.
-  vouchActionsAsAdmin VouchAction[]        @relation("VouchActionAdminActor")
-  vouchFlagsResolved  VouchFlag[]          @relation("VouchFlagResolver")
+  endorsementActionsAsAdmin EndorsementAction[]        @relation("EndorsementActionAdminActor")
+  endorsementFlagsResolved  EndorsementFlag[]          @relation("EndorsementFlagResolver")
   claimCodes          ClaimCode[]
 }
 
-// The vouch feature is three tables, and which one a piece of text lives in
+// The endorsement feature is three tables, and which one a piece of text lives in
 // is the whole design:
 //
-//   Vouch          — the workflow header. Mutable. Current state only.
-//   VouchRevision  — every version of the GIVER's testimonial. Insert-only.
-//   VouchAction    — every state transition, including the RECEIVER's
+//   Endorsement          — the workflow header. Mutable. Current state only.
+//   EndorsementRevision  — every version of the GIVER's testimonial. Insert-only.
+//   EndorsementAction    — every state transition, including the RECEIVER's
 //                    revert and cancel notes. Insert-only.
 //
 // The rule that makes the audit trail work: no table holds a text column
@@ -326,28 +326,28 @@ model Account {
 // text, so there is exactly one place each piece of authored text exists
 // and no way for the history to disagree with the current state.
 //
-// A vouch is receiver-gated before it counts as a trust signal — mirrors
+// An endorsement is receiver-gated before it counts as a trust signal — mirrors
 // how LinkedIn recommendations need the recipient's approval before going
 // live, rather than a bilateral edit negotiation. The receiver has four
 // actions and each is one transition:
-//   pending -> published (accept; counts toward vouchCount/vouchLevel)
+//   pending -> published (accept; counts toward endorsementCount/endorsementLevel)
 //   pending -> cancelled (cancel, or 14 days pass untouched — see
-//     lib/vouchExpiry.js for the lazy, no-cron expiry check)
+//     lib/endorsementExpiry.js for the lazy, no-cron expiry check)
 //   pending -> reverted (revert: sent back to be edited, capped at
 //     maxRevisions rounds, so the loop can't run forever)
 //   pending|reverted -> under_review (flag: suspended, an admin's move)
 // and the giver's revise closes the loop:
 //   reverted -> pending (new revision; revisionCount += 1)
 // under_review is the one status no business can leave. An admin picks one
-// of three exits (see POST /admin/vouch-reviews/:id/decide):
+// of three exits (see POST /admin/endorsement-reviews/:id/decide):
 //   under_review -> pending   (returned to the receiver; flag dismissed)
 //   under_review -> reverted  (sent back to the giver to fix; flag upheld)
 //   under_review -> cancelled (killed; flag upheld)
-// cancelled rows are never deleted — a fresh POST /vouches on a cancelled
-// pair resets this same row in place (see routes/vouches.js) rather than
+// cancelled rows are never deleted — a fresh POST /endorsements on a cancelled
+// pair resets this same row in place (see routes/endorsements.js) rather than
 // requiring a delete-then-recreate dance, so @@unique keeps meaning
 // "exactly one row per pair, ever, reused across attempts."
-model Vouch {
+model Endorsement {
   id String @id @default(cuid())
 
   // "pending"      — the receiver's move
@@ -355,7 +355,7 @@ model Vouch {
   // "under_review" — flagged by the receiver; an admin's move, and the one
   //                  in-flight status the 14-day expiry doesn't touch
   // "published" / "cancelled" — terminal (closedAt set)
-  // See the diagram at the top of src/routes/vouches.js.
+  // See the diagram at the top of src/routes/endorsements.js.
   status String @default("pending")
 
   // Pointer to the live testimonial, not a copy of its text. The previous
@@ -364,10 +364,10 @@ model Vouch {
   // "what did revision 1 actually say" became unanswerable. Reads that
   // want the current text join through this.
   currentRevisionId String?        @unique
-  currentRevision   VouchRevision? @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
+  currentRevision   EndorsementRevision? @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
 
   // Which submission cycle this row is on. Starts at 1 and increments
-  // each time a cancelled row is resubmitted through POST /vouches. Child
+  // each time a cancelled row is resubmitted through POST /endorsements. Child
   // rows carry the attempt they belong to, so a fresh attempt starts with
   // a clean slate instead of inheriting the previous attempt's change
   // requests — while the old rows stay as history rather than being
@@ -377,38 +377,38 @@ model Vouch {
   attempt       Int @default(1)
   // Rounds used within the CURRENT attempt only (reset to 0 on resubmit).
   revisionCount Int @default(0)
-  // Per-row rather than a global constant so a specific vouch can be given
+  // Per-row rather than a global constant so a specific endorsement can be given
   // more rounds later without a migration.
   maxRevisions  Int @default(2)
 
   // Bumped on every state transition — drives the 14-day lazy-expiry check.
   lastActionAt DateTime  @default(now())
   createdAt    DateTime  @default(now())
-  // Set when the vouch reaches a terminal status. Distinguishes "settled"
+  // Set when the endorsement reaches a terminal status. Distinguishes "settled"
   // from "in flight" without having to enumerate status values.
   closedAt     DateTime?
 
   fromBusinessId String
-  fromBusiness   Business @relation("VouchSource", fields: [fromBusinessId], references: [id])
+  fromBusiness   Business @relation("EndorsementSource", fields: [fromBusinessId], references: [id])
 
   toBusinessId String
-  toBusiness   Business @relation("VouchTarget", fields: [toBusinessId], references: [id])
+  toBusiness   Business @relation("EndorsementTarget", fields: [toBusinessId], references: [id])
 
-  revisions     VouchRevision[] @relation("VouchRevisions")
-  actions       VouchAction[]
-  flags         VouchFlag[]
-  // Back-relation only. The feed points AT a vouch rather than copying its
+  revisions     EndorsementRevision[] @relation("EndorsementRevisions")
+  actions       EndorsementAction[]
+  flags         EndorsementFlag[]
+  // Back-relation only. The feed points AT an endorsement rather than copying its
   // text, so a revised or withdrawn testimonial is never stale in two places.
   networkEvents NetworkEvent[]
 
-  // One vouch per (voucher, target) pair — the mock store didn't enforce
-  // this, but letting the same business vouch for another unlimited times
-  // undermines the signal. vouchCount/vouchLevel are intentionally NOT stored
-  // here (unlike the mock's business.vouchCount) — derive them by counting
+  // One endorsement per (endorser, target) pair — the mock store didn't enforce
+  // this, but letting the same business endorse another unlimited times
+  // undermines the signal. endorsementCount/endorsementLevel are intentionally NOT stored
+  // here (unlike the mock's business.endorsementCount) — derive them by counting
   // published rows in this relation at query time so they can never drift
   // out of sync.
   @@unique([fromBusinessId, toBusinessId])
-  // GET /vouches/requests filters on exactly these two pairs.
+  // GET /endorsements/requests filters on exactly these two pairs.
   @@index([toBusinessId, status])
   @@index([fromBusinessId, status])
 }
@@ -416,10 +416,10 @@ model Vouch {
 // Every version of the giver's testimonial, one row per submit or revise.
 // Never updated, only inserted — that invariant is the entire reason this
 // table exists, so nothing here should ever appear in an UPDATE.
-model VouchRevision {
+model EndorsementRevision {
   id      String @id @default(cuid())
-  vouchId String
-  vouch   Vouch  @relation("VouchRevisions", fields: [vouchId], references: [id])
+  endorsementId String
+  endorsement   Endorsement  @relation("EndorsementRevisions", fields: [endorsementId], references: [id])
   attempt Int
 
   // 1 = the attempt's original submission, 2.. = successive revisions.
@@ -428,36 +428,36 @@ model VouchRevision {
   revisionNumber Int
   comment        String
 
-  // Always the giver — denormalized off vouch.fromBusinessId so a revision
+  // Always the giver — denormalized off endorsement.fromBusinessId so a revision
   // is self-describing when read on its own (e.g. from an admin query).
   createdById String
-  createdBy   Business @relation("VouchRevisionAuthor", fields: [createdById], references: [id])
+  createdBy   Business @relation("EndorsementRevisionAuthor", fields: [createdById], references: [id])
 
   createdAt DateTime @default(now())
 
-  actions   VouchAction[]
-  flags     VouchFlag[]
-  currentOf Vouch?        @relation("CurrentRevision")
+  actions   EndorsementAction[]
+  flags     EndorsementFlag[]
+  currentOf Endorsement?        @relation("CurrentRevision")
 
-  @@unique([vouchId, attempt, revisionNumber])
-  @@index([vouchId])
+  @@unique([endorsementId, attempt, revisionNumber])
+  @@index([endorsementId])
 }
 
 // Append-only log of every state transition — the timeline UI reads this
 // and nothing else. Distinct from ActivityEvent, which is a per-business
-// notification feed keyed on businessId with no vouchId and therefore
-// can't reconstruct a single vouch's history.
+// notification feed keyed on businessId with no endorsementId and therefore
+// can't reconstruct a single endorsement's history.
 //
 // `comment` is the RECEIVER's text (why they want changes, why they
 // cancelled). It lives on the action rather than in its own table because
 // it only ever exists as the payload of one specific transition — giving
 // it a separate home meant a note could in principle outlive, or drift
 // from, the action that produced it. The giver's text is never here; that
-// belongs in VouchRevision, reachable via revisionId.
-model VouchAction {
+// belongs in EndorsementRevision, reachable via revisionId.
+model EndorsementAction {
   id      String @id @default(cuid())
-  vouchId String
-  vouch   Vouch  @relation(fields: [vouchId], references: [id])
+  endorsementId String
+  endorsement   Endorsement  @relation(fields: [endorsementId], references: [id])
   attempt Int
 
   // Giver:    "submit" | "revise"
@@ -470,23 +470,23 @@ model VouchAction {
   // submit/revise) or the one being responded to (for revert, cancel,
   // accept). This is what answers "which testimonial was the second
   // revert about" — it pins the action to the exact text in front of
-  // the actor at the time, rather than to whatever the vouch says now.
+  // the actor at the time, rather than to whatever the endorsement says now.
   revisionId String?
-  revision   VouchRevision? @relation(fields: [revisionId], references: [id])
+  revision   EndorsementRevision? @relation(fields: [revisionId], references: [id])
 
   // Null for "expire" and for every admin_* action — neither the system nor
-  // an admin is a party to the vouch, and an admin reading the log has to be
+  // an admin is a party to the endorsement, and an admin reading the log has to be
   // able to tell a real cancel from a timeout or an intervention.
   actorId String?
-  actor   Business? @relation("VouchActionActor", fields: [actorId], references: [id])
+  actor   Business? @relation("EndorsementActionActor", fields: [actorId], references: [id])
 
   // Set only on admin_* actions, where actorId is null: which admin made the
   // call. An Account rather than a Business because admins have no business
   // (see AppLayout.jsx's admin redirect), which is the whole reason actorId
   // can't carry them. Never serialized to the two businesses — they see that
-  // "an admin" ruled, not who; see serializeAction in lib/vouchTurn.js.
+  // "an admin" ruled, not who; see serializeAction in lib/endorsementTurn.js.
   actorAccountId String?
-  actorAccount   Account? @relation("VouchActionAdminActor", fields: [actorAccountId], references: [id])
+  actorAccount   Account? @relation("EndorsementActionAdminActor", fields: [actorAccountId], references: [id])
 
   comment String?
 
@@ -495,24 +495,24 @@ model VouchAction {
 
   createdAt DateTime @default(now())
 
-  @@index([vouchId, createdAt])
+  @@index([endorsementId, createdAt])
 }
 
 // A report an admin is meant to read, raised by either side.
 //
 // The two directions are NOT symmetric, and the asymmetry is the point:
-//   receiver -> giver ("abusive_content"/"other") suspends the live vouch
+//   receiver -> giver ("abusive_content"/"other") suspends the live endorsement
 //     in "under_review", because the thing being reported is a testimonial
 //     that hasn't been published yet and shouldn't proceed while in doubt;
 //   giver -> receiver ("unfair_cancel") is tracking-only, because by then
-//     the vouch is already terminal — there's nothing left to suspend, and
+//     the endorsement is already terminal — there's nothing left to suspend, and
 //     the report exists to surface a business that cancels in bad faith
 //     repeatedly.
 // See routes/admin.js for the review queue.
-model VouchFlag {
+model EndorsementFlag {
   id      String @id @default(cuid())
-  vouchId String
-  vouch   Vouch  @relation(fields: [vouchId], references: [id])
+  endorsementId String
+  endorsement   Endorsement  @relation(fields: [endorsementId], references: [id])
 
   raisedByBusinessId String
   raisedByBusiness   Business @relation("FlagRaisedBy", fields: [raisedByBusinessId], references: [id])
@@ -530,7 +530,7 @@ model VouchFlag {
   // immutable, pointing at one is strictly better: same guarantee, no
   // duplicated text to fall out of sync.
   revisionId String?
-  revision   VouchRevision? @relation(fields: [revisionId], references: [id])
+  revision   EndorsementRevision? @relation(fields: [revisionId], references: [id])
 
   status              String    @default("open") // "open" | "reviewed"
   // How it was judged, recorded separately from `status` because "an admin
@@ -542,18 +542,18 @@ model VouchFlag {
   outcome             String? // "upheld" | "dismissed"
   resolvedAt          DateTime?
   resolvedByAccountId String?
-  resolvedByAccount   Account?  @relation("VouchFlagResolver", fields: [resolvedByAccountId], references: [id])
+  resolvedByAccount   Account?  @relation("EndorsementFlagResolver", fields: [resolvedByAccountId], references: [id])
   createdAt           DateTime  @default(now())
 
-  @@index([vouchId])
+  @@index([endorsementId])
 }
 
 // Powers the give-first reciprocity loop's notify step (Dashboard.jsx's
 // "Recent activity") — businessId is whose feed this appears in,
 // actorBusinessId is the other party. type values (see
-// lib/activityEvents.js for the message-text map): "vouch_submitted"
-// (-> receiver), "vouch_published" / "vouch_cancelled" / "vouch_reverted" /
-// "vouch_flagged" (-> giver), "vouch_revised" (-> receiver),
+// lib/activityEvents.js for the message-text map): "endorsement_submitted"
+// (-> receiver), "endorsement_published" / "endorsement_cancelled" / "endorsement_reverted" /
+// "endorsement_flagged" (-> giver), "endorsement_revised" (-> receiver),
 // "connection_added" (-> the side that didn't press the button).
 model ActivityEvent {
   id         String   @id @default(cuid())
@@ -596,7 +596,7 @@ model ActivityEvent {
 // four types cannot be derived. Business.verificationLevel is current state
 // with no history anywhere, so "claimed their listing" and "became
 // SSM-Verified" have no timestamp to read. The rule this schema states is
-// that SUMMARIES (vouchCount, follower counts) are never stored because they
+// that SUMMARIES (endorsementCount, follower counts) are never stored because they
 // drift from the rows they summarise. This table stores no counts and no
 // copies of text — it records that a thing happened at a time, which
 // summarises nothing. Same category as Ask.expiresAt.
@@ -775,11 +775,11 @@ model ProfileView {
 
 // Two businesses saying they worked together, on a date, on something.
 //
-// THE CHEAP RUNG BELOW A VOUCH, and that is the entire design goal. Ranked by
+// THE CHEAP RUNG BELOW A ENDORSEMENT, and that is the entire design goal. Ranked by
 // what a signal costs to fake, this product had the registry rung (SSM -> L2)
-// and the reputation rung (a vouch, which costs the giver prose and their own
+// and the reputation rung (an endorsement, which costs the giver prose and their own
 // name) with nothing in between — so the FIRST artifact it ever asked anyone
-// for was the most expensive one. That is why the vouch graph is thin. An
+// for was the most expensive one. That is why the endorsement graph is thin. An
 // portfolio entry costs one tap and a month.
 //
 // IT NEEDS THE OTHER SIDE'S AGREEMENT, for the reason Connection's own comment
@@ -798,7 +798,7 @@ model ProfileView {
 // see who, and invisible behind a single number.
 //
 // NOT A RATING. There is no score, stars or free-form testimonial here. A
-// vouch is the place to say someone is good; this only says you worked
+// endorsement is the place to say someone is good; this only says you worked
 // together. Keeping it factual is what keeps it cheap enough to be created,
 // and what keeps it defensible — a dated fact survives a dispute in a way a
 // judgement does not.
@@ -813,7 +813,7 @@ model PortfolioEntry {
   //               portfolio entries a rival would obviously decline becomes a way to
   //               damage them, which is a weapon rather than a record.
   // "cancelled" — withdrawn by the proposer, or lapsed after 14 days untouched
-  //               (lib/portfolio entries.js, the same lazy sweep vouches use).
+  //               (lib/portfolio entries.js, the same lazy sweep endorsements use).
   status String @default("pending")
 
   // The pair, ordered by id via orderedPair in lib/connections.js so one row
@@ -893,19 +893,19 @@ model PortfolioEntry {
 model NetworkEvent {
   id String @id @default(cuid())
 
-  // "vouch_published"   — a testimonial went live on a profile
+  // "endorsement_published"   — a testimonial went live on a profile
   // "business_claimed"  — an L0 listing became a member (L0 -> L1)
   // "business_verified" — SSM verification granted (L1 -> L2)
   //
   // String, not a Prisma enum — this schema has none. NETWORK_EVENT_TYPES in
   // lib/networkEvents.js is the only thing constraining it.
   //
-  // "vouch_published" deliberately shares a name with the ActivityEvent type:
+  // "endorsement_published" deliberately shares a name with the ActivityEvent type:
   // it is the same real-world event written for two different audiences, and
   // giving the network copy a second name would hide that.
   type String
 
-  // Who the event is ABOUT. Always set — the vouch's receiver, or the business
+  // Who the event is ABOUT. Always set — the endorsement's receiver, or the business
   // that claimed or got verified.
   subjectBusinessId String
   subjectBusiness   Business @relation("NetworkEventSubject", fields: [subjectBusinessId], references: [id])
@@ -917,7 +917,7 @@ model NetworkEvent {
   actorBusinessId String?
   actorBusiness   Business? @relation("NetworkEventActor", fields: [actorBusinessId], references: [id])
 
-  // A POINTER, never a copy — exactly the shape Vouch.currentRevisionId uses,
+  // A POINTER, never a copy — exactly the shape Endorsement.currentRevisionId uses,
   // and for the same reason its comment gives: a denormalized copy of the
   // testimonial is where history goes to die. The feed joins through this for
   // the text, so an edited or withdrawn one changes here with no second write.
@@ -931,10 +931,10 @@ model NetworkEvent {
   // fields nobody can explain.
   //
   // Cascade on delete, unlike every Business key in this schema. A pointer has
-  // nothing to unwind: delete the vouch and the announcement is about
+  // nothing to unwind: delete the endorsement and the announcement is about
   // something that no longer exists.
-  vouchId String?
-  vouch   Vouch?  @relation(fields: [vouchId], references: [id], onDelete: Cascade)
+  endorsementId String?
+  endorsement   Endorsement?  @relation(fields: [endorsementId], references: [id], onDelete: Cascade)
 
   // The level REACHED, for the two level types. Stored because it is a fact
   // about the PAST, and Business.verificationLevel can no longer answer it
@@ -957,7 +957,7 @@ model NetworkEvent {
   @@index([actorBusinessId])
   @@index([subjectBusinessId])
   // Serves the backfill's idempotence check and nothing else on the hot path.
-  @@index([vouchId])
+  @@index([endorsementId])
 }
 
 // A mutual edge — connecting via a tap (or in-app connect) links both
@@ -1174,7 +1174,7 @@ model SourceRecord {
   // count of government contracts won.
   detail Json?
 
-  // The year the source last vouched for the record, as the source says it.
+  // The year the source last endorsed the record, as the source says it.
   sourceYear String?
   fetchedAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
