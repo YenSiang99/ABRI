@@ -38,6 +38,7 @@ import { membershipTierAllows } from "@/lib/membershipTiers";
 import { toast } from "@/lib/toast";
 import { fetchServiceCatalogue } from "@/lib/api/serviceCatalogue";
 import { CLAIMED } from "@/lib/verificationLevels";
+import { AbriMark } from "@/components/layout/AbriMark";
 
 function Stat({ label, value }) {
   return (
@@ -1045,8 +1046,8 @@ function Profile() {
                         {business.category}
                       </div>
                     </div>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-                      A
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white">
+                      <AbriMark onLight className="h-5" />
                     </div>
                   </div>
                   <div className="absolute right-6 bottom-5 left-6 flex items-end justify-between font-mono text-[10px] opacity-70">

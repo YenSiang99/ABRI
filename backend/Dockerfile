@@ -19,7 +19,11 @@ COPY prisma ./prisma
 # kind of difference that only shows up during a deploy.
 COPY prisma.config.ts ./
 
-RUN npm ci --omit=dev --no-audit --no-fund
+# The cache is cleaned in the same RUN as the install: a later `npm cache clean`
+# deletes the files but cannot shrink this layer, so ~/.npm would still ship in
+# the image (it was most of the backend's largest layer).
+RUN npm ci --omit=dev --no-audit --no-fund \
+    && npm cache clean --force
 
 # Generated EXPLICITLY, not left to @prisma/client's postinstall. That hook does
 # not run here — prisma.config.ts takes over config resolution, and on Prisma 6

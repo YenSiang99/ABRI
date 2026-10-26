@@ -2,8 +2,9 @@ import logo from "@/assets/home/logo.png";
 import logoWhite from "@/assets/home/logo-white.png";
 import { cn } from "@/lib/utils";
 
-// The ABRI logo (mark over the wordmark). Its lettering is black, so dark mode
-// swaps in the white-lettered version.
+// The ABRI logo (mark over the wordmark). Light mode shows the original: yellow
+// A, black check, black lettering. Dark mode swaps in the designer's dark
+// version, with the check and lettering in white.
 function AbriLogo({ className }) {
   return (
     <>

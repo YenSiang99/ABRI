@@ -8,6 +8,7 @@ import { TIMELINE_COPY } from "@/components/business/VerificationTimeline";
 import { hostOf, linkClass } from "@/lib/contactDisplay";
 import { verificationLevelLabel } from "@/lib/trustLabels";
 import { formatDate, profileStage } from "@/lib/profileStage";
+import { AbriMark } from "@/components/layout/AbriMark";
 
 // THE STANDARD BUSINESS PROFILE, decided 28 Sep 2026: every business — an
 // unclaimed seed listing, a claimed one waiting on SSM, a verified member —
@@ -354,8 +355,8 @@ export function CardSection({ layout, business }) {
                 <div className="mt-6 text-xl font-semibold">{business.name}</div>
                 <div className="text-xs opacity-70">{business.category}</div>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow text-sm font-bold text-yellow-ink dark:bg-accent dark:text-accent-foreground">
-                A
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white">
+                <AbriMark onLight className="h-5" />
               </div>
             </div>
             <div className="absolute right-6 bottom-5 left-6 flex items-end justify-between font-mono text-[10px] opacity-70">

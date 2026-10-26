@@ -30,6 +30,7 @@ import {
   membershipTierAllows,
 } from "@/lib/membershipTiers";
 import { CLAIMED } from "@/lib/verificationLevels";
+import { AbriMark } from "@/components/layout/AbriMark";
 
 // THE NAV IS GROUPED BY QUESTION, not by feature area. Each group answers one:
 //
@@ -225,9 +226,7 @@ function SidebarNav({
         className="flex items-center gap-2 px-4 py-4"
         onClick={onNavigate}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-foreground text-sm font-bold text-background">
-          A
-        </div>
+        <AbriMark className="h-7 shrink-0" />
         <span className="text-base font-semibold tracking-tight text-foreground">
           ABRI
         </span>

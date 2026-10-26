@@ -81,6 +81,12 @@ jobs:
             "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" <<'REMOTE'
           set -euo pipefail
           cd /srv/abri/deploy
+          # Prune BEFORE pulling as well as after. The pull lands next to the
+          # images already on disk, and the post-deploy prune never runs when a
+          # deploy fails, so leftovers from a failed run would otherwise eat
+          # into the room the next pull needs. Images of running containers
+          # (dev and prod) are kept.
+          docker image prune -af
           docker compose pull backend-dev frontend-dev
           docker compose up -d backend-dev frontend-dev
           # 3.0 GB free on an 8 GB disk. Untagged layers from the previous build

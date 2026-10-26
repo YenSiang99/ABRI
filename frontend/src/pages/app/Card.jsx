@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { membershipTierAllows } from "@/lib/membershipTiers";
 import { CLAIMED } from "@/lib/verificationLevels";
 import { verificationLevelLabel } from "@/lib/trustLabels";
+import { AbriMark } from "@/components/layout/AbriMark";
 
 function Row({ label, value, mono }) {
   return (
@@ -56,8 +57,8 @@ function CardFace({ business, preview = false }) {
             {verificationLevelLabel[business.verificationLevel]}
           </div>
         </div>
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-lg font-bold text-accent-foreground">
-          A
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white">
+          <AbriMark onLight className="h-6" />
         </div>
       </div>
       <div className="absolute right-8 bottom-6 left-8 flex items-end justify-between font-mono text-[10px] opacity-70">
