@@ -77,6 +77,12 @@ function fetchDirectoryFacets({ category, location } = {}) {
   return apiFetch(`/businesses/facets${qs ? `?${qs}` : ""}`);
 }
 
+// The homepage trust strip's live numbers:
+// `{ verifiedBusinesses, publishedEndorsements }`.
+function fetchPublicStats() {
+  return apiFetch("/businesses/stats");
+}
+
 function fetchBusiness(id) {
   return apiFetch(`/businesses/${id}`).then((data) => data.business);
 }
@@ -136,6 +142,7 @@ export {
   fetchBusinesses,
   fetchBusinessPage,
   fetchDirectoryFacets,
+  fetchPublicStats,
   submitSsm,
   fetchBusiness,
   submitBusinessClaim,

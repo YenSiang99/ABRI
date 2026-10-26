@@ -8,16 +8,21 @@ import { BusinessCard } from "@/components/business/BusinessCard";
 import { CategoryAreaFilters } from "@/components/directory/CategoryAreaFilters";
 
 function Directory() {
-  const [query, setQuery] = useState("");
-  const [place, setPlace] = useState({ category: "", location: "" });
+  // The page lives in the URL (?page=3), so Back returns to it and a page can
+  // be linked. Filters and search don't, and changing one starts again at 1 —
+  // except on arrival: the homepage search hands over ?q=, ?category= and
+  // ?location=, read once here as the starting values.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [place, setPlace] = useState(() => ({
+    category: searchParams.get("category") ?? "",
+    location: searchParams.get("location") ?? "",
+  }));
   const [businesses, setBusinesses] = useState([]);
   const [status, setStatus] = useState("loading");
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(24);
 
-  // The page lives in the URL (?page=3), so Back returns to it and a page can
-  // be linked. Filters and search don't, and changing one starts again at 1.
-  const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const goTo = useCallback(
     (n, { replace = false } = {}) => {

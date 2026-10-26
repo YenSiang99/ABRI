@@ -8,15 +8,14 @@ function Pricing() {
       <div className="mx-auto max-w-[1200px] px-6">
         <div className="mx-auto mb-13 max-w-[640px] text-center">
           <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
-            Membership
+            Your network. Your next level.
           </span>
           <h2 className="mt-3 text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
-            Simple, transparent membership.
+            Start with a connection. Grow when you’re ready.
           </h2>
           <p className="mt-3.5 text-[17px] text-grey-600 dark:text-muted-foreground">
-            Start free and stay free for as long as you like. The paid tiers
-            are annual — ABRI is a network you join, not software you
-            subscribe to.
+            Join free. Find your circle. Choose more as you grow. Paid plans
+            are billed yearly, in Malaysian Ringgit.
           </p>
         </div>
 

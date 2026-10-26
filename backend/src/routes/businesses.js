@@ -21,7 +21,7 @@ import { ensureDirectoryOrder } from "../lib/directoryOrder.js";
 import { isValidCategory, isValidLocation, BUSINESS_CATEGORIES, BUSINESS_LOCATIONS } from "../lib/businessVocab.js";
 import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
-import { UNCLAIMED, CLAIMED } from "../lib/verificationLevels.js";
+import { UNCLAIMED, CLAIMED, SSM_VERIFIED, verificationLevelsAtOrAbove } from "../lib/verificationLevels.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { endorsersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
@@ -483,6 +483,32 @@ router.get(
 // doesn't reshuffle as numbers move.
 //
 // Declared before /:id for the same reason as the catalogue below.
+// The two live numbers on the homepage's trust strip: businesses at SSM-Verified
+// or above, and endorsements that reached "published". Public and unpersonalised,
+// so one answer serves every visitor; cached for five minutes because the
+// verified count scans Business (no index on verificationLevel) and the strip
+// does not need to-the-second accuracy.
+//
+// Declared before /:id for the same reason as the catalogue below.
+const STATS_TTL_MS = 5 * 60 * 1000;
+let statsCache = { at: 0, body: null };
+
+router.get(
+  "/stats",
+  asyncHandler(async (req, res) => {
+    if (!statsCache.body || Date.now() - statsCache.at > STATS_TTL_MS) {
+      const [verifiedBusinesses, publishedEndorsements] = await Promise.all([
+        prisma.business.count({
+          where: { verificationLevel: { in: verificationLevelsAtOrAbove(SSM_VERIFIED) } },
+        }),
+        prisma.endorsement.count({ where: { status: "published" } }),
+      ]);
+      statsCache = { at: Date.now(), body: { verifiedBusinesses, publishedEndorsements } };
+    }
+    res.json(statsCache.body);
+  }),
+);
+
 router.get(
   "/facets",
   optionalAuth,

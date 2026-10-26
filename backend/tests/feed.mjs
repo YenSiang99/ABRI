@@ -191,7 +191,7 @@ for (const [i, id] of PAGING_SUBJECTS.entries()) {
 // assertion got wrong for a while. 50 is MAX_LIMIT in routes/feed.js, so this
 // call returns AT MOST 50 rows however many exist — it was a stand-in for the
 // whole feed only while the database held fewer than 50 visible events.
-// scripts/seed-demo.mjs adds 48 on its own, which pushed a real feed to 56 and
+// A demo seed (since deleted) added 48 on its own, which pushed a real feed to 56 and
 // made this suite fail with a diff whose first divergence was at index 50: the
 // end of the truncated list, not a paging fault. Paging was correct the whole
 // time — no duplicates, no gaps, same order for all 50 it could compare.

@@ -11,7 +11,6 @@
     "db:start": "sh scripts/local-db.sh start",
     "db:stop": "sh scripts/local-db.sh stop",
     "db:status": "sh scripts/local-db.sh status",
-    "prisma:seed": "prisma db seed",
     "admin:grant": "node scripts/grant-admin.js",
     "tier:set": "node scripts/set-membership-tier.js",
     "test": "node tests/run-all.mjs",
@@ -22,9 +21,6 @@
   "license": "ISC",
   "description": "",
   "type": "module",
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",

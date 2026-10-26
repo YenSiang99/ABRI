@@ -3,13 +3,19 @@ import { PrismaClient } from "@prisma/client";
 import { CATEGORY_SERVICES } from "../src/lib/categoryServices.js";
 import { UNCLAIMED } from "../src/lib/verificationLevels.js";
 
-const prisma = new PrismaClient();
+// FICTIONAL LISTINGS, FOR THE TEST DATABASE ONLY. Every business below is
+// made up (ported from the old frontend fixture), and several suites assume
+// these ids exist. They used to be prisma/seed.js, which is how 22 of them
+// reached prod and sat in the directory beside real listings. Real listings
+// come from data/seed/listings.csv via scripts/import-seed.mjs, never from here,
+// and this refuses any database whose name doesn't end in _test.
+const dbName = new URL(process.env.DATABASE_URL ?? "postgresql://x/").pathname.slice(1);
+if (!dbName.endsWith("_test")) {
+  console.error(`Refusing to seed fictional listings into "${dbName || "(no DATABASE_URL)"}": only a *_test database may hold them.`);
+  process.exit(1);
+}
 
-// Ported from the frontend's data/businesses.js — the same 21 sample
-// listings, seeded here as unclaimed (T0) so the claim flow has real rows
-// to claim against. Drops the frontend's fake endorsementCount/pre-claimed tiers
-// (T1/T2 with no real account behind them) since a real database shouldn't
-// contain claims or endorsements nobody actually made.
+const prisma = new PrismaClient();
 const businesses = [
   { id: "meridian-accounting", name: "Meridian Accounting", category: "Accounting & Tax", location: "Petaling Jaya", domain: "meridianaccounting.my", description: "Full-service accounting and tax filing for SMEs, with a focus on fast SSM annual return turnaround.", phone: "03-7955 1234", whatsapp: "60123451234", email: "hello@meridianaccounting.my", website: "https://meridianaccounting.my", address: "Level 8, Menara MPPJ, Jalan Tengah, 46200 Petaling Jaya, Selangor", openingHours: "Mon–Fri 9am–6pm\nSat 9am–1pm\nClosed Sunday and public holidays" },
   { id: "sentul-corp-services", name: "Sentul Corp Services", category: "Corporate Secretarial", location: "Kuala Lumpur", domain: "sentulcorpservices.my", description: "Company secretarial services covering incorporation, statutory filings, and compliance advisory.", phone: "03-4045 8820", whatsapp: "60193348820", email: "enquiry@sentulcorpservices.my", website: "https://sentulcorpservices.my", address: "22 Jalan Sentul Pasar, 51000 Kuala Lumpur", openingHours: "Mon–Fri 9am–5.30pm" },
@@ -93,9 +99,8 @@ async function main() {
       //
       // Be clear about the cost: on the six seeded rows this DOES overwrite
       // whatever an owner last saved through PATCH /businesses/me. That's
-      // acceptable for a dev seed on sample listings — resetting them to a
-      // known state is usually the reason you re-ran it — but it is the
-      // reason not to add a real member's business to the list above.
+      // acceptable for test fixtures — resetting them to a known state is
+      // the point.
       update: contact,
       create: {
         id: b.id,

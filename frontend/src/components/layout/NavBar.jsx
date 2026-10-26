@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
+import { AbriLogo } from "@/components/layout/AbriLogo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { useAuth } from "@/context/AuthContext";
 
+// The links follow the Oct 2026 homepage draft. "Discover" goes to the
+// directory itself rather than the homepage search box, so every public page
+// keeps a one-click way into it.
 const NAV_LINKS = [
-  { href: "/#how", label: "How it works" },
-  { href: "/#trust", label: "The badge" },
-  { href: "/#pricing", label: "Membership" },
-  { to: "/directory", label: "Directory" },
+  { to: "/directory", label: "Discover" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#opportunities", label: "Opportunities" },
+  { href: "/#pricing", label: "Pricing" },
 ];
 
 function NavBar() {
@@ -39,14 +43,8 @@ function NavBar() {
       aria-label="Main"
     >
       <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between px-6">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight text-ink dark:text-foreground"
-        >
-          <span className="grid size-[30px] place-items-center rounded-[7px] bg-ink text-base font-extrabold text-yellow dark:bg-grey-700">
-            A
-          </span>
-          ABRI
+        <Link to="/" aria-label="ABRI home" className="flex items-center">
+          <AbriLogo className="h-12" />
         </Link>
 
         <div className="hidden items-center gap-7 text-sm font-semibold text-grey-600 dark:text-muted-foreground lg:flex">
@@ -95,13 +93,13 @@ function NavBar() {
                 to="/login"
                 className="hidden rounded-sm border border-grey-300 px-4 py-2.5 text-sm leading-none font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted lg:inline-flex"
               >
-                Log in
+                Sign in
               </Link>
               <Link
                 to="/register"
                 className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2.5 text-sm leading-none font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
               >
-                Claim your business
+                Join ABRI
               </Link>
             </>
           )}
@@ -165,7 +163,7 @@ function NavBar() {
                 onClick={() => setOpen(false)}
                 className="mt-2 rounded-sm border border-grey-300 px-4 py-2.5 text-center text-sm leading-none font-bold text-ink hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
               >
-                Log in
+                Sign in
               </Link>
             )}
           </div>

@@ -165,7 +165,7 @@ process.on("SIGINT", () => {
   process.exit(130);
 });
 
-// The 22 base listings, which several suites assume exist rather than create:
+// The fictional base listings (tests/base-listings.mjs), which several suites assume exist rather than create:
 // directory.mjs needs the row count to be able to exceed its paging cap, and
 // lookup.mjs searches names it does not own. They were always there when the
 // tests ran against the development database; on a database of their own they
@@ -173,7 +173,7 @@ process.on("SIGINT", () => {
 // the first.
 console.log("Seeding base listings…");
 const listings = await new Promise((resolve) => {
-  const child = spawn(process.execPath, [path.join(here, "..", "prisma", "seed.js")], {
+  const child = spawn(process.execPath, [path.join(here, "base-listings.mjs")], {
     env: { ...childEnv, DATABASE_URL: TEST_DATABASE_URL, DIRECT_URL: TEST_DATABASE_URL },
     stdio: ["ignore", "pipe", "pipe"],
   });

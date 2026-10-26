@@ -43,7 +43,7 @@
 // started claiming since the import is theirs now and stays.
 //
 // ANY DATABASE OTHER THAN backend/.env's needs ABRI_IMPORT_CONFIRM set to
-// "<host>:<port>/<dbname>" — the same idea as seed-demo.mjs's guard. It is
+// "<host>:<port>/<dbname>". It is
 // keyed to the whole target, not the hostname, because dev is reached
 // through an SSH tunnel: the host is "localhost" and only the port and
 // database name say it isn't this machine's database.
@@ -51,7 +51,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-// DATABASE_URL, resolved file-relative, like seed-demo.mjs — src/prisma.js
+// DATABASE_URL, resolved file-relative — src/prisma.js
 // constructs a bare PrismaClient and nothing here loads dotenv.
 if (!process.env.DATABASE_URL) {
   const envPath = new URL("../.env", import.meta.url);

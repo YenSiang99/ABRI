@@ -24,7 +24,7 @@ Everything here works the same for every business. **Free is Core with limits**,
 
 - [x] **Sign up and log in** — email and password, stay logged in.
 - [x] **Claim your business** — find your listing, prove it by email, an admin approves. Rival claims get dropped.
-- [x] **Listings already there** — 22 businesses seeded as "Unclaimed" (T0) in `backend/prisma/seed.js`, so they exist before anyone signs up. Sample rows ported from the old frontend fixture, **not** a real registry import — the actual SSM data pull is still to do.
+- [x] **Listings already there** — real listings loaded as "Unclaimed" (L0) from `data/seed/listings.csv` by `backend/scripts/import-seed.mjs`, so they exist before anyone signs up. The fictional sample listings live only in `backend/tests/base-listings.mjs` and load only into a `*_test` database.
 - [x] **Public business page** — name, category, location, description, services, badges. Anyone can view it.
 - [x] **Edit your own page** — the owner changes their own details, via `PATCH /businesses/me` (description, services and all six contact fields). **Free too** — the route asks for an approved claim and nothing else, and no plan gate has ever stood in front of it. The pricing table claimed otherwise until Aug 2026; the table was wrong, not the code. What Plus buys is the contact block being *visible*, not writable. Until Aug 2026 this was ticked but false: the dialog wrote to a localStorage store nothing read back, so it toasted "Profile updated" and changed nothing.
 - [x] **Browse and search** — every business, searchable by name and category, filterable by verification level. **Location is shown but not searched** — `GET /businesses` matches `name` and `category` only. See "Search filters" in §2.
