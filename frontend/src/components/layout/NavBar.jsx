@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#opportunities", label: "Opportunities" },
   { href: "/#pricing", label: "Pricing" },
+  { to: "/ask", label: "Ask ABRI" },
 ];
 
 function NavBar() {

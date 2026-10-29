@@ -35,6 +35,7 @@ import { AdminUsers } from "@/pages/admin/AdminUsers";
 import { About } from "@/pages/legal/About";
 import { Contact } from "@/pages/legal/Contact";
 import { Faq } from "@/pages/legal/Faq";
+import { Ask } from "@/pages/Ask";
 import { Privacy } from "@/pages/legal/Privacy";
 import { Terms } from "@/pages/legal/Terms";
 
@@ -44,6 +45,16 @@ function PublicLayout() {
       <NavBar />
       <Outlet />
       <Footer />
+    </>
+  );
+}
+
+// A chat fills the window under the nav bar, so no footer below it.
+function ChatLayout() {
+  return (
+    <>
+      <NavBar />
+      <Outlet />
     </>
   );
 }
@@ -74,6 +85,9 @@ function App() {
           <Route path="/faq" element={<Faq />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
+        </Route>
+        <Route element={<ChatLayout />}>
+          <Route path="/ask" element={<Ask />} />
         </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="/app" element={<AppLayout />}>

@@ -68,6 +68,8 @@ const SUITES = [
   "auth-recovery.mjs",
   // Moves the Founding settings and puts them back (open, no end date).
   "founding.mjs",
+  // Stateless; stubs fetch to test the model call in-process.
+  "ask.mjs",
 ];
 
 function run(file) {
@@ -128,6 +130,10 @@ async function startApi() {
       // is how the claim suites open their own confirmation links. Set, not
       // deleted, because dotenv never overrides a variable that exists.
       SMTP_HOST: "",
+      // No model: ask.mjs checks the route's validation and its "not set up"
+      // answer, and a run never spends real quota. Blank for the same dotenv
+      // reason as SMTP_HOST.
+      GEMINI_API_KEY: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

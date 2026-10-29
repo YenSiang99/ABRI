@@ -13,6 +13,7 @@ import { followRouter } from "./routes/follows.js";
 import { feedRouter } from "./routes/feed.js";
 import { watchRouter } from "./routes/watches.js";
 import { portfolioRouter } from "./routes/portfolio.js";
+import { askRouter } from "./routes/ask.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { startMembershipSweep } from "./lib/membershipExpiry.js";
 
@@ -37,6 +38,7 @@ app.use("/follows", followRouter);
 app.use("/feed", feedRouter);
 app.use("/watches", watchRouter);
 app.use("/portfolio", portfolioRouter);
+app.use("/ask", askRouter);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

@@ -27,3 +27,7 @@ services:
       # needed so the backend's CORS config trusts cookies from it.
       - key: FRONTEND_URL
         sync: false
+      # The Ask ABRI chat at /ask — a free Google AI Studio key. Unset
+      # hides the chat.
+      - key: GEMINI_API_KEY
+        sync: false

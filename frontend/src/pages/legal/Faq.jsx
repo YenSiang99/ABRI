@@ -70,6 +70,9 @@ const QUESTIONS = [
 function Faq() {
   return (
     <InfoPage eyebrow="Help" title="Frequently asked questions">
+      <p>
+        Can&rsquo;t find your answer? <Link to="/ask">Ask ABRI</Link> in your own words.
+      </p>
       {QUESTIONS.map(({ q, a }) => (
         <div key={q}>
           <h2 className="!mt-8">{q}</h2>

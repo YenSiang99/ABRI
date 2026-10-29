@@ -13,6 +13,7 @@ const FOOTER_LINKS = [
   { to: "/about", label: "About ABRI" },
   { to: "/contact", label: "Contact" },
   { to: "/faq", label: "FAQ" },
+  { to: "/ask", label: "Ask ABRI" },
 ];
 
 const LINK = "text-sm text-grey-600 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground";
