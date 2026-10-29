@@ -1,5 +1,5 @@
 <!--
-Everything the "Ask ABRI" box on the FAQ page knows (routes/ask.js sends this
+Everything the Ask ABRI chat (/ask) knows (routes/ask.js sends this
 whole file to the model with every question). Describe the product as it works
 TODAY, like the FAQ page does: when a flow changes, change it here too. The
 model is told to answer only from this file, so a fact missing here is an
