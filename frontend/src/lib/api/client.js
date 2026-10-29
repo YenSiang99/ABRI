@@ -41,6 +41,9 @@ async function apiFetch(path, { method = "GET", body } = {}) {
       // A claim code that can no longer be used (expired, or out of
       // attempts) — the claim screen goes back to "send a code".
       expired: data?.expired,
+      // Login refused because the email was never confirmed — the login
+      // screen offers to send a new confirmation link.
+      requiresEmailVerification: data?.requiresEmailVerification,
     });
   }
   return data;

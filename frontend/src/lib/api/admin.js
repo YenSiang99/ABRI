@@ -117,7 +117,34 @@ function deleteAdminBusiness(id) {
   return apiFetch(`/admin/businesses/${id}`, { method: "DELETE" });
 }
 
+// params: { page, pageSize, email, name, verified, claimStatus }; blank
+// values are dropped.
+function fetchAdminAccounts(params = {}) {
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== "" && v != null) query.set(k, v);
+  }
+  return apiFetch(`/admin/accounts?${query}`);
+}
+
+// body: any of { name, phone, role, email, emailVerified }.
+function updateAdminAccount(id, body) {
+  return apiFetch(`/admin/accounts/${id}`, { method: "PATCH", body }).then((d) => d.account);
+}
+
+// releaseBusiness must be true to delete an approved claimant: their
+// business goes back to unclaimed.
+function deleteAdminAccount(id, { releaseBusiness = false } = {}) {
+  return apiFetch(`/admin/accounts/${id}`, {
+    method: "DELETE",
+    body: releaseBusiness ? { releaseBusiness: true } : undefined,
+  });
+}
+
 export {
+  fetchAdminAccounts,
+  updateAdminAccount,
+  deleteAdminAccount,
   fetchAdminBusinesses,
   createAdminBusiness,
   updateAdminBusiness,

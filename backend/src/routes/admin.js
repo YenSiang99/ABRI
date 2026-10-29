@@ -975,4 +975,142 @@ router.delete(
   }),
 );
 
+// Accounts
+
+const ACCOUNT_LIST_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  role: true,
+  emailVerified: true,
+  isAdmin: true,
+  createdAt: true,
+  claimStatus: true,
+  business: { select: { id: true, name: true, verificationLevel: true } },
+};
+
+router.get(
+  "/accounts",
+  asyncHandler(async (req, res) => {
+    const q = req.query;
+    const pageSize = Math.min(Math.max(parseInt(q.pageSize, 10) || 25, 1), 100);
+    const page = Math.max(parseInt(q.page, 10) || 1, 1);
+
+    const contains = (v) => ({ contains: String(v).trim(), mode: "insensitive" });
+    const where = {};
+    for (const field of ["email", "name"]) {
+      if (typeof q[field] === "string" && q[field].trim()) where[field] = contains(q[field]);
+    }
+    if (q.verified === "yes") where.emailVerified = true;
+    else if (q.verified === "no") where.emailVerified = false;
+    if (q.claimStatus === "none") where.claimStatus = null;
+    else if (["pending", "approved", "rejected"].includes(q.claimStatus)) where.claimStatus = q.claimStatus;
+
+    const [accounts, total] = await prisma.$transaction([
+      prisma.account.findMany({
+        where,
+        select: ACCOUNT_LIST_SELECT,
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.account.count({ where }),
+    ]);
+    res.json({ accounts, total, page, pageSize });
+  }),
+);
+
+// Contact details and the email-verified flag. Setting emailVerified is how
+// an admin lets in a signup whose confirmation email never arrived. Claim,
+// business and admin rights are not editable here; they have their own
+// screens.
+const ACCOUNT_EMAIL_RE = /^\S+@\S+\.\S+$/;
+
+router.patch(
+  "/accounts/:id",
+  asyncHandler(async (req, res) => {
+    const existing = await prisma.account.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: "Account not found." });
+
+    const body = req.body ?? {};
+    const data = {};
+    for (const field of ["name", "phone", "role", "email"]) {
+      if (!Object.hasOwn(body, field)) continue;
+      const value = typeof body[field] === "string" ? body[field].trim() : "";
+      if (!value) return res.status(400).json({ error: `${field[0].toUpperCase()}${field.slice(1)} can't be empty.` });
+      data[field] = value;
+    }
+    if (Object.hasOwn(body, "emailVerified")) {
+      if (typeof body.emailVerified !== "boolean") {
+        return res.status(400).json({ error: "emailVerified must be true or false." });
+      }
+      data.emailVerified = body.emailVerified;
+    }
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: "Nothing to update." });
+
+    const emailChanged = data.email !== undefined && data.email !== existing.email;
+    if (emailChanged) {
+      if (!ACCOUNT_EMAIL_RE.test(data.email)) return res.status(400).json({ error: "Enter a valid email." });
+      const taken = await prisma.account.findFirst({
+        where: { email: { equals: data.email, mode: "insensitive" }, id: { not: existing.id } },
+      });
+      if (taken) return res.status(409).json({ error: "Another account already uses this email." });
+    }
+
+    const [account] = await prisma.$transaction([
+      prisma.account.update({ where: { id: existing.id }, data, select: ACCOUNT_LIST_SELECT }),
+      // A link sent to the old address must not confirm the new one.
+      ...(emailChanged
+        ? [prisma.emailVerificationToken.deleteMany({ where: { accountId: existing.id, consumed: false } })]
+        : []),
+    ]);
+    res.json({ account });
+  }),
+);
+
+// For clearing a stuck or unwanted signup so the email can register again.
+// Admins are never deletable from here: they're the only accounts the
+// endorsement-review FKs point at, and an admin deleting themself locks
+// the screen they're on.
+//
+// An approved claimant owns a listing, and deleting them is a revoke: the
+// business drops to unclaimed and is open to claim again, keeping its own
+// network history. That needs `releaseBusiness: true`, so the warning the
+// admin saw is the one thing that can send it.
+router.delete(
+  "/accounts/:id",
+  asyncHandler(async (req, res) => {
+    const account = await prisma.account.findUnique({
+      where: { id: req.params.id },
+      include: { business: { select: { id: true, name: true, verificationLevel: true } } },
+    });
+    if (!account) return res.status(404).json({ error: "Account not found." });
+    if (account.isAdmin) {
+      return res.status(400).json({ error: "Admin accounts can't be deleted here." });
+    }
+
+    const approved = account.claimStatus === "approved" && account.businessId;
+    if (approved && req.body?.releaseBusiness !== true) {
+      return res.status(409).json({
+        error: `This account owns ${account.business.name}. Deleting it makes the business claimable again.`,
+        business: account.business,
+      });
+    }
+
+    // Tokens have no FK. One left behind is a claim link that still works
+    // after the account it belonged to is gone.
+    const tokens = prisma.emailVerificationToken.deleteMany({
+      where: { OR: [{ accountId: account.id }, { email: account.email }] },
+    });
+    if (approved) {
+      await tokens;
+      await revokeApprovedClaim({ accountId: account.id, businessId: account.businessId });
+    } else {
+      await prisma.$transaction([tokens, prisma.account.delete({ where: { id: account.id } })]);
+    }
+    res.json({ deleted: account.id, releasedBusiness: approved ? account.businessId : null });
+  }),
+);
+
 export { router as adminRouter };

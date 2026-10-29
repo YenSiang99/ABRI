@@ -23,6 +23,7 @@ import { serviceCatalogueFor, canonicalService } from "../lib/serviceVocab.js";
 import { loadAccountView } from "../lib/accountView.js";
 import { UNCLAIMED, CLAIMED, SSM_VERIFIED, verificationLevelsAtOrAbove } from "../lib/verificationLevels.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { CLAIM_TOKEN_TTL_MS } from "../lib/tokens.js";
 import { endorsersInNetworkFor } from "../lib/networkOverlap.js";
 import { recordChecks } from "../lib/businessCheck.js";
 import { recordProfileView } from "../lib/profileView.js";
@@ -42,7 +43,6 @@ import {
 const router = Router();
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
-const CLAIM_TOKEN_TTL_MS = 15 * 60 * 1000;
 
 // Every claim carries an SSM number (ABRI-launch-access-plan.md step 3): on
 // the admin path it is the proof of ownership, and one review covers both.
@@ -1119,7 +1119,9 @@ router.post(
 
     const existingAccount = await prisma.account.findUnique({ where: { email: repEmail } });
     if (existingAccount) {
-      return res.status(409).json({ error: "An account with this email already exists — log in instead." });
+      return res.status(409).json({
+        error: "An account with this email already exists. Log in instead. You can resend the confirmation email or reset your password from there.",
+      });
     }
 
     // Resolve the business's known domain BEFORE creating/mutating

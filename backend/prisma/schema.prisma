@@ -309,6 +309,7 @@ model Account {
   endorsementActionsAsAdmin EndorsementAction[]        @relation("EndorsementActionAdminActor")
   endorsementFlagsResolved  EndorsementFlag[]          @relation("EndorsementFlagResolver")
   claimCodes          ClaimCode[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 // The endorsement feature is three tables, and which one a piece of text lives in
@@ -861,7 +862,7 @@ model PortfolioEntry {
   // Deliberately not expressible as a cheap DB constraint: this is always
   // businessAId or businessBId, never a third business.
   serviceProvidedById String?
-  serviceProvidedBy   Business? @relation("PortfolioEntryServiceProvider", fields: [serviceProvidedById], references: [id])
+  serviceProvidedBy   Business? @relation("PortfolioEntryServiceProvider", fields: [serviceProvidedById], references: [id], onDelete: Restrict)
 
   // Free text, optional, and deliberately inert — never matched, never
   // aggregated, never searched. It exists so a reader can tell two portfolio entries
@@ -1222,4 +1223,20 @@ model AppSetting {
   key       String   @id
   value     String?
   updatedAt DateTime @updatedAt
+}
+
+// A "forgot password" link. Its own table rather than a flag on
+// EmailVerificationToken so a reset link can never be fed to
+// /auth/verify-claim, and so the account's delete cascades to it. Opening
+// one also confirms the email: only the inbox owner can reach it. See
+// POST /auth/forgot-password and /auth/reset-password/:token.
+model PasswordResetToken {
+  token     String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([accountId, createdAt])
 }

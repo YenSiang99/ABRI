@@ -59,6 +59,13 @@ const SUITES = [
   // Creates and deletes its own e2e-admin-biz-* listings through the admin
   // routes; clears last run's at its start.
   "admin-businesses.mjs",
+  // Registers, claims and deletes its own e2e-adminacct* accounts and
+  // e2e-admin-acct-* listings; clears last run's at its start.
+  "admin-accounts.mjs",
+  // Its own e2e-recovery* accounts and e2e-recovery-* listing; clears last
+  // run's at its start. Calls forgot-password a handful of times, well
+  // under that route's per-IP limit.
+  "auth-recovery.mjs",
   // Moves the Founding settings and puts them back (open, no end date).
   "founding.mjs",
 ];

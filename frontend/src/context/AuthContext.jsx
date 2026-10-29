@@ -91,7 +91,7 @@ function AuthProvider({ children }) {
       setClaim(data.claim ?? null);
       return { ok: true, isAdmin: Boolean(data.account?.isAdmin) };
     } catch (err) {
-      return { ok: false, error: err.message };
+      return { ok: false, error: err.message, requiresEmailVerification: Boolean(err.requiresEmailVerification) };
     }
   }
 

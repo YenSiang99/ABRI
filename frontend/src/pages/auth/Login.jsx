@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { resendVerification } from "@/lib/api/auth";
 
 // text-base (not text-sm) below md: inputs under 16px make iOS Safari
 // auto-zoom on focus, and the zoom tends to stick around after navigating
@@ -36,6 +37,19 @@ function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Set when login was refused only because the email was never confirmed.
+  const [unverified, setUnverified] = useState(false);
+  const [resend, setResend] = useState({ status: "idle", message: "" });
+
+  async function handleResend() {
+    setResend({ status: "sending", message: "" });
+    try {
+      await resendVerification({ email: email.trim(), password });
+      setResend({ status: "sent", message: `Sent. Check ${email.trim()} for a new link.` });
+    } catch (err) {
+      setResend({ status: "error", message: err.message });
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -45,10 +59,13 @@ function Login() {
       return;
     }
     setError("");
+    setUnverified(false);
+    setResend({ status: "idle", message: "" });
     setSubmitting(true);
     const result = await login(email.trim(), password);
     if (!result.ok) {
       setError(result.error);
+      setUnverified(result.requiresEmailVerification);
       setSubmitting(false);
       return;
     }
@@ -87,7 +104,15 @@ function Login() {
           </div>
 
           <div>
-            <label className={labelClass}>Password</label>
+            <div className="flex items-baseline justify-between">
+              <label className={labelClass}>Password</label>
+              <Link
+                to="/forgot-password"
+                className="text-[12.5px] font-bold text-grey-600 hover:underline dark:text-muted-foreground"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
@@ -99,6 +124,32 @@ function Login() {
           </div>
 
           {error && <p className="text-[12.5px] text-red-600 dark:text-red-400">{error}</p>}
+
+          {unverified && (
+            <div className="rounded-sm border border-grey-200 bg-grey-50 p-3 text-[13px] dark:border-border dark:bg-muted/40">
+              {resend.status === "sent" ? (
+                <p className="text-ink dark:text-foreground">{resend.message}</p>
+              ) : (
+                <>
+                  <p className="text-grey-600 dark:text-muted-foreground">
+                    Lost the email, or the link expired?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resend.status === "sending"}
+                    className="mt-2 inline-flex items-center gap-2 font-bold text-ink hover:underline disabled:opacity-60 dark:text-foreground"
+                  >
+                    {resend.status === "sending" && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                    Send a new confirmation link
+                  </button>
+                  {resend.status === "error" && (
+                    <p className="mt-1 text-[12.5px] text-red-600 dark:text-red-400">{resend.message}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

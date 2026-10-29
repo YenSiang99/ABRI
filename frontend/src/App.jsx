@@ -6,6 +6,8 @@ import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
 import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/auth/Login";
+import { ForgotPassword } from "@/pages/auth/ForgotPassword";
+import { ResetPassword } from "@/pages/auth/ResetPassword";
 import { Directory } from "@/pages/Directory";
 import { BusinessProfile } from "@/pages/BusinessProfile";
 import { CardTap } from "@/pages/CardTap";
@@ -29,6 +31,7 @@ import { AdminReview } from "@/pages/admin/AdminReview";
 import { AdminEndorsementReviews } from "@/pages/admin/AdminEndorsementReviews";
 import { AdminSsmReviews } from "@/pages/admin/AdminSsmReviews";
 import { AdminBusinesses } from "@/pages/admin/AdminBusinesses";
+import { AdminUsers } from "@/pages/admin/AdminUsers";
 import { About } from "@/pages/legal/About";
 import { Contact } from "@/pages/legal/Contact";
 import { Faq } from "@/pages/legal/Faq";
@@ -53,6 +56,8 @@ function App() {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/directory" element={<Directory />} />
           <Route path="/business/:id" element={<BusinessProfile />} />
           <Route path="/m/:businessId" element={<CardTap />} />
@@ -125,6 +130,7 @@ function App() {
             <Route path="admin/vouch-reviews" element={<Navigate to="/app/admin/endorsement-reviews" replace />} />
             <Route path="admin/ssm-reviews" element={<AdminSsmReviews />} />
             <Route path="admin/businesses" element={<AdminBusinesses />} />
+            <Route path="admin/users" element={<AdminUsers />} />
           </Route>
         </Route>
         <Route path="/admin" element={<Navigate to="/app/admin" replace />} />
