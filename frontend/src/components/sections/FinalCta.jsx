@@ -1,39 +1,34 @@
 import { Link } from "react-router-dom";
+import { ArrowUpRight } from "lucide-react";
 
 import worldMap from "@/assets/home/world-map.png";
 import { Eyebrow } from "@/components/sections/Eyebrow";
-import { BTN_PRIMARY, CONTAINER, SECTION_PB } from "@/components/sections/marketing";
+import { BTN_DARK, BTN_LG, CONTAINER, H2 } from "@/components/sections/marketing";
 import { cn } from "@/lib/utils";
 
+// The closing card from Homepage v6: a rounded gold panel inside the page
+// width, the dotted world map faded in behind it.
 function FinalCta() {
   return (
-    <section id="claim" className={SECTION_PB}>
-      <div className={CONTAINER}>
-        <div className="relative overflow-hidden rounded-lg bg-ink px-6 py-12 text-white md:px-12 md:py-[72px] dark:border dark:border-border dark:bg-card">
-          {/* The map is drawn in dark dots; inverted, it reads as a faint
-              light texture on the ink panel. */}
-          <img
-            src={worldMap}
-            alt=""
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 -right-40 w-[560px] -translate-y-1/2 opacity-15 invert lg:right-8 lg:max-w-[44%]"
-          />
-          <div className="relative">
-            <Eyebrow className="text-[#a5a198] dark:text-[#a5a198]">Make your next connection count</Eyebrow>
-            <h2 className="mt-3 max-w-[650px] text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-white">
-              Your next big business connection could start right here.
-            </h2>
-            <p className="mt-3.5 max-w-[46ch] text-[#a5a198]">
-              Build your profile. Grow your credibility. Meet businesses ready to move forward, together.
-            </p>
-            <div className="mt-7 flex flex-wrap items-center gap-5">
-              <Link to="/register" className={cn(BTN_PRIMARY, "px-7 py-[15px] text-base")}>
-                Join ABRI
-              </Link>
-              <span className="font-mono text-[12.5px] text-[#8a857a]">Built on trust. Open to possibility.</span>
-            </div>
-          </div>
+    <section id="claim" className={cn(CONTAINER, "py-16 md:py-24")}>
+      <div className="relative flex flex-wrap items-center justify-between gap-7 overflow-hidden rounded-[32px] bg-yellow px-6 py-11 text-ink sm:rounded-[40px] sm:px-14 sm:py-16">
+        <img
+          src={worldMap}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 -right-10 hidden w-[460px] max-w-none -translate-y-1/2 opacity-30 lg:block"
+        />
+        <div className="relative max-w-[620px]">
+          <Eyebrow className="text-ink dark:text-ink">Make your next connection count</Eyebrow>
+          <h2 className={cn(H2, "text-ink dark:text-ink")}>Your next big business connection could start right here.</h2>
+          <p className="mt-3 text-[17px] leading-[1.6] text-[#1F2937]">
+            Build your profile. Grow your credibility. Meet businesses ready to move forward, together.
+          </p>
         </div>
+        <Link to="/register" className={cn(BTN_DARK, BTN_LG, "relative")}>
+          Join ABRI free
+          <ArrowUpRight className="size-[18px]" aria-hidden />
+        </Link>
       </div>
     </section>
   );

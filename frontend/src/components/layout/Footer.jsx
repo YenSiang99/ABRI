@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
 import { VerificationIcon } from "@/components/badge/VerificationIcon";
-import { AbriLogo } from "@/components/layout/AbriLogo";
+import logoWhite from "@/assets/home/logo-white.png";
+import worldMap from "@/assets/home/world-map.png";
 
 // Laid out after the Oct 2026 homepage draft (one row of links beside the
 // wordmark, then a bottom bar with the legal links); styled as the site was
@@ -16,15 +17,23 @@ const FOOTER_LINKS = [
   { to: "/ask", label: "Ask ABRI" },
 ];
 
-const LINK = "text-sm text-grey-600 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground";
+// The black footer from the homepage v2 draft, in both themes.
+const LINK =
+  "text-[15px] font-semibold text-white decoration-yellow decoration-2 underline-offset-4 transition-colors hover:text-yellow hover:underline";
 
 function Footer() {
   return (
-    <footer className="border-t border-grey-200 py-14 pb-10 dark:border-border">
-      <div className="mx-auto max-w-[1200px] px-6">
-        <div className="mb-10 flex flex-col items-start gap-x-12 gap-y-6 sm:flex-row sm:flex-wrap sm:items-center">
+    <footer className="relative isolate overflow-hidden bg-black text-[#D1D5DB] dark:border-t dark:border-border">
+      <img
+        src={worldMap}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 -right-[120px] -z-10 w-[420px] max-w-none -translate-y-1/2 opacity-10 invert md:-right-10 md:w-[560px] md:opacity-[0.14]"
+      />
+      <div className="mx-auto w-full max-w-[1296px] px-5 sm:px-6 lg:px-12">
+        <div className="flex flex-col items-start gap-x-12 gap-y-6 pt-12 pb-9 sm:flex-row sm:flex-wrap sm:items-center">
           <Link to="/" aria-label="ABRI home" className="flex items-center">
-            <AbriLogo className="h-[52px]" />
+            <img src={logoWhite} alt="ABRI" className="h-[60px] w-auto" />
           </Link>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-7 gap-y-3">
             {FOOTER_LINKS.map((link) =>
@@ -41,14 +50,14 @@ function Footer() {
           </nav>
         </div>
 
-        <div className="flex flex-wrap items-end justify-between gap-4 border-t border-grey-200 pt-6 text-[13px] text-grey-500 dark:border-border dark:text-muted-foreground">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-t border-white/14 py-5 text-[13px] text-[#D1D5DB]">
           <div className="space-y-1">
             <div>© 2026 ABRI. All rights reserved.</div>
-            <div>Prelaunch preview. Photography is illustrative, not actual ABRI members.</div>
+            <div className="text-[12px] text-[#9CA3AF]">Prelaunch preview. Photography is illustrative, not actual ABRI members.</div>
             {/* Required by the data licences: OpenStreetMap's ODbL and Overture
                 Maps' terms both ask for a visible credit wherever their data
                 is shown. */}
-            <div>
+            <div className="text-[12px] text-[#9CA3AF]">
               Listing data includes{" "}
               <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline underline-offset-2">
                 © OpenStreetMap contributors
@@ -65,10 +74,10 @@ function Footer() {
               <VerificationIcon mark="verified" size="small" />
               Verified against SSM records
             </span>
-            <Link to="/privacy" className="hover:text-ink dark:hover:text-foreground">
+            <Link to="/privacy" className="font-semibold text-white hover:text-yellow">
               Privacy
             </Link>
-            <Link to="/terms" className="hover:text-ink dark:hover:text-foreground">
+            <Link to="/terms" className="font-semibold text-white hover:text-yellow">
               Terms
             </Link>
           </div>

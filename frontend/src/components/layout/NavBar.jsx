@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { ArrowUpRight, Menu, X } from "lucide-react";
 
 import { AbriLogo } from "@/components/layout/AbriLogo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -38,17 +38,17 @@ function NavBar() {
 
   return (
     <nav
-      className={`sticky top-0 z-50 border-b bg-white/92 backdrop-blur transition-colors duration-200 dark:bg-background/92 ${
-        scrolled ? "border-grey-200 dark:border-border" : "border-transparent"
+      className={`sticky top-0 z-50 border-b border-grey-200 bg-white transition-shadow duration-200 dark:border-border dark:bg-background ${
+        scrolled ? "shadow-sm" : ""
       }`}
       aria-label="Main"
     >
-      <div className="mx-auto flex h-[68px] max-w-[1200px] items-center justify-between px-6">
+      <div className="mx-auto flex h-[82px] w-full max-w-[1296px] items-center justify-between gap-6 px-5 sm:px-6 lg:px-12">
         <Link to="/" aria-label="ABRI home" className="flex items-center">
-          <AbriLogo className="h-12" />
+          <AbriLogo className="h-[54px]" />
         </Link>
 
-        <div className="hidden items-center gap-7 text-sm font-semibold text-grey-600 dark:text-muted-foreground lg:flex">
+        <div className="hidden items-center gap-8 text-[15px] font-medium text-grey-600 dark:text-muted-foreground lg:flex">
           {NAV_LINKS.map((link) =>
             link.to ? (
               <Link
@@ -70,20 +70,20 @@ function NavBar() {
           )}
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3.5">
           <ThemeToggle className="hidden lg:inline-flex" />
           {isAuthenticated ? (
             <>
               <Link
                 to="/app"
-                className="hidden rounded-sm border border-grey-300 px-4 py-2.5 text-sm leading-none font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted lg:inline-flex"
+                className="hidden h-11 items-center rounded-[6px] px-4 text-[15px] leading-none font-semibold text-grey-600 transition-colors hover:bg-yellow-soft hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground lg:inline-flex"
               >
                 Dashboard
               </Link>
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2.5 text-sm leading-none font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+                className="inline-flex h-11 items-center gap-2 rounded-[6px] border border-transparent bg-yellow px-4 text-[15px] leading-none font-semibold text-ink transition-all duration-200 hover:-translate-y-px hover:bg-yellow-hi"
               >
                 Log out
               </button>
@@ -92,15 +92,16 @@ function NavBar() {
             <>
               <Link
                 to="/login"
-                className="hidden rounded-sm border border-grey-300 px-4 py-2.5 text-sm leading-none font-bold text-ink transition-colors hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted lg:inline-flex"
+                className="hidden h-11 items-center rounded-[6px] px-4 text-[15px] leading-none font-semibold text-grey-600 transition-colors hover:bg-yellow-soft hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground lg:inline-flex"
               >
                 Sign in
               </Link>
               <Link
                 to="/register"
-                className="inline-flex items-center gap-2 rounded-sm border border-transparent bg-yellow px-4 py-2.5 text-sm leading-none font-bold text-yellow-ink transition-all hover:-translate-y-px hover:bg-yellow-hi hover:shadow-md"
+                className="inline-flex h-11 items-center gap-2 rounded-[6px] border border-transparent bg-yellow px-4 text-[15px] leading-none font-semibold text-ink transition-all duration-200 hover:-translate-y-px hover:bg-yellow-hi"
               >
                 Join ABRI
+                <ArrowUpRight className="size-3.5" aria-hidden />
               </Link>
             </>
           )}
@@ -110,15 +111,15 @@ function NavBar() {
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="inline-flex items-center justify-center rounded-sm border border-grey-300 p-2 dark:border-border dark:text-foreground lg:hidden"
+            className="inline-flex size-10 items-center justify-center rounded-[6px] text-grey-600 hover:bg-yellow-soft hover:text-ink dark:text-foreground dark:hover:bg-muted lg:hidden"
           >
-            {open ? <X className="size-4" /> : <Menu className="size-4" />}
+            {open ? <X className="size-[18px]" /> : <Menu className="size-[18px]" />}
           </button>
         </div>
       </div>
 
       {open && (
-        <div className="border-t border-grey-200 bg-white px-6 py-4 dark:border-border dark:bg-background lg:hidden">
+        <div className="border-t border-grey-200 bg-white px-5 py-5 sm:px-6 dark:border-border dark:bg-background lg:hidden">
           <div className="flex flex-col gap-1">
             {NAV_LINKS.map((link) =>
               link.to ? (
@@ -126,7 +127,7 @@ function NavBar() {
                   key={link.label}
                   to={link.to}
                   onClick={() => setOpen(false)}
-                  className="rounded-sm px-2 py-2.5 text-sm font-semibold text-grey-600 hover:bg-surface-2 hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                  className="rounded-[6px] px-2 py-2.5 text-[15px] font-medium text-grey-600 hover:bg-surface-2 hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                 >
                   {link.label}
                 </Link>
@@ -135,7 +136,7 @@ function NavBar() {
                   key={link.label}
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="rounded-sm px-2 py-2.5 text-sm font-semibold text-grey-600 hover:bg-surface-2 hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
+                  className="rounded-[6px] px-2 py-2.5 text-[15px] font-medium text-grey-600 hover:bg-surface-2 hover:text-ink dark:text-muted-foreground dark:hover:bg-muted dark:hover:text-foreground"
                 >
                   {link.label}
                 </a>
@@ -146,14 +147,14 @@ function NavBar() {
                 <Link
                   to="/app"
                   onClick={() => setOpen(false)}
-                  className="mt-2 rounded-sm border border-grey-300 px-4 py-2.5 text-center text-sm leading-none font-bold text-ink hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
+                  className="mt-2 inline-flex h-11 items-center justify-center rounded-[6px] border border-grey-200 bg-white px-4 text-[15px] leading-none font-semibold text-ink hover:border-ink dark:border-border dark:bg-card dark:text-foreground dark:hover:border-foreground"
                 >
                   Dashboard
                 </Link>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="mt-2 rounded-sm border border-transparent bg-yellow px-4 py-2.5 text-center text-sm leading-none font-bold text-yellow-ink hover:bg-yellow-hi"
+                  className="mt-2 inline-flex h-11 items-center justify-center rounded-[6px] border border-transparent bg-yellow px-4 text-[15px] leading-none font-semibold text-ink hover:bg-yellow-hi"
                 >
                   Log out
                 </button>
@@ -162,7 +163,7 @@ function NavBar() {
               <Link
                 to="/login"
                 onClick={() => setOpen(false)}
-                className="mt-2 rounded-sm border border-grey-300 px-4 py-2.5 text-center text-sm leading-none font-bold text-ink hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted"
+                className="mt-2 inline-flex h-11 items-center justify-center rounded-[6px] border border-grey-200 bg-white px-4 text-[15px] leading-none font-semibold text-ink hover:border-ink dark:border-border dark:bg-card dark:text-foreground dark:hover:border-foreground"
               >
                 Sign in
               </Link>

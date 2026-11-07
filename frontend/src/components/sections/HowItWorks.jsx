@@ -1,132 +1,117 @@
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 
+import verifiedImage from "@/assets/home/card-verified.jpg";
+import endorsementImage from "@/assets/home/card-endorsement.jpg";
+import referralsImage from "@/assets/home/card-referrals.jpg";
 import { Eyebrow } from "@/components/sections/Eyebrow";
-import {
-  BTN_PRIMARY,
-  CARD,
-  CARD_BODY,
-  CARD_TITLE,
-  CONTAINER,
-  H2,
-  SECTION_HEAD,
-  SECTION_PB,
-} from "@/components/sections/marketing";
+import { CONTAINER, H2, TEXT_LINK } from "@/components/sections/marketing";
 import { cn } from "@/lib/utils";
 
-// The three line illustrations from the homepage draft, ported as-is. Their
-// colours are fixed rather than themed: each sits on its own white panel.
-const line = { fill: "none", stroke: "#6B7280", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+// "How ABRI works" as four tiles, from Homepage v6. Replaces the earlier
+// three benefit cards and the three-step band, which said the same things
+// twice. Tiles alternate between the cream and the gold tint.
 
-function ProfileScene() {
+// The NFC card tapping a phone, drawn for the draft. Fixed colours: it sits
+// on its own white panel.
+function NfcScene() {
   return (
-    <svg viewBox="0 0 300 160" role="img" aria-label="Verified business profile" className="size-full">
-      <path fill="none" stroke="#6B7280" strokeWidth="1" strokeDasharray="3 5" d="M32 115V51Q32 29 57 29H245M261 49V124H52" />
-      <rect fill="#FEF3C7" x="78" y="25" width="154" height="111" rx="6" transform="rotate(8 78 25)" />
-      <rect fill="#FFFFFF" stroke="#6B7280" strokeWidth="1.5" x="68" y="20" width="155" height="116" rx="6" />
-      <path {...line} d="M68 43H223" />
-      <circle fill="#FBBF24" cx="81" cy="32" r="3" />
-      <circle fill="#FEF3C7" cx="91" cy="32" r="3" />
-      <rect fill="#FEF3C7" x="83" y="58" width="37" height="37" rx="5" />
-      <circle fill="#111827" cx="102" cy="71" r="7" />
-      <path fill="#111827" d="M90 91a12 12 0 0 1 24 0" />
-      <path {...line} d="M134 65H196M134 77H180M134 89H186M84 111H163M84 120H145" />
-      <path fill="#111827" d="m218 86 25 10-3 29-22 15-22-15-3-29Z" />
-      <path fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="m208 112 7 7 14-16" />
-      <path {...line} d="M48 63v12M42 69h12M250 37v10M245 42h10" />
+    <svg viewBox="0 0 240 180" role="img" aria-label="An ABRI NFC card tapping a phone" className="h-auto w-[78%]">
+      <rect x="128" y="18" width="78" height="146" rx="16" fill="#141413" />
+      <rect x="134" y="24" width="66" height="134" rx="11" fill="#FFFFFF" />
+      <rect x="152" y="40" width="30" height="30" rx="9" fill="#141413" />
+      <text x="167" y="61" textAnchor="middle" fontFamily="Manrope, sans-serif" fontSize="17" fontWeight="800" fill="#FBBF24">
+        A
+      </text>
+      <rect x="146" y="80" width="42" height="7" rx="3.5" fill="#141413" />
+      <rect x="150" y="93" width="34" height="11" rx="5.5" fill="#FBBF24" />
+      <rect x="142" y="112" width="50" height="14" rx="5" fill="#F6F4EF" />
+      <rect x="142" y="132" width="50" height="14" rx="5" fill="#F6F4EF" />
+      <path d="M112 74a22 22 0 0 1 0 32M120 66a34 34 0 0 1 0 48" fill="none" stroke="#FBBF24" strokeWidth="4" strokeLinecap="round" />
+      <g transform="rotate(-14 62 90)">
+        <rect x="14" y="58" width="96" height="62" rx="9" fill="#141413" />
+        <rect x="24" y="68" width="24" height="8" rx="4" fill="#FBBF24" />
+        <rect x="24" y="104" width="40" height="5" rx="2.5" fill="#5E5D59" />
+      </g>
     </svg>
   );
 }
 
-function ConversationScene() {
-  return (
-    <svg viewBox="0 0 300 160" role="img" aria-label="Endorsements earned from real work" className="size-full">
-      <path fill="none" stroke="#6B7280" strokeWidth="1" strokeDasharray="3 5" d="M71 50Q149 3 224 48M62 112Q150 160 237 106" />
-      <rect fill="#FEF3C7" x="54" y="45" width="165" height="88" rx="9" />
-      <rect fill="#FFFFFF" stroke="#6B7280" strokeWidth="1.5" x="64" y="33" width="166" height="87" rx="7" />
-      <circle fill="#FEF3C7" cx="91" cy="59" r="12" />
-      <circle fill="#111827" cx="91" cy="55" r="4" />
-      <path fill="#111827" d="M83 67a8 8 0 0 1 16 0" />
-      <path {...line} d="M113 54h89M113 63h59M84 84h125M84 95h95" />
-      <path
-        fill="#FBBF24"
-        d="m79 107 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1ZM99 107l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1ZM119 107l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z"
-      />
-      <rect fill="#111827" x="194" y="91" width="60" height="44" rx="6" />
-      <path fill="#111827" d="m202 129-3 16 19-13" />
-      <path fill="none" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" d="M211 110h26M211 118h17" />
-      <path {...line} d="M43 82v10M38 87h10M246 48v10M241 53h10" />
-    </svg>
-  );
-}
-
-function GrowthScene() {
-  return (
-    <svg viewBox="0 0 300 160" role="img" aria-label="A reputation that opens doors" className="size-full">
-      <path fill="none" stroke="#6B7280" strokeWidth="1" strokeDasharray="3 5" d="M42 125H263M69 126V36M93 24H246V125" />
-      <rect fill="#FEF3C7" x="93" y="100" width="30" height="25" rx="3" />
-      <rect fill="#FEF3C7" x="137" y="79" width="30" height="46" rx="3" />
-      <rect fill="#111827" x="181" y="55" width="30" height="70" rx="3" />
-      <path {...line} strokeWidth="2" d="m85 87 44-25 31 7 59-43M198 27l22-2-3 22" />
-      <circle fill="#FBBF24" cx="232" cy="111" r="23" />
-      <path {...line} strokeWidth="2.5" d="m222 111 7 7 13-15" />
-      <circle fill="#FFFFFF" stroke="#6B7280" strokeWidth="1.5" cx="65" cy="104" r="19" />
-      <circle fill="#111827" cx="65" cy="99" r="6" />
-      <path fill="#111827" d="M54 115a11 11 0 0 1 22 0" />
-      <path {...line} d="M47 47v12M41 53h12M249 60v10M244 65h10" />
-    </svg>
-  );
-}
-
-const STEPS = [
+const TILES = [
   {
-    Scene: ProfileScene,
-    title: "Show the business behind the name.",
-    description: "Create your profile, complete verification and let the right people see what you do best.",
+    image: verifiedImage,
+    alt: "A verified business profile",
+    title: "Get verified",
+    body: "Look for the badge. It means the business completed ABRI’s verification process.",
+    link: { to: "/faq", label: "The ABRI Verified difference" },
   },
   {
-    Scene: ConversationScene,
-    title: "Find your people. Start a conversation.",
-    description: "Discover businesses, explore opportunities and connect with people who share your ambition.",
+    image: endorsementImage,
+    alt: "Members endorsing a business",
+    title: "Earn endorsements",
+    body: "Real feedback from members who have worked with the business.",
+    link: { to: "/register", label: "Build your credibility" },
   },
   {
-    Scene: GrowthScene,
-    title: "Build trust. Grow together.",
-    description: "Earn endorsements, strengthen your reputation and turn relationships into real opportunities.",
+    image: referralsImage,
+    alt: "Members introducing businesses to each other",
+    title: "Get introduced",
+    body: "Grow through introductions from people who know your work.",
+    link: { to: "/directory", label: "Grow through your network" },
+  },
+  {
+    Scene: NfcScene,
+    title: "Tap your NFC card",
+    body: "One tap opens your verified profile on any phone.",
+    link: { href: "/#pricing", label: "See what’s included" },
   },
 ];
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className={SECTION_PB}>
-      <div className={CONTAINER}>
-        <div className={cn(SECTION_HEAD, "mx-auto text-center")}>
+    <section id="how-it-works" className={cn(CONTAINER, "pt-20 md:pt-[120px]")}>
+      <div className="flex flex-wrap items-end justify-between gap-5">
+        <div>
           <Eyebrow>Good connections start simply</Eyebrow>
-          <h2 className={H2}>Your next chapter, in three steps.</h2>
+          <h2 className={H2}>How ABRI works</h2>
         </div>
+        <Link to="/faq" className={TEXT_LINK}>
+          Read the FAQ
+          <ArrowRight className="size-4" aria-hidden />
+        </Link>
+      </div>
 
-        <ol className="grid grid-cols-1 gap-5 md:grid-cols-3">
-          {STEPS.map(({ Scene, title, description }, i) => (
-            <li key={title} className={cn(CARD, "transition-all hover:-translate-y-0.5 hover:shadow-md")}>
-              {/* White behind the artwork in both themes: the illustrations
-                  use fixed colours drawn for a white ground. Dimmed in dark mode so
-                  the panels don't outshine the text. */}
-              <div className="mb-[18px] h-[150px] rounded-md bg-white dark:brightness-[0.82]">
-                <Scene />
-              </div>
-              <span className="mb-[18px] grid size-[26px] place-items-center rounded-full bg-yellow font-mono text-xs font-semibold text-yellow-ink">
-                {i + 1}
-              </span>
-              <h3 className={cn(CARD_TITLE, "mb-2")}>{title}</h3>
-              <p className={CARD_BODY}>{description}</p>
-            </li>
-          ))}
-        </ol>
-
-        <div className="mt-11 text-center">
-          <Link to="/register" className={BTN_PRIMARY}>
-            Make your first connection
-          </Link>
-        </div>
+      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {TILES.map(({ image, alt, Scene, title, body, link }, i) => (
+          <article
+            key={title}
+            className={cn(
+              "flex flex-col rounded-[28px] px-4 pt-4 pb-[26px]",
+              i % 2 === 0 ? "bg-yellow-soft dark:bg-yellow/10" : "bg-surface-2 dark:bg-muted",
+            )}
+          >
+            {/* White behind the artwork in both themes: it is drawn on white.
+                Dimmed in dark mode so the panels don't outshine the text. */}
+            <div className="grid aspect-[4/3] place-items-center overflow-hidden rounded-[20px] bg-white dark:brightness-[0.82]">
+              {Scene ? <Scene /> : <img src={image} alt={alt} loading="lazy" className="size-full object-contain" />}
+            </div>
+            <h3 className="mx-2 mt-5 font-display text-[21px] leading-[1.25] font-bold tracking-[-0.02em] text-ink dark:text-foreground">
+              {title}
+            </h3>
+            <p className="mx-2 mt-1.5 flex-1 text-[15px] leading-[1.6] text-grey-600 dark:text-muted-foreground">{body}</p>
+            {link.to ? (
+              <Link to={link.to} className={cn(TEXT_LINK, "mx-2 mt-[18px] self-start")}>
+                {link.label}
+                <ArrowRight className="size-4" aria-hidden />
+              </Link>
+            ) : (
+              <a href={link.href} className={cn(TEXT_LINK, "mx-2 mt-[18px] self-start")}>
+                {link.label}
+                <ArrowRight className="size-4" aria-hidden />
+              </a>
+            )}
+          </article>
+        ))}
       </div>
     </section>
   );

@@ -1,19 +1,26 @@
 import { Link } from "react-router-dom";
 
+import { Sparkles } from "lucide-react";
+
+import { Eyebrow } from "@/components/sections/Eyebrow";
 import { MembershipTierComparison } from "@/components/sections/MembershipTierComparison";
+import { CONTAINER, H2, LEAD } from "@/components/sections/marketing";
 
 function Pricing() {
   return (
-    <section id="pricing" className="pt-0 pb-[60px] md:pb-[104px]">
-      <div className="mx-auto max-w-[1200px] px-6">
-        <div className="mx-auto mb-13 max-w-[640px] text-center">
-          <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
-            Your network. Your next level.
-          </span>
-          <h2 className="mt-3 text-[clamp(28px,3.4vw,40px)] leading-[1.12] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
-            Start with a connection. Grow when you’re ready.
+    <section
+      id="pricing"
+      className="border-t border-grey-200 bg-white pt-12 pb-12 md:pt-14 md:pb-[60px] dark:border-border dark:bg-card"
+    >
+      <div className={CONTAINER}>
+        <div className="mb-9 text-center">
+          <Eyebrow center>Your network. Your next level.</Eyebrow>
+          <h2 className={H2}>
+            Start with a connection.
+            <br />
+            Grow when you’re ready.
           </h2>
-          <p className="mt-3.5 text-[17px] text-grey-600 dark:text-muted-foreground">
+          <p className={LEAD}>
             Join free. Find your circle. Choose more as you grow. Paid plans
             are billed yearly, in Malaysian Ringgit.
           </p>
@@ -21,17 +28,20 @@ function Pricing() {
 
         <MembershipTierComparison />
 
-        <div className="mx-auto mt-11 max-w-[640px] rounded-md bg-surface-2 px-7 py-5 text-center text-[14.5px] text-grey-600 dark:bg-muted dark:text-muted-foreground">
-          <b className="text-ink dark:text-foreground">Founding members — join before launch.</b>{" "}
+        <div className="mx-auto mt-10 flex max-w-[750px] gap-3.5 rounded-[6px] bg-[#1F2937] px-[18px] py-[19px] text-[15px] leading-[1.7] text-[#D1D5DB] sm:px-6 dark:border dark:border-border dark:bg-muted">
+          <Sparkles className="mt-1 size-5 flex-none text-yellow" aria-hidden />
+          <div>
+          <b className="block text-[16px] font-semibold text-white">Founding members — join before launch.</b>
           Every business that joins before ABRI launches is a Founding member:
           every Pro feature free until the founding period ends, the founding
           badge for good, and a founding discount if you stay on a paid tier.{" "}
-          <Link to="/register" className="border-b-2 border-yellow font-bold text-ink dark:text-foreground">
+          <Link to="/register" className="font-semibold text-yellow hover:underline">
             Claim your business →
           </Link>
+          </div>
         </div>
 
-        <div className="mx-auto mt-[22px] max-w-[640px] text-center text-sm text-grey-500 dark:text-muted-foreground">
+        <div className="mx-auto mt-5 max-w-[750px] text-center text-[13px] text-grey-600 dark:text-muted-foreground">
           You can choose a paid tier before your SSM check is done — your year
           starts the day you're verified, not the day you pay. But{" "}
           <b className="text-ink dark:text-foreground">

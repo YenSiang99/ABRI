@@ -33,19 +33,19 @@ function TrustStrip() {
           <div
             key={label}
             className={cn(
-              "flex items-center gap-3.5 py-5 sm:py-7",
+              "flex items-center gap-3.5 py-4 sm:py-[26px]",
               i === 1 && "sm:justify-center",
               i === 2 && "sm:justify-end",
             )}
           >
-            <div className="grid size-11 flex-none place-items-center rounded-xl bg-yellow">
-              <Icon className="size-5 text-yellow-ink" aria-hidden />
+            <div className="grid size-[60px] flex-none place-items-center rounded-[10px] bg-yellow">
+              <Icon className="size-[30px] text-ink" strokeWidth={1.8} aria-hidden />
             </div>
             <div>
-              <p className="text-[clamp(24px,2.8vw,32px)] leading-[1.15] font-extrabold tracking-[-0.022em] text-ink dark:text-foreground">
+              <p className="font-display text-[30px] leading-[1.1] font-bold tracking-[-0.02em] text-ink sm:text-[36px] dark:text-foreground">
                 {value}
               </p>
-              <p className="mt-0.5 text-[14.5px] text-grey-600 dark:text-muted-foreground">{label}</p>
+              <p className="mt-1 text-[14px] text-grey-600 dark:text-muted-foreground">{label}</p>
             </div>
           </div>
         ))}

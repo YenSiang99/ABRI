@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import {
@@ -61,66 +61,65 @@ function TierCard({ tier }) {
   return (
     <div
       className={cn(
-        "flex flex-col rounded-lg border p-5",
+        "relative flex flex-col rounded-[8px] px-[23px] py-[26px]",
         featured
-          ? "border-ink bg-white shadow-md dark:border-yellow dark:bg-card"
-          : "border-grey-200 bg-white dark:border-border dark:bg-card",
+          ? "border-2 border-yellow bg-[#FFFBEB] dark:bg-yellow/10"
+          : "border border-grey-200 bg-white dark:border-border dark:bg-card",
       )}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-extrabold text-ink dark:text-foreground">
-          {membershipTierLabel[tier]}
+      {featured && (
+        <span className="absolute -top-[13px] left-1/2 -translate-x-1/2 rounded-[4px] bg-yellow px-3.5 py-[5px] text-[12px] font-semibold whitespace-nowrap text-ink uppercase">
+          Most members
         </span>
-        {featured && (
-          <span className="rounded-sm bg-yellow px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-yellow-ink">
-            Most members
-          </span>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="text-[26px] leading-none font-extrabold tracking-[-0.02em] text-ink dark:text-foreground">
-          {membershipTierPrice[tier]}
-        </span>
-        <span className="text-[11px] font-semibold text-grey-500 dark:text-muted-foreground">
-          {membershipTierPriceNote[tier]}
-        </span>
-      </div>
+      )}
+      <h3 className="font-display text-[22px] font-semibold tracking-[-0.01em] text-ink dark:text-foreground">
+        {membershipTierLabel[tier]}
+      </h3>
 
       {/* Height reserved whether or not the pitch needs it. Enterprise's wraps
           to two lines and the other three don't, and without this the CTA and
           the feature lists start at different heights across the row — which
           is the one thing a side-by-side comparison must not do. Same fix
           pages/app/Plan.jsx makes for the same reason. */}
-      <p className="mt-3 min-h-[2.5rem] text-[12.5px] leading-snug text-grey-600 dark:text-muted-foreground">
+      <p className="mt-2 min-h-[3rem] text-[14px] leading-[1.7] text-grey-600 dark:text-muted-foreground">
         {membershipTierPitch[tier]}
       </p>
+
+      <div className="mt-5 mb-6">
+        <p className="font-display text-[34px] leading-[1.1] font-bold tracking-[-0.02em] text-ink sm:text-[40px] dark:text-foreground">
+          {membershipTierPrice[tier]}
+        </p>
+        <p className="mt-1 text-[13px] text-grey-600 dark:text-muted-foreground">
+          {membershipTierPriceNote[tier]}
+        </p>
+      </div>
 
       <Link
         to={CTA[tier].to}
         className={cn(
-          "mt-4 inline-flex w-full items-center justify-center rounded-sm border px-3 py-2 text-[12.5px] leading-none font-bold transition-all hover:-translate-y-px",
+          "inline-flex h-11 w-full items-center justify-center gap-2 rounded-[6px] border px-4 text-[15px] leading-none font-semibold transition-all duration-200 hover:-translate-y-px",
           featured
-            ? "border-transparent bg-yellow text-yellow-ink hover:bg-yellow-hi hover:shadow-md"
-            : "border-grey-300 text-ink hover:bg-surface-2 dark:border-border dark:text-foreground dark:hover:bg-muted",
+            ? "border-transparent bg-yellow text-ink hover:bg-yellow-hi"
+            : "border-grey-200 bg-white text-ink hover:border-ink dark:border-border dark:bg-card dark:text-foreground dark:hover:border-foreground",
         )}
       >
         {CTA[tier].label}
+        <ArrowUpRight className="size-3.5" aria-hidden />
       </Link>
 
-      <div className="mt-5 border-t border-grey-100 pt-4 dark:border-border">
+      <div className="mt-6">
         {/* The line that carries the whole design. Free says what it holds;
             every tier above names the one below rather than repeating it, so
             nothing is listed twice and each card is only as long as what it
             actually adds. */}
-        <div className="text-[12px] font-bold text-ink dark:text-foreground">
+        <div className="text-[14px] font-bold text-ink dark:text-foreground">
           {below ? `Everything in ${membershipTierLabel[below]}, plus:` : "What you get:"}
         </div>
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-3 grid gap-3">
           {features.map((f) => (
             <li
               key={f.label}
-              className="flex items-start gap-2 text-[12.5px] leading-snug text-grey-600 dark:text-muted-foreground"
+              className="flex items-start gap-2 text-[15px] leading-[1.55] text-grey-600 dark:text-muted-foreground"
             >
               {/* A plain lucide tick, deliberately NOT VerificationIcon. That
                   mark's yellow is the SSM-verified colour, and using it as a
@@ -128,7 +127,7 @@ function TierCard({ tier }) {
                   claim on the one page where a purchase must never look like
                   one. Same rule the in-app cards follow. */}
               <Check
-                className="mt-px h-3.5 w-3.5 flex-none text-ink dark:text-foreground"
+                className="mt-[5px] size-3.5 flex-none text-ink dark:text-foreground"
                 aria-hidden
               />
               <span>
@@ -153,7 +152,7 @@ function MembershipTierComparison() {
     // operable overflow-x region because four columns will not fit a phone;
     // cards stack instead, so the scroll container and its aria plumbing are
     // gone rather than hidden.
-    <div className="mx-auto grid max-w-[1000px] gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {MEMBERSHIP_TIER_ORDER.map((tier) => (
         <TierCard key={tier} tier={tier} />
       ))}
