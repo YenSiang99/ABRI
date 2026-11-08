@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 import { login as apiLogin, logout as apiLogout, getMe } from "@/lib/api/auth";
 import { submitBusinessClaim, submitClaimAsMember } from "@/lib/api/businesses";
+import { markSignedIn } from "@/lib/returningVisitor";
 
 const AuthContext = createContext(null);
 
@@ -58,6 +59,13 @@ function AuthProvider({ children }) {
       cancelled = true;
     };
   }, []);
+
+  // Any session at all (an existing one found on load, a login, or one a
+  // signup started) marks this device as a returning visitor's, which the
+  // homepage reads to skip its first-visit entrance. Kept after logout.
+  useEffect(() => {
+    if (account) markSignedIn();
+  }, [account]);
 
   // Re-fetches /auth/me without touching `loading` — for refreshing
   // `business` (endorsements/endorsementCount/endorsementLevel) after an action elsewhere in

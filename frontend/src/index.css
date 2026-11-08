@@ -311,6 +311,27 @@
     transform: translateY(-8px);
   }
 }
+/* The hero load-in, measured from linear.app: each headline line goes from
+   invisible and 10px blurred to sharp (no movement); the image then fades in,
+   opacity only. Timings and easing live in Hero.jsx. "backwards" fill holds
+   the start state during the delay and leaves no filter behind once it ends. */
+@keyframes abri-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+  /* An explicit end. Left to the browser (blur → none), Chrome showed a
+     one-frame 4px blur just as the line finished. */
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@keyframes abri-fade-in {
+  from {
+    opacity: 0;
+  }
+}
 @keyframes abri-marquee {
   to {
     transform: translateX(-50%);
