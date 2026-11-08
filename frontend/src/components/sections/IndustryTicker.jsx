@@ -56,7 +56,15 @@ function useMarquee() {
   const resume = () => {
     pausedRef.current = false;
   };
-  return { trackRef, handlers: { onMouseEnter: pause, onMouseLeave: resume, onFocus: pause, onBlur: resume } };
+  // Hover pauses for a real mouse only: on a touch screen a tap fires a
+  // hover with no matching leave, which would leave the row stuck.
+  const onMouse = (fn) => (e) => {
+    if (e.pointerType === "mouse") fn();
+  };
+  return {
+    trackRef,
+    handlers: { onPointerEnter: onMouse(pause), onPointerLeave: onMouse(resume), onFocus: pause, onBlur: resume },
+  };
 }
 
 function IndustryTicker({ className }) {

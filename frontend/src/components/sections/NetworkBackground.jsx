@@ -152,7 +152,11 @@ function NetworkBackground({ className, style }) {
         "pointer-events-none absolute inset-0 -z-10 size-full",
         // Clear behind the headline and search, the network showing towards
         // the sides and edges.
-        "[mask-image:radial-gradient(ellipse_42%_48%_at_50%_34%,transparent_35%,#000_100%)]",
+        "min-[640px]:[mask-image:radial-gradient(ellipse_42%_48%_at_50%_34%,transparent_35%,#000_100%)]",
+        // On a phone the copy spans the full width, so there are no clear
+        // sides: the network shows only above the label and from the photo
+        // down, never behind the headline, search or moving row.
+        "max-[639px]:[mask-image:linear-gradient(to_bottom,#000_0,transparent_56px,transparent_calc(100%-230px),#000_calc(100%-150px))]",
         className,
       )}
     />

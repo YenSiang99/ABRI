@@ -369,8 +369,10 @@ function Hero() {
     // between each block.
     <header className="relative isolate overflow-x-clip px-6 pt-[4.5rem] text-center min-[480px]:px-8 min-[480px]:pt-20 min-[992px]:px-32">
       <NetworkBackground className={network.className} style={network.style} />
-      <div className="mx-auto grid max-w-[120rem] grid-cols-[minmax(0,1fr)] gap-12">
-        <div className="grid gap-12">
+      {/* Blinq's 3rem gaps from 480px up; tighter on a phone, so the top of
+          the photo still shows on the first screen under the search. */}
+      <div className="mx-auto grid max-w-[120rem] grid-cols-[minmax(0,1fr)] gap-8 min-[480px]:gap-12">
+        <div className="grid gap-8 min-[480px]:gap-12">
           <div className="grid justify-items-center gap-5">
             <span
               style={label.style}
@@ -395,7 +397,7 @@ function Hero() {
             </h1>
           </div>
 
-          <div className="mx-auto grid w-full max-w-[50rem] gap-8">
+          <div className="mx-auto grid w-full max-w-[50rem] gap-6 min-[480px]:gap-8">
             <p
               className={cn("text-[1.25rem] leading-[1.35] text-grey-600 dark:text-muted-foreground", subCopy.className)}
               style={subCopy.style}
@@ -408,7 +410,7 @@ function Hero() {
           </div>
 
           {/* 2rem above the row rather than the hero's usual 3rem. */}
-          <div className={cn("-mt-4 min-w-0", row.className)} style={row.style}>
+          <div className={cn("-mt-2 min-w-0 min-[480px]:-mt-4", row.className)} style={row.style}>
             <IndustryTicker />
           </div>
         </div>
