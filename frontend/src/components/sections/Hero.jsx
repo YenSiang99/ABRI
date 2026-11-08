@@ -44,7 +44,7 @@ function VerifiedPill() {
 // Bottom left: what a verified profile looks like.
 function ProfileBubble() {
   return (
-    <div className={cn(BUBBLE, "bottom-20 left-3 w-[230px] sm:bottom-32 sm:w-[310px] lg:-left-9")} aria-hidden>
+    <div className={cn(BUBBLE, "right-3 bottom-16 left-3 p-3 sm:right-auto sm:bottom-32 sm:w-[310px] sm:p-4 lg:-left-9")} aria-hidden>
       <div className="flex items-center gap-3">
         <span className={cn(AVATAR, "size-[46px] rounded-[14px] bg-ink text-[18px] text-yellow")}>C</span>
         <div className="min-w-0">
@@ -82,7 +82,7 @@ function ClaimBubble() {
 
   return (
     <div
-      className={cn(BUBBLE, "top-3 right-3 w-[230px] [animation-delay:-2.3s] sm:top-16 sm:w-[310px] lg:-right-9")}
+      className={cn(BUBBLE, "top-16 right-3 hidden w-[310px] [animation-delay:-2.3s] sm:block lg:-right-9")}
       aria-live="polite"
     >
       <div className="flex items-center gap-2">
@@ -162,26 +162,27 @@ function Hero() {
   const stageRef = useScrollGrow();
 
   return (
-    <header className="overflow-x-clip pt-12 text-center sm:pt-[72px]">
+    <header className="overflow-x-clip pt-8 text-center sm:pt-[72px]">
       <div className={CONTAINER}>
         <div className="animate-in duration-700 fade-in slide-in-from-bottom-3">
-          <span className="inline-flex items-center gap-2.5 rounded-full bg-yellow-soft py-2 pr-4 pl-2.5 text-[14px] font-semibold text-ink dark:bg-yellow/15 dark:text-foreground">
+          <span className="inline-flex items-center gap-2 rounded-full bg-yellow-soft py-1.5 pr-3.5 pl-2 text-[13px] font-semibold whitespace-nowrap sm:gap-2.5 sm:py-2 sm:pr-4 sm:pl-2.5 sm:text-[14px] text-ink dark:bg-yellow/15 dark:text-foreground">
             <span className="inline-flex items-center gap-1 rounded-full bg-yellow px-2 py-0.5 text-[12px] font-bold text-ink">
               <BadgeCheck className="size-3.5" aria-hidden />
               Verified
             </span>
-            Malaysia’s verified business network
+            <span className="sm:hidden">Malaysia’s business network</span>
+            <span className="hidden sm:inline">Malaysia’s verified business network</span>
           </span>
 
-          <h1 className="mx-auto mt-6 max-w-[980px] font-display text-[44px] leading-[1.02] font-bold tracking-[-0.04em] text-ink sm:text-[64px] lg:text-[84px] dark:text-foreground">
+          <h1 className="mx-auto mt-5 max-w-[980px] font-display text-[40px] leading-[1.04] font-bold tracking-[-0.04em] sm:mt-6 text-ink sm:text-[64px] lg:text-[84px] dark:text-foreground">
             Do business with people{" "}
             <span className="bg-[linear-gradient(transparent_82%,var(--yellow)_82%)] px-[0.04em]">you can trust.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-[620px] text-[18px] leading-[1.55] text-grey-600 sm:text-[20px] dark:text-muted-foreground">
+          <p className="mx-auto mt-4 max-w-[620px] text-[17px] leading-[1.55] sm:mt-6 text-grey-600 sm:text-[20px] dark:text-muted-foreground">
             Find partners, build trust and discover opportunities.
           </p>
 
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
+          <div className="mt-7 flex flex-col gap-2.5 sm:mt-9 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-3">
             <Link to="/register" className={cn(BTN_DARK, BTN_LG)}>
               Join ABRI free
               <ArrowUpRight className="size-[18px]" aria-hidden />
@@ -191,14 +192,14 @@ function Hero() {
               <ArrowRight className="size-[18px]" aria-hidden />
             </Link>
           </div>
-          <p className="mt-5 inline-flex items-center gap-2 text-[14px] font-medium text-grey-600 dark:text-muted-foreground">
+          <p className="mt-4 inline-flex items-center gap-2 text-[13px] sm:mt-5 sm:text-[14px] font-medium text-grey-600 dark:text-muted-foreground">
             <span className="size-2 rounded-full bg-yellow" aria-hidden />
             Free to join. Opportunities await.
           </p>
         </div>
 
-        <div ref={stageRef} className="relative mx-auto mt-14 max-w-[1120px] origin-top will-change-transform">
-          <div className="h-[420px] overflow-hidden rounded-[28px] bg-surface-2 sm:h-[580px] sm:rounded-[40px] dark:bg-muted">
+        <div ref={stageRef} className="relative mx-auto mt-9 max-w-[1120px] origin-top will-change-transform sm:mt-14">
+          <div className="h-[460px] overflow-hidden rounded-[24px] bg-surface-2 sm:h-[580px] sm:rounded-[40px] dark:bg-muted">
             {HERO_VIDEO ? (
               <video
                 src={HERO_VIDEO}
@@ -207,13 +208,13 @@ function Hero() {
                 muted
                 loop
                 playsInline
-                className="size-full object-cover object-[center_45%]"
+                className="size-full object-cover object-[64%_center] sm:object-[center_45%]"
               />
             ) : (
               <img
                 src={heroImage}
                 alt="Malaysian professionals connecting over a business conversation in Kuala Lumpur"
-                className="size-full object-cover object-[center_45%]"
+                className="size-full object-cover object-[64%_center] sm:object-[center_45%]"
               />
             )}
           </div>

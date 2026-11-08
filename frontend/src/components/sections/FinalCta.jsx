@@ -25,7 +25,7 @@ function FinalCta() {
             Build your profile. Grow your credibility. Meet businesses ready to move forward, together.
           </p>
         </div>
-        <Link to="/register" className={cn(BTN_DARK, BTN_LG, "relative")}>
+        <Link to="/register" className={cn(BTN_DARK, BTN_LG, "relative dark:bg-ink dark:text-white dark:hover:bg-black")}>
           Join ABRI free
           <ArrowUpRight className="size-[18px]" aria-hidden />
         </Link>

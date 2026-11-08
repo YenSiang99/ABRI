@@ -38,7 +38,15 @@ const BTN_PRIMARY = `${BTN} border-transparent bg-yellow text-ink hover:bg-yello
 
 const BTN_OUTLINE = `${BTN} border-grey-200 bg-white text-ink hover:border-ink dark:border-border dark:bg-card dark:text-foreground dark:hover:border-foreground`;
 
-const BTN_DARK = `${BTN} border-transparent bg-ink text-white hover:bg-black`;
+// Inverts in dark mode, where a black button would vanish into the page.
+const BTN_DARK = `${BTN} border-transparent bg-ink text-white hover:bg-black dark:bg-white dark:text-ink dark:hover:bg-grey-100`;
+
+// A row of cards that becomes a sideways swipe on a phone, the next card
+// peeking in from the right, instead of a tall stack. From 640px up the
+// component lays the cards out as its own grid.
+const SWIPE_ROW =
+  "no-scrollbar max-sm:-mx-5 max-sm:flex max-sm:snap-x max-sm:snap-mandatory max-sm:gap-3 max-sm:overflow-x-auto max-sm:scroll-px-5 max-sm:px-5";
+const SWIPE_ITEM = "max-sm:w-[84%] max-sm:flex-none max-sm:snap-start";
 
 // The black button with a light rim, for use on the hero photo.
 const BTN_DARK_ON_PHOTO = `${BTN} border-white/35 bg-black text-yellow hover:border-white`;
@@ -64,5 +72,7 @@ export {
   BTN_OUTLINE,
   BTN_DARK,
   BTN_DARK_ON_PHOTO,
+  SWIPE_ROW,
+  SWIPE_ITEM,
   TEXT_LINK,
 };

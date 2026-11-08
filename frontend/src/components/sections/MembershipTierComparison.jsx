@@ -9,6 +9,7 @@ import {
   membershipTierPriceNote,
   membershipTierUpgrades,
 } from "@/lib/membershipTiers";
+import { SWIPE_ITEM, SWIPE_ROW } from "@/components/sections/marketing";
 import { cn } from "@/lib/utils";
 
 // The public pricing section. Four cumulative cards, each listing only what
@@ -62,6 +63,7 @@ function TierCard({ tier }) {
     <div
       className={cn(
         "relative flex flex-col rounded-[8px] px-[23px] py-[26px]",
+        SWIPE_ITEM,
         featured
           ? "border-2 border-yellow bg-[#FFFBEB] dark:bg-yellow/10"
           : "border border-grey-200 bg-white dark:border-border dark:bg-card",
@@ -152,7 +154,7 @@ function MembershipTierComparison() {
     // operable overflow-x region because four columns will not fit a phone;
     // cards stack instead, so the scroll container and its aria plumbing are
     // gone rather than hidden.
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={cn("grid gap-5 max-sm:pt-4 sm:grid-cols-2 lg:grid-cols-4", SWIPE_ROW)}>
       {MEMBERSHIP_TIER_ORDER.map((tier) => (
         <TierCard key={tier} tier={tier} />
       ))}

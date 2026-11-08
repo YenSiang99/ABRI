@@ -5,7 +5,7 @@ import verifiedImage from "@/assets/home/card-verified.jpg";
 import endorsementImage from "@/assets/home/card-endorsement.jpg";
 import referralsImage from "@/assets/home/card-referrals.jpg";
 import { Eyebrow } from "@/components/sections/Eyebrow";
-import { CONTAINER, H2, TEXT_LINK } from "@/components/sections/marketing";
+import { CONTAINER, H2, SWIPE_ITEM, SWIPE_ROW, TEXT_LINK } from "@/components/sections/marketing";
 import { cn } from "@/lib/utils";
 
 // "How ABRI works" as four tiles, from Homepage v6. Replaces the earlier
@@ -69,7 +69,7 @@ const TILES = [
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className={cn(CONTAINER, "pt-20 md:pt-[120px]")}>
+    <section id="how-it-works" className={cn(CONTAINER, "pt-16 md:pt-[120px]")}>
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <Eyebrow>Good connections start simply</Eyebrow>
@@ -81,12 +81,13 @@ function HowItWorks() {
         </Link>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={cn("mt-8 grid gap-5 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4", SWIPE_ROW)}>
         {TILES.map(({ image, alt, Scene, title, body, link }, i) => (
           <article
             key={title}
             className={cn(
               "flex flex-col rounded-[28px] px-4 pt-4 pb-[26px]",
+              SWIPE_ITEM,
               i % 2 === 0 ? "bg-yellow-soft dark:bg-yellow/10" : "bg-surface-2 dark:bg-muted",
             )}
           >

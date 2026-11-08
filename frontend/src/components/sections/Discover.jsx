@@ -47,8 +47,8 @@ function Discover() {
     "h-[52px] w-full min-w-0 border-0 bg-transparent text-[16px] text-ink outline-none placeholder:text-grey-500";
 
   return (
-    <section id="discover" className={cn(CONTAINER, "pt-16 md:pt-24")}>
-      <div className="grid items-center gap-8 rounded-[28px] bg-ink px-5 py-8 text-white sm:rounded-[36px] sm:px-12 sm:py-11 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10 dark:border dark:border-border dark:bg-card">
+    <section id="discover" className={cn(CONTAINER, "pt-12 md:pt-24")}>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-8 rounded-[28px] bg-ink px-5 py-8 text-white sm:rounded-[36px] sm:px-12 sm:py-11 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10 dark:border dark:border-border dark:bg-card">
         <div>
           <Eyebrow className="text-yellow dark:text-yellow">Your next connection is out there</Eyebrow>
           <h2 className={cn(H2, "text-white sm:text-[34px] lg:text-[36px] dark:text-white")}>Find the right business partner.</h2>
@@ -88,14 +88,14 @@ function Discover() {
             </button>
           </form>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2 text-[14px] text-[#D6D4CE]">
+          <div className="no-scrollbar -mx-5 mt-4 flex items-center gap-2 overflow-x-auto px-5 text-[14px] whitespace-nowrap text-[#D6D4CE] sm:mx-0 sm:flex-wrap sm:px-0">
             <span className="mr-1">Popular</span>
             {POPULAR.map((p) => (
               <button
                 key={p.label}
                 type="button"
                 onClick={() => goToDirectory({ category: p.category })}
-                className="rounded-full bg-white/10 px-3 py-1 text-[14px] text-white transition-colors hover:bg-yellow hover:text-ink"
+                className="flex-none rounded-full bg-white/10 px-3 py-1 text-[14px] text-white transition-colors hover:bg-yellow hover:text-ink"
               >
                 {p.label}
               </button>

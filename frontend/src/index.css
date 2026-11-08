@@ -293,6 +293,14 @@
   --sidebar-ring: oklch(0.83 0.16 82);
 }
 
+/* Swipe rows keep their scrolling but hide the bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---- Homepage motion (Nov 2026 hero, after drafts v4–v6) ---- */
 @keyframes abri-float {
   0%,

@@ -9,6 +9,8 @@ import {
   H2,
   LEAD,
   SAMPLE_TAG,
+  SWIPE_ITEM,
+  SWIPE_ROW,
 } from "@/components/sections/marketing";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,7 @@ function RequestTicket({ request, featured = false }) {
   return (
     <article
       className={cn(
+        SWIPE_ITEM,
         "group relative flex flex-col rounded-xl border border-grey-200 bg-white transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_12px_40px_rgba(17,24,39,0.10)] dark:border-border dark:bg-card",
         featured ? "border-t-[5px] border-t-yellow p-[22px] sm:px-8 sm:pt-[34px] sm:pb-[30px] dark:border-t-yellow" : "p-[22px] sm:p-[26px]",
       )}
@@ -148,7 +151,7 @@ function RequestTicket({ request, featured = false }) {
 function OpportunityHub() {
   const [featured, ...rest] = REQUESTS;
   return (
-    <section id="opportunities" className={cn(CONTAINER, "pt-20 pb-16 md:pt-[120px] md:pb-24")}>
+    <section id="opportunities" className={cn(CONTAINER, "pt-16 pb-14 md:pt-[120px] md:pb-24")}>
       <div className="mb-8 flex flex-col gap-4">
         <div>
           <Eyebrow>Real business needs</Eyebrow>
@@ -163,9 +166,10 @@ function OpportunityHub() {
         </Link>
       </div>
 
-      <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className={cn("grid items-stretch gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]", SWIPE_ROW)}>
         <RequestTicket request={featured} featured />
-        <div className="grid gap-5">
+        {/* On a phone the two smaller tickets join the swipe row as siblings. */}
+        <div className="grid gap-5 max-sm:contents">
           {rest.map((r) => (
             <RequestTicket key={r.ask} request={r} />
           ))}

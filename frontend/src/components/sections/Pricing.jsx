@@ -10,7 +10,7 @@ function Pricing() {
   return (
     <section
       id="pricing"
-      className="border-t border-grey-200 bg-white pt-12 pb-12 md:pt-14 md:pb-[60px] dark:border-border dark:bg-card"
+      className="border-t border-grey-200 bg-white pt-12 pb-12 max-sm:pt-10 md:pt-14 md:pb-[60px] dark:border-border dark:bg-card"
     >
       <div className={CONTAINER}>
         <div className="mb-9 text-center">

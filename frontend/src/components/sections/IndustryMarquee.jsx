@@ -31,7 +31,7 @@ function IndustryMarquee() {
         to={`/directory?category=${encodeURIComponent(category)}`}
         aria-hidden={copy === 1 || undefined}
         tabIndex={copy === 1 ? -1 : undefined}
-        className="inline-flex items-center gap-7 pr-7 font-display text-[19px] font-bold tracking-[-0.01em] whitespace-nowrap text-white transition-colors hover:text-yellow sm:text-[24px]"
+        className="inline-flex items-center gap-7 pr-7 font-display text-[17px] font-bold tracking-[-0.01em] whitespace-nowrap text-white transition-colors hover:text-yellow sm:text-[24px]"
       >
         {category}
         <Sparkle className="size-5 fill-yellow text-yellow" aria-hidden />
@@ -43,7 +43,7 @@ function IndustryMarquee() {
       aria-label="Industries on ABRI"
       className="relative z-20 -mx-5 -mt-12 -rotate-[1.2deg] overflow-hidden border-y-2 border-black bg-black sm:-mt-14 dark:border-border"
     >
-      <div className="flex w-max items-center py-[18px] motion-safe:animate-[abri-marquee_60s_linear_infinite] hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]">
+      <div className="flex w-max items-center py-3.5 sm:py-[18px] motion-safe:animate-[abri-marquee_60s_linear_infinite] hover:[animation-play-state:paused] focus-within:[animation-play-state:paused]">
         {run(0)}
         {run(1)}
       </div>

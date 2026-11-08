@@ -16,7 +16,7 @@ function Landing() {
     <div className="overflow-x-clip">
       <Hero />
       <IndustryMarquee />
-      <div className="mt-14 border-t border-grey-200 dark:border-border">
+      <div className="mt-10 border-t sm:mt-14 border-grey-200 dark:border-border">
         <TrustStrip />
       </div>
       <Discover />
