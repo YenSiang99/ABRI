@@ -52,7 +52,10 @@ function NetworkBackground({ className, style }) {
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const count = Math.min(70, Math.round((width * height) / 22000));
+      // Denser on a narrow screen, where the hero is small and a desktop
+      // density would leave only a handful of nodes.
+      const density = width < 640 ? 11000 : 22000;
+      const count = Math.min(70, Math.round((width * height) / density));
       nodes = Array.from({ length: count }, (_, i) => {
         const old = nodes[i];
         const angle = Math.random() * Math.PI * 2;
@@ -154,9 +157,9 @@ function NetworkBackground({ className, style }) {
         // the sides and edges.
         "min-[640px]:[mask-image:radial-gradient(ellipse_42%_48%_at_50%_34%,transparent_35%,#000_100%)]",
         // On a phone the copy spans the full width, so there are no clear
-        // sides: the network shows only above the label and from the photo
-        // down, never behind the headline, search or moving row.
-        "max-[639px]:[mask-image:linear-gradient(to_bottom,#000_0,transparent_56px,transparent_calc(100%-230px),#000_calc(100%-150px))]",
+        // sides to keep it to: it shows across the whole hero, at a third of
+        // its strength behind the copy and in full above and around the photo.
+        "max-[639px]:[mask-image:linear-gradient(to_bottom,#000_0,rgba(0,0,0,0.35)_56px,rgba(0,0,0,0.35)_calc(100%-260px),#000_calc(100%-180px))]",
         className,
       )}
     />

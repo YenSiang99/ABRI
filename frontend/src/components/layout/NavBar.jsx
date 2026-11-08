@@ -43,9 +43,9 @@ function NavBar() {
       }`}
       aria-label="Main"
     >
-      <div className="mx-auto flex h-[82px] w-full max-w-[1296px] items-center justify-between gap-6 px-5 sm:px-6 lg:px-12">
+      <div className="mx-auto flex h-16 min-[480px]:h-[82px] w-full max-w-[1296px] items-center justify-between gap-6 px-5 sm:px-6 lg:px-12">
         <Link to="/" aria-label="ABRI home" className="flex items-center">
-          <AbriLogo className="h-[54px]" />
+          <AbriLogo className="h-11 min-[480px]:h-[54px]" />
         </Link>
 
         <div className="hidden items-center gap-8 text-[15px] font-medium text-grey-600 dark:text-muted-foreground lg:flex">

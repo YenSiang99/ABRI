@@ -230,7 +230,7 @@ function HeroSearch() {
           const q = query.trim();
           navigate(q ? `/directory?q=${encodeURIComponent(q)}` : "/directory");
         }}
-        className="flex w-full gap-2 rounded-xl border border-grey-200 bg-white p-2 shadow-[0_12px_40px_rgba(17,24,39,0.08)] dark:border-transparent dark:shadow-none"
+        className="flex w-full gap-1.5 rounded-xl border border-grey-200 bg-white p-1 min-[480px]:gap-2 min-[480px]:p-2 shadow-[0_12px_40px_rgba(17,24,39,0.08)] dark:border-transparent dark:shadow-none"
       >
         <label className="flex min-w-0 flex-1 items-center gap-2 pl-2 text-grey-600 min-[480px]:gap-2.5 min-[480px]:pl-3">
           <Search className="size-[18px] flex-none" aria-hidden />
@@ -240,19 +240,19 @@ function HeroSearch() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Company or industry"
             autoComplete="off"
-            className="h-[52px] w-full min-w-0 border-0 bg-transparent text-[1.0625rem] text-ink outline-none placeholder:text-grey-500"
+            className="h-10 w-full min-w-0 border-0 bg-transparent text-[15px] text-ink min-[480px]:h-[52px] min-[480px]:text-[1.0625rem] outline-none placeholder:text-grey-500"
           />
         </label>
         <button
           type="submit"
-          className="inline-flex h-[52px] items-center justify-center rounded-lg bg-yellow px-4 text-[15px] font-bold whitespace-nowrap text-ink transition-all duration-150 hover:-translate-y-px hover:bg-yellow-hi min-[480px]:px-[22px]"
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-yellow px-4 text-[14px] min-[480px]:h-[52px] min-[480px]:text-[15px] font-bold whitespace-nowrap text-ink transition-all duration-150 hover:-translate-y-px hover:bg-yellow-hi min-[480px]:px-[22px]"
         >
           Search
         </button>
       </form>
 
 
-      <p className="text-[14px] text-grey-600 dark:text-muted-foreground">
+      <p className="text-[13px] text-grey-600 min-[480px]:text-[14px] dark:text-muted-foreground">
         Run a business?{" "}
         <Link
           to="/register"
@@ -367,13 +367,15 @@ function Hero() {
     // are so the two scale alike: 5rem above (4.5rem on a phone), side
     // padding 8rem from 992px, 2rem below that, 1.5rem on a phone, and 3rem
     // between each block.
-    <header className="relative isolate overflow-x-clip px-6 pt-[4.5rem] text-center min-[480px]:px-8 min-[480px]:pt-20 min-[992px]:px-32">
+    <header className="relative isolate overflow-x-clip px-[17px] pt-[50px] text-center min-[480px]:px-8 min-[480px]:pt-20 min-[992px]:px-32">
       <NetworkBackground className={network.className} style={network.style} />
-      {/* Blinq's 3rem gaps from 480px up; tighter on a phone, so the top of
-          the photo still shows on the first screen under the search. */}
-      <div className="mx-auto grid max-w-[120rem] grid-cols-[minmax(0,1fr)] gap-8 min-[480px]:gap-12">
-        <div className="grid gap-8 min-[480px]:gap-12">
-          <div className="grid justify-items-center gap-5">
+      {/* Blinq's 3rem gaps from 480px up. Below 480px, Blinq's phone layout
+          as measured at 390px: 17px sides, 50px above, a 42px headline, 14px
+          sub-copy, 28px between blocks, a 45px-tall action row, 21px video
+          corners, so the whole video sits on the first screen. */}
+      <div className="mx-auto grid max-w-[120rem] grid-cols-[minmax(0,1fr)] gap-7 min-[480px]:gap-12">
+        <div className="grid gap-7 min-[480px]:gap-12">
+          <div className="grid justify-items-center gap-4 min-[480px]:gap-5">
             <span
               style={label.style}
               className={cn(
@@ -387,7 +389,7 @@ function Hero() {
               </span>
               Malaysia’s verified business network
             </span>
-            <h1 className="mx-auto w-full font-display text-[3.75rem] leading-none font-semibold tracking-[-0.03em] text-ink min-[480px]:w-3/4 min-[480px]:text-[4.5rem] min-[768px]:w-[65%] min-[992px]:w-auto min-[992px]:max-w-[52rem] dark:text-foreground">
+            <h1 className="mx-auto w-[80%] font-display text-[42px] leading-none font-semibold tracking-[-0.03em] text-ink min-[480px]:w-3/4 min-[480px]:text-[4.5rem] min-[768px]:w-[65%] min-[992px]:w-auto min-[992px]:max-w-[52rem] dark:text-foreground">
               <span className={cn("block", line1.className)} style={line1.style}>
                 Do business with people
               </span>
@@ -397,9 +399,9 @@ function Hero() {
             </h1>
           </div>
 
-          <div className="mx-auto grid w-full max-w-[50rem] gap-6 min-[480px]:gap-8">
+          <div className="mx-auto grid w-full max-w-[50rem] gap-7 min-[480px]:gap-8">
             <p
-              className={cn("text-[1.25rem] leading-[1.35] text-grey-600 dark:text-muted-foreground", subCopy.className)}
+              className={cn("mx-auto w-[85%] text-[14px] leading-[1.35] text-grey-600 min-[480px]:w-auto min-[480px]:text-[1.25rem] dark:text-muted-foreground", subCopy.className)}
               style={subCopy.style}
             >
               Find partners, build trust and discover opportunities.
@@ -410,7 +412,7 @@ function Hero() {
           </div>
 
           {/* 2rem above the row rather than the hero's usual 3rem. */}
-          <div className={cn("-mt-2 min-w-0 min-[480px]:-mt-4", row.className)} style={row.style}>
+          <div className={cn("min-w-0 min-[480px]:-mt-4", row.className)} style={row.style}>
             <IndustryTicker />
           </div>
         </div>
@@ -422,7 +424,7 @@ function Hero() {
           className={cn("relative mx-auto w-full max-w-[90rem] min-[768px]:max-[991px]:w-3/4", photo.className)}
           style={photo.style}
         >
-          <div className="aspect-video overflow-hidden rounded-[30px] bg-surface-2 min-[480px]:rounded-[3.125rem] dark:bg-muted">
+          <div className="aspect-video overflow-hidden rounded-[21px] bg-surface-2 min-[480px]:rounded-[3.125rem] dark:bg-muted">
             {HERO_VIDEO ? (
               <video
                 ref={mediaRef}
