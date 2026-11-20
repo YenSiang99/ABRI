@@ -11,4 +11,6 @@ const COMPANY_LEGAL_NAME = "[ABRI's registered company name and SSM number]";
 // this is true they carry a banner saying so. Set it to false once reviewed.
 const LEGAL_DRAFT = true;
 
-export { CONTACT_EMAIL, COMPANY_LEGAL_NAME, LEGAL_DRAFT };
+const SITE_ORIGIN = (import.meta.env.VITE_SITE_URL || "https://abri.asia").replace(/\/$/, "");
+
+export { CONTACT_EMAIL, COMPANY_LEGAL_NAME, LEGAL_DRAFT, SITE_ORIGIN };

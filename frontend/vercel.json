@@ -1,5 +1,17 @@
 {
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "https://abri-b855.onrender.com/seo/sitemap.xml" },
+    { "source": "/sitemaps/:path*", "destination": "https://abri-b855.onrender.com/seo/sitemaps/:path*" },
+    {
+      "source": "/business/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|googlebot|bingbot|applebot|bytespider|gptbot|claudebot|perplexitybot|ccbot|yandexbot).*" }],
+      "destination": "https://abri-b855.onrender.com/seo/share/business/:id"
+    },
+    {
+      "source": "/m/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|googlebot|bingbot|applebot|bytespider|gptbot|claudebot|perplexitybot|ccbot|yandexbot).*" }],
+      "destination": "https://abri-b855.onrender.com/seo/share/business/:id"
+    },
     { "source": "/api/:path*", "destination": "https://abri-b855.onrender.com/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 
 import { InfoPage } from "./InfoPage";
-import { CONTACT_EMAIL } from "@/lib/site";
+import { CONTACT_EMAIL, SITE_ORIGIN } from "@/lib/site";
+import { Seo } from "@/components/Seo";
 
 // Every answer here describes what the product does today. When a flow
 // changes (claims, verification, the Founding programme), change its answer.
@@ -67,8 +68,30 @@ const QUESTIONS = [
   },
 ];
 
+const FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    ["Why is my business on ABRI?", "ABRI builds its directory from public open map data, government registers, and businesses' own websites. Owners can claim a listing to manage it."],
+    ["How do I claim my business?", "Find the business in the ABRI directory, then claim it with your details and the business SSM registration number."],
+    ["How long does verification take?", "ABRI checks registration details against the SSM register, usually within a couple of business days."],
+    ["What does it cost?", "Joining ABRI is free. Paid plans are optional and available for additional features."],
+    ["Can I pay for the SSM-Verified badge?", "No. The badge means ABRI checked the business registration against the SSM register; payment does not unlock the verification badge."],
+    ["How do I change or remove my business details?", "Claim the listing, then edit or remove supported public business details from the member profile."],
+    ["Who can see my phone number and email?", "Contact details are gated by ABRI membership rules. Public visitors can generally see the business name, area, address, and website."],
+    ["What is an endorsement?", "An endorsement is a verified ABRI business publicly confirming that it worked with another business and stands behind it."],
+  ].map(([question, answer]) => ({
+    "@type": "Question",
+    name: question,
+    acceptedAnswer: { "@type": "Answer", text: answer },
+  })),
+  "@id": `${SITE_ORIGIN}/faq#faq`,
+};
+
 function Faq() {
   return (
+    <>
+    <Seo title="Frequently Asked Questions" description="Answers about ABRI business claims, SSM verification, privacy, membership plans, public listings, and endorsements." path="/faq" jsonLd={FAQ_SCHEMA} />
     <InfoPage eyebrow="Help" title="Frequently asked questions">
       <p>
         Can&rsquo;t find your answer? <Link to="/ask">Ask ABRI</Link> in your own words.
@@ -80,6 +103,7 @@ function Faq() {
         </div>
       ))}
     </InfoPage>
+    </>
   );
 }
 
