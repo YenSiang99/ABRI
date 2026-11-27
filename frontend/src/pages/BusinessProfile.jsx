@@ -30,6 +30,8 @@ import { UpgradePrompt, useUpgradeGate } from "@/components/app/UpgradePrompt";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast";
 import { UNCLAIMED } from "@/lib/verificationLevels";
+import { Seo } from "@/components/Seo";
+import { SITE_ORIGIN } from "@/lib/site";
 
 function EndorsementCard({ endorsement }) {
   return (
@@ -116,6 +118,41 @@ function BusinessProfile({ inApp = false }) {
   }, [id]);
 
   const status = loadedId !== id ? "loading" : (error ?? "ready");
+  const profilePath = `/business/${encodeURIComponent(id)}`;
+  const profileDescription = business
+    ? [business.description, `${business.name} is a ${business.category} business${business.location ? ` in ${business.location}` : ""} on ABRI.`]
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .slice(0, 157)
+    : "View verified public business information on ABRI.";
+  const profileSchema = business
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": `${SITE_ORIGIN}${profilePath}#organization`,
+        name: business.name,
+        url: `${SITE_ORIGIN}${profilePath}`,
+        description: business.description || profileDescription,
+        ...(business.website ? { sameAs: [business.website] } : {}),
+        ...(business.address ? { address: { "@type": "PostalAddress", streetAddress: business.address, addressCountry: "MY" } } : {}),
+        ...(Number.isFinite(business.lat) && Number.isFinite(business.lng)
+          ? { geo: { "@type": "GeoCoordinates", latitude: business.lat, longitude: business.lng } }
+          : {}),
+        ...(business.services?.length ? { knowsAbout: business.services } : {}),
+        ...(business.ssm ? { identifier: business.ssm } : {}),
+      }
+    : undefined;
+  const profileSeo = (
+    <Seo
+      title={business ? `${business.name} — ${business.category} in ${business.location || "Malaysia"}` : "Business Profile"}
+      description={profileDescription}
+      path={profilePath}
+      type={business ? "profile" : "website"}
+      noindex={inApp || !business}
+      jsonLd={profileSchema}
+    />
+  );
 
   // Submitting an endorsement no longer changes anything visible immediately —
   // it's pending until the receiver accepts (see the Endorsement review state
@@ -213,28 +250,34 @@ function BusinessProfile({ inApp = false }) {
 
   if (status === "loading") {
     return (
-      <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
-        <p className="text-grey-600 dark:text-muted-foreground">Loading…</p>
-      </div>
+      <>
+        {profileSeo}
+        <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
+          <p className="text-grey-600 dark:text-muted-foreground">Loading…</p>
+        </div>
+      </>
     );
   }
 
   if (status !== "ready") {
     return (
-      <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
-        <p className="text-grey-600 dark:text-muted-foreground">
-          {status === "notfound"
-            ? "We couldn't find that business."
-            : "Something went wrong loading this business. Please try again."}
-        </p>
-        <Link
-          to={backLink.to}
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-ink hover:underline dark:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-          {backLink.label}
-        </Link>
-      </div>
+      <>
+        {profileSeo}
+        <div className="mx-auto max-w-[1200px] px-6 py-24 text-center">
+          <p className="text-grey-600 dark:text-muted-foreground">
+            {status === "notfound"
+              ? "We couldn't find that business."
+              : "Something went wrong loading this business. Please try again."}
+          </p>
+          <Link
+            to={backLink.to}
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-ink hover:underline dark:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            {backLink.label}
+          </Link>
+        </div>
+      </>
     );
   }
 
@@ -256,7 +299,9 @@ function BusinessProfile({ inApp = false }) {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <>
+      {profileSeo}
+      <div className="mx-auto max-w-5xl px-6 py-10">
       <Link
         to={backLink.to}
         className="inline-flex items-center gap-1.5 text-sm font-bold text-grey-600 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground"
@@ -401,7 +446,8 @@ function BusinessProfile({ inApp = false }) {
           <UpgradePrompt gate={endorsementGate} />
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

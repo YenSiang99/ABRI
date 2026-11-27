@@ -3,6 +3,7 @@ import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { NavBar } from "@/components/layout/NavBar";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { RouteSeo } from "@/components/RouteSeo";
 import { ProtectedRoute } from "@/components/routing/ProtectedRoute";
 import { Landing } from "@/pages/Landing";
 import { Login } from "@/pages/auth/Login";
@@ -62,6 +63,7 @@ function ChatLayout() {
 function App() {
   return (
     <>
+      <RouteSeo />
       <ScrollToTop />
       <Routes>
         <Route element={<PublicLayout />}>

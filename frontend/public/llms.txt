@@ -1,0 +1,23 @@
+# ABRI
+
+> ABRI is a Malaysian business network for public company discovery, SSM verification evidence, and peer endorsements.
+
+Canonical website: https://abri.asia/
+
+## Primary public resources
+
+- [Business directory](https://abri.asia/directory): Browse and filter Malaysian business listings.
+- [About ABRI](https://abri.asia/about): How verification and the business network work.
+- [Frequently asked questions](https://abri.asia/faq): Claims, SSM verification, privacy, plans, and endorsements.
+- [Contact ABRI](https://abri.asia/contact): Contact routes and support.
+- [Ask ABRI](https://abri.asia/ask): Interactive questions about the platform.
+
+## Entity profiles
+
+Individual public company profiles use `https://abri.asia/business/{business-id}`. Their structured data and visible page content are authoritative for profile-specific facts.
+
+## Crawl guidance
+
+- The canonical business index is linked from /sitemap.xml.
+- Member-only, account, recovery, claim-token, and administrative paths must not be indexed.
+- Public source attribution, privacy, and licensing statements are in /privacy and the site footer.

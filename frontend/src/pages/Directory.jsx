@@ -6,12 +6,13 @@ import { fetchBusinessPage } from "@/lib/api/businesses";
 import { Pagination } from "@/components/Pagination";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { CategoryAreaFilters } from "@/components/directory/CategoryAreaFilters";
+import { Seo } from "@/components/Seo";
+import { SITE_ORIGIN } from "@/lib/site";
 
 function Directory() {
-  // The page lives in the URL (?page=3), so Back returns to it and a page can
-  // be linked. Filters and search don't, and changing one starts again at 1 —
-  // except on arrival: the homepage search hands over ?q=, ?category= and
-  // ?location=, read once here as the starting values.
+  // Page, filters, and search all live in the URL, so Back works and the same
+  // directory state can be copied or shared. Changing a filter starts at page
+  // one while the homepage can hand over ?q=, ?category= and ?location=.
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [place, setPlace] = useState(() => ({
@@ -23,12 +24,33 @@ function Directory() {
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(24);
 
+  // Local input state is responsive while the debounced API request runs, but
+  // browser Back/Forward must still restore filters from the URL. Comparing
+  // values before setting keeps normal page/filter navigation from causing an
+  // extra render or request.
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") ?? "";
+    const urlCategory = searchParams.get("category") ?? "";
+    const urlLocation = searchParams.get("location") ?? "";
+    setQuery((current) => current === urlQuery ? current : urlQuery);
+    setPlace((current) =>
+      current.category === urlCategory && current.location === urlLocation
+        ? current
+        : { category: urlCategory, location: urlLocation },
+    );
+  }, [searchParams]);
+
   const page = Math.max(1, Number(searchParams.get("page")) || 1);
   const goTo = useCallback(
     (n, { replace = false } = {}) => {
-      setSearchParams(n > 1 ? { page: String(n) } : {}, { replace });
+      const next = new URLSearchParams();
+      if (query.trim()) next.set("q", query.trim());
+      if (place.category) next.set("category", place.category);
+      if (place.location) next.set("location", place.location);
+      if (n > 1) next.set("page", String(n));
+      setSearchParams(next, { replace });
     },
-    [setSearchParams],
+    [place.category, place.location, query, setSearchParams],
   );
 
   // Compared by value, not run on every render of its dependencies:
@@ -92,8 +114,43 @@ function Directory() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function directoryPath(targetPage = page) {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (place.category) params.set("category", place.category);
+    if (place.location) params.set("location", place.location);
+    if (targetPage > 1) params.set("page", String(targetPage));
+    return `/directory${params.size ? `?${params}` : ""}`;
+  }
+
+  const directoryTitle = [place.category, place.location].filter(Boolean).join(" businesses in ")
+    || "Malaysia Business Directory";
+  const itemList = status === "ready" && businesses.length > 0
+    ? {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        numberOfItems: total,
+        itemListElement: businesses.map((business, index) => ({
+          "@type": "ListItem",
+          position: (page - 1) * pageSize + index + 1,
+          url: `${SITE_ORIGIN}/business/${encodeURIComponent(business.id)}`,
+          name: business.name,
+        })),
+      }
+    : undefined;
+
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-16">
+    <>
+      <Seo
+        title={directoryTitle}
+        description={`Browse ${directoryTitle.toLowerCase()} on ABRI and review public business details, registration evidence, and verification status.`}
+        path={directoryPath()}
+        noindex={Boolean(q)}
+        prev={page > 1 ? directoryPath(page - 1) : undefined}
+        next={page < totalPages ? directoryPath(page + 1) : undefined}
+        jsonLd={itemList}
+      />
+      <div className="mx-auto max-w-[1200px] px-6 py-16">
       <span className="text-[11px] font-bold tracking-[0.14em] text-grey-500 uppercase dark:text-muted-foreground">
         The verified business network
       </span>
@@ -132,7 +189,7 @@ function Directory() {
               ? `Showing ${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()} businesses`
               : `${total.toLocaleString()} ${total === 1 ? "business" : "businesses"}`}
           </div>
-          <Pagination page={page} totalPages={totalPages} onChange={changePage} />
+          <Pagination page={page} totalPages={totalPages} getHref={directoryPath} onChange={changePage} />
         </div>
       )}
 
@@ -153,6 +210,7 @@ function Directory() {
             className="mt-10"
             page={page}
             totalPages={totalPages}
+            getHref={directoryPath}
             onChange={changePage}
           />
           {totalPages > 1 && (
@@ -170,7 +228,8 @@ function Directory() {
               : "No businesses match this filter."}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
